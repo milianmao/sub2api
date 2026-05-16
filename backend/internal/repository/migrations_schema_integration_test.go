@@ -24,6 +24,17 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	// users: columns required by repository queries
 	requireColumn(t, tx, "users", "username", "character varying", 100, false)
 	requireColumn(t, tx, "users", "notes", "text", 0, false)
+	requireColumn(t, tx, "users", "level", "integer", 0, false)
+	requireColumnDefaultContains(t, tx, "users", "level", "0")
+	requireConstraintDefinitionContains(t, tx, "users", "users_level_non_negative", "level", "0")
+
+	// groups: authorization fields
+	requireColumn(t, tx, "groups", "access_mode", "character varying", 20, false)
+	requireColumnDefaultContains(t, tx, "groups", "access_mode", "public")
+	requireConstraintDefinitionContains(t, tx, "groups", "groups_access_mode_check", "access_mode", "'public'", "'restricted'")
+	requireColumn(t, tx, "groups", "min_user_level", "integer", 0, false)
+	requireColumnDefaultContains(t, tx, "groups", "min_user_level", "0")
+	requireConstraintDefinitionContains(t, tx, "groups", "groups_min_user_level_non_negative", "min_user_level", "0")
 
 	// accounts: schedulable and rate-limit fields
 	requireColumn(t, tx, "accounts", "notes", "text", 0, true)

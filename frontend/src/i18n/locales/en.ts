@@ -1708,6 +1708,7 @@ export default {
       searchGroups: 'Search groups...',
       fuzzySearch: 'Fuzzy search',
       admin: 'Admin',
+      superAdmin: 'Super Admin',
       user: 'User',
       disabled: 'Disabled',
       email: 'Email',
@@ -1737,6 +1738,7 @@ export default {
         username: 'Username',
         notes: 'Notes',
         role: 'Role',
+        level: 'Level',
         groups: 'Groups',
         subscriptions: 'Subscriptions',
         balance: 'Balance',
@@ -1754,6 +1756,7 @@ export default {
       publicGroupCount: '+{count} public',
       exclusiveLabel: 'exclusive',
       publicLabel: 'public',
+      restrictedLabel: 'restricted',
       daysRemaining: '{days}d',
       expired: 'Expired',
       disable: 'Disable',
@@ -1856,6 +1859,7 @@ export default {
       totalRecharged: 'Total Recharged',
       roles: {
         admin: 'Admin',
+        super_admin: 'Super Admin',
         user: 'User'
       },
       // Settings Dropdowns
@@ -1941,9 +1945,14 @@ export default {
       exclusive: 'Exclusive',
       nonExclusive: 'Non-Exclusive',
       public: 'Public',
+      accessModes: {
+        public: 'Public',
+        restricted: 'Restricted'
+      },
       columns: {
         name: 'Name',
         platform: 'Platform',
+        access: 'Access',
         rateMultiplier: 'Rate Multiplier',
         rpmOverride: 'RPM Override',
         rpmOverrideHint: 'Per-user RPM cap in this group; empty = group default; 0 = unlimited',
@@ -1976,6 +1985,11 @@ export default {
         rateMultiplier: 'Rate Multiplier',
         status: 'Status',
         exclusive: 'Exclusive Group',
+        accessMode: 'Access Mode',
+        accessModeHint: 'Public groups require the minimum user level. Restricted groups require both explicit access and the minimum user level.',
+        minUserLevel: 'Minimum User Level',
+        minUserLevelPlaceholder: '0 = no level requirement',
+        minUserLevelHint: 'Users must be at or above this level. Restricted groups still require explicit access.',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
         rpmLimitHint: 'Max requests per minute for each user in this group; 0 = unlimited. Once set, it takes over per-user rate limiting in this group (overrides the user-level rpm_limit fallback).'

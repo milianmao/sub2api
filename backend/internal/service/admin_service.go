@@ -123,6 +123,7 @@ type CreateUserInput struct {
 	Balance       float64
 	Concurrency   int
 	RPMLimit      int
+	Level         int
 	AllowedGroups []int64
 }
 
@@ -134,6 +135,7 @@ type UpdateUserInput struct {
 	Balance       *float64 // 使用指针区分"未提供"和"设置为0"
 	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
 	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
+	Level         *int
 	Status        string
 	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
 	// GroupRates 用户专属分组倍率配置
@@ -185,6 +187,8 @@ type CreateGroupInput struct {
 	Platform         string
 	RateMultiplier   float64
 	IsExclusive      bool
+	AccessMode       string
+	MinUserLevel     int
 	SubscriptionType string   // standard/subscription
 	DailyLimitUSD    *float64 // 日限额 (USD)
 	WeeklyLimitUSD   *float64 // 周限额 (USD)
@@ -224,6 +228,8 @@ type UpdateGroupInput struct {
 	Platform         string
 	RateMultiplier   *float64 // 使用指针以支持设置为0
 	IsExclusive      *bool
+	AccessMode       *string
+	MinUserLevel     *int
 	Status           string
 	SubscriptionType string   // standard/subscription
 	DailyLimitUSD    *float64 // 日限额 (USD)
@@ -337,7 +343,7 @@ type BulkUpdateAccountResult struct {
 // AdminUpdateAPIKeyGroupIDResult is the result of AdminUpdateAPIKeyGroupID.
 type AdminUpdateAPIKeyGroupIDResult struct {
 	APIKey                 *APIKey
-	AutoGrantedGroupAccess bool   // true if a new exclusive group permission was auto-added
+	AutoGrantedGroupAccess bool   // true if restricted group permission was auto-added
 	GrantedGroupID         *int64 // the group ID that was auto-granted
 	GrantedGroupName       string // the group name that was auto-granted
 }
@@ -661,6 +667,10 @@ func (s *adminServiceImpl) GetUser(ctx context.Context, id int64) (*User, error)
 }
 
 func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInput) (*User, error) {
+	if input.Level < 0 {
+		return nil, fmt.Errorf("level must be >= 0")
+	}
+
 	user := &User{
 		Email:         input.Email,
 		Username:      input.Username,
@@ -669,6 +679,7 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 		Balance:       input.Balance,
 		Concurrency:   input.Concurrency,
 		RPMLimit:      input.RPMLimit,
+		Level:         input.Level,
 		Status:        StatusActive,
 		AllowedGroups: input.AllowedGroups,
 	}
@@ -723,6 +734,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	oldStatus := user.Status
 	oldRole := user.Role
 	oldRPMLimit := user.RPMLimit
+	oldLevel := user.Level
 
 	if input.Email != "" {
 		user.Email = input.Email
@@ -752,6 +764,13 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 		user.RPMLimit = *input.RPMLimit
 	}
 
+	if input.Level != nil {
+		if *input.Level < 0 {
+			return nil, fmt.Errorf("level must be >= 0")
+		}
+		user.Level = *input.Level
+	}
+
 	if input.AllowedGroups != nil {
 		user.AllowedGroups = *input.AllowedGroups
 	}
@@ -770,7 +789,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	if s.authCacheInvalidator != nil {
 		// RPMLimit 直接参与 billing_cache_service.checkRPM 的三级级联，
 		// 不失效缓存会让修改在一个 L2 TTL 内失去效果。
-		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit {
+		if user.Concurrency != oldConcurrency || user.Status != oldStatus || user.Role != oldRole || user.RPMLimit != oldRPMLimit || user.Level != oldLevel || input.AllowedGroups != nil {
 			s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, user.ID)
 		}
 	}
@@ -1577,6 +1596,9 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if input.RateMultiplier <= 0 {
 		return nil, errors.New("rate_multiplier must be > 0")
 	}
+	if input.MinUserLevel < 0 {
+		return nil, fmt.Errorf("min_user_level must be >= 0")
+	}
 
 	platform := input.Platform
 	if platform == "" {
@@ -1660,12 +1682,19 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		}
 	}
 
+	accessMode, err := normalizeGroupAccessMode(input.AccessMode, input.IsExclusive)
+	if err != nil {
+		return nil, err
+	}
+
 	group := &Group{
 		Name:                            input.Name,
 		Description:                     input.Description,
 		Platform:                        platform,
 		RateMultiplier:                  input.RateMultiplier,
 		IsExclusive:                     input.IsExclusive,
+		AccessMode:                      accessMode,
+		MinUserLevel:                    input.MinUserLevel,
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
 		DailyLimitUSD:                   dailyLimit,
@@ -1741,6 +1770,20 @@ func normalizePrice(price *float64) *float64 {
 		return nil
 	}
 	return price
+}
+
+func normalizeGroupAccessMode(accessMode string, isExclusive bool) (string, error) {
+	switch accessMode {
+	case GroupAccessModePublic, GroupAccessModeRestricted:
+		return accessMode, nil
+	case "":
+		if isExclusive {
+			return GroupAccessModeRestricted, nil
+		}
+		return GroupAccessModePublic, nil
+	default:
+		return "", fmt.Errorf("access_mode must be %q or %q", GroupAccessModePublic, GroupAccessModeRestricted)
+	}
 }
 
 // validateFallbackGroup 校验降级分组的有效性
@@ -1835,6 +1878,26 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.IsExclusive != nil {
 		group.IsExclusive = *input.IsExclusive
+		if input.AccessMode == nil {
+			accessMode, err := normalizeGroupAccessMode(group.AccessMode, group.IsExclusive)
+			if err != nil {
+				return nil, err
+			}
+			group.AccessMode = accessMode
+		}
+	}
+	if input.AccessMode != nil {
+		accessMode, err := normalizeGroupAccessMode(*input.AccessMode, group.IsExclusive)
+		if err != nil {
+			return nil, err
+		}
+		group.AccessMode = accessMode
+	}
+	if input.MinUserLevel != nil {
+		if *input.MinUserLevel < 0 {
+			return nil, fmt.Errorf("min_user_level must be >= 0")
+		}
+		group.MinUserLevel = *input.MinUserLevel
 	}
 	if input.Status != "" {
 		group.Status = input.Status
@@ -2160,6 +2223,23 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 		if group.Status != StatusActive {
 			return nil, infraerrors.BadRequest("GROUP_NOT_ACTIVE", "target group is not active")
 		}
+
+		if group.MinUserLevel > 0 {
+			owner := apiKey.User
+			if owner == nil {
+				if s.userRepo == nil {
+					return nil, infraerrors.InternalServer("USER_REPOSITORY_UNAVAILABLE", "user repository is not configured")
+				}
+				owner, err = s.userRepo.GetByID(ctx, apiKey.UserID)
+				if err != nil {
+					return nil, err
+				}
+			}
+			if owner.Level < group.MinUserLevel {
+				return nil, ErrGroupNotAllowed
+			}
+		}
+
 		// 订阅类型分组：用户须持有该分组的有效订阅才可绑定
 		if group.IsSubscriptionType() {
 			if s.userSubRepo == nil {
@@ -2177,12 +2257,15 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 		apiKey.GroupID = &gid
 		apiKey.Group = group
 
-		// 专属标准分组：使用事务保证「添加分组权限」与「更新 API Key」的原子性
-		if group.IsExclusive && !group.IsSubscriptionType() {
+		// 受限分组：使用事务保证「添加分组权限」与「更新 API Key」的原子性
+		if group.IsRestrictedAccess() {
+			if s.userRepo == nil {
+				return nil, infraerrors.InternalServer("USER_REPOSITORY_UNAVAILABLE", "user repository is not configured")
+			}
 			opCtx := ctx
 			var tx *dbent.Tx
 			if s.entClient == nil {
-				logger.LegacyPrintf("service.admin", "Warning: entClient is nil, skipping transaction protection for exclusive group binding")
+				logger.LegacyPrintf("service.admin", "Warning: entClient is nil, skipping transaction protection for restricted group binding")
 			} else {
 				var txErr error
 				tx, txErr = s.entClient.Tx(ctx)

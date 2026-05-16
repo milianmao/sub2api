@@ -11,6 +11,7 @@ type User struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	Role          string     `json:"role"`
+	Level         int        `json:"level"`
 	Balance       float64    `json:"balance"`
 	Concurrency   int        `json:"concurrency"`
 	Status        string     `json:"status"`
@@ -86,6 +87,8 @@ type Group struct {
 	Platform       string  `json:"platform"`
 	RateMultiplier float64 `json:"rate_multiplier"`
 	IsExclusive    bool    `json:"is_exclusive"`
+	AccessMode     string  `json:"access_mode"`
+	MinUserLevel   int     `json:"min_user_level"`
 	Status         string  `json:"status"`
 
 	SubscriptionType string   `json:"subscription_type"`

@@ -14,8 +14,15 @@ const (
 
 // Role constants
 const (
-	RoleAdmin = domain.RoleAdmin
-	RoleUser  = domain.RoleUser
+	RoleSuperAdmin = domain.RoleSuperAdmin
+	RoleAdmin      = domain.RoleAdmin
+	RoleUser       = domain.RoleUser
+)
+
+// Group access mode constants
+const (
+	GroupAccessModePublic     = domain.GroupAccessModePublic
+	GroupAccessModeRestricted = domain.GroupAccessModeRestricted
 )
 
 // Affiliate rebate settings

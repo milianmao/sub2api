@@ -54,6 +54,8 @@ func (s *GroupRepoSuite) TestCreate() {
 		Platform:         service.PlatformAnthropic,
 		RateMultiplier:   1.0,
 		IsExclusive:      false,
+		AccessMode:       service.GroupAccessModeRestricted,
+		MinUserLevel:     2,
 		Status:           service.StatusActive,
 		SubscriptionType: service.SubscriptionTypeStandard,
 	}
@@ -65,6 +67,8 @@ func (s *GroupRepoSuite) TestCreate() {
 	got, err := s.repo.GetByID(s.ctx, group.ID)
 	s.Require().NoError(err, "GetByID")
 	s.Require().Equal("test-create", got.Name)
+	s.Require().Equal(service.GroupAccessModeRestricted, got.AccessMode)
+	s.Require().Equal(2, got.MinUserLevel)
 }
 
 func (s *GroupRepoSuite) TestGetByID_NotFound() {
@@ -105,12 +109,16 @@ func (s *GroupRepoSuite) TestUpdate() {
 	s.Require().NoError(s.repo.Create(s.ctx, group))
 
 	group.Name = "updated"
+	group.AccessMode = service.GroupAccessModeRestricted
+	group.MinUserLevel = 4
 	err := s.repo.Update(s.ctx, group)
 	s.Require().NoError(err, "Update")
 
 	got, err := s.repo.GetByID(s.ctx, group.ID)
 	s.Require().NoError(err, "GetByID after update")
 	s.Require().Equal("updated", got.Name)
+	s.Require().Equal(service.GroupAccessModeRestricted, got.AccessMode)
+	s.Require().Equal(4, got.MinUserLevel)
 }
 
 func (s *GroupRepoSuite) TestGetByID_PreservesMessagesDispatchModelConfig() {

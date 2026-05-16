@@ -13,6 +13,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/service"
+	"github.com/lib/pq"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 
@@ -81,7 +82,11 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.hydrateAPIKeyAuthorizationFields(ctx, []*service.APIKey{out}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // GetKeyAndOwnerID 根据 API Key ID 获取其 key 与所有者（用户）ID。
@@ -115,7 +120,11 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.hydrateAPIKeyAuthorizationFields(ctx, []*service.APIKey{out}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*service.APIKey, error) {
@@ -193,7 +202,11 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 		}
 		return nil, err
 	}
-	return apiKeyEntityToService(m), nil
+	out := apiKeyEntityToService(m)
+	if err := r.hydrateAPIKeyAuthorizationFields(ctx, []*service.APIKey{out}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) error {
@@ -611,6 +624,234 @@ func (r *apiKeyRepository) GetRateLimitData(ctx context.Context, id int64) (resu
 		return nil, err
 	}
 	return data, rows.Err()
+}
+
+func (r *apiKeyRepository) hydrateAPIKeyAuthorizationFields(ctx context.Context, keys []*service.APIKey) error {
+	exec := txAwareSQLExecutor(ctx, r.sql, r.client)
+	if exec == nil {
+		return fmt.Errorf("sql executor is not configured")
+	}
+
+	users := make([]*service.User, 0, len(keys))
+	groups := make([]*service.Group, 0, len(keys))
+	for _, key := range keys {
+		if key == nil {
+			continue
+		}
+		if key.User != nil {
+			users = append(users, key.User)
+		}
+		if key.Group != nil {
+			groups = append(groups, key.Group)
+		}
+	}
+
+	if err := hydrateUserAuthorizationFields(ctx, exec, users, true); err != nil {
+		return err
+	}
+	if err := hydrateGroupAuthorizationFields(ctx, exec, groups); err != nil {
+		return err
+	}
+	return nil
+}
+
+func hydrateUserAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, users []*service.User, includeAllowedGroups bool) error {
+	if len(users) == 0 {
+		return nil
+	}
+	if exec == nil {
+		return fmt.Errorf("sql executor is not configured")
+	}
+
+	byID := make(map[int64]*service.User, len(users))
+	ids := make([]int64, 0, len(users))
+	for _, user := range users {
+		if user == nil || user.ID <= 0 {
+			continue
+		}
+		if _, exists := byID[user.ID]; exists {
+			continue
+		}
+		byID[user.ID] = user
+		ids = append(ids, user.ID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	rows, err := exec.QueryContext(ctx, `
+		SELECT id, level
+		FROM users
+		WHERE id = ANY($1) AND deleted_at IS NULL
+	`, pq.Array(ids))
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var (
+			userID int64
+			level  int
+		)
+		if err := rows.Scan(&userID, &level); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if user, ok := byID[userID]; ok {
+			user.Level = level
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if !includeAllowedGroups {
+		return nil
+	}
+	for _, user := range byID {
+		user.AllowedGroups = nil
+	}
+
+	rows, err = exec.QueryContext(ctx, `
+		SELECT user_id, group_id
+		FROM user_allowed_groups
+		WHERE user_id = ANY($1)
+		ORDER BY user_id, group_id
+	`, pq.Array(ids))
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var (
+			userID  int64
+			groupID int64
+		)
+		if err := rows.Scan(&userID, &groupID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if user, ok := byID[userID]; ok {
+			user.AllowedGroups = append(user.AllowedGroups, groupID)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	return rows.Err()
+}
+
+func hydrateGroupAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, groups []*service.Group) error {
+	if len(groups) == 0 {
+		return nil
+	}
+	if exec == nil {
+		return fmt.Errorf("sql executor is not configured")
+	}
+
+	byID := make(map[int64]*service.Group, len(groups))
+	ids := make([]int64, 0, len(groups))
+	for _, group := range groups {
+		if group == nil || group.ID <= 0 {
+			continue
+		}
+		if _, exists := byID[group.ID]; exists {
+			continue
+		}
+		byID[group.ID] = group
+		ids = append(ids, group.ID)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	rows, err := exec.QueryContext(ctx, `
+		SELECT id,
+			COALESCE(NULLIF(access_mode, ''), CASE WHEN is_exclusive THEN $2 ELSE $3 END) AS access_mode,
+			COALESCE(min_user_level, 0) AS min_user_level
+		FROM groups
+		WHERE id = ANY($1) AND deleted_at IS NULL
+	`, pq.Array(ids), service.GroupAccessModeRestricted, service.GroupAccessModePublic)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var (
+			groupID      int64
+			accessMode   string
+			minUserLevel int
+		)
+		if err := rows.Scan(&groupID, &accessMode, &minUserLevel); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if group, ok := byID[groupID]; ok {
+			group.AccessMode = accessMode
+			group.MinUserLevel = minUserLevel
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	return rows.Err()
+}
+
+func setUserAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, userID int64, level int) error {
+	if exec == nil {
+		return fmt.Errorf("sql executor is not configured")
+	}
+	res, err := exec.ExecContext(ctx, `
+		UPDATE users
+		SET level = $1
+		WHERE id = $2 AND deleted_at IS NULL
+	`, level, userID)
+	if err != nil {
+		return err
+	}
+	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
+		return service.ErrUserNotFound
+	}
+	return nil
+}
+
+func setGroupAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, groupIn *service.Group) error {
+	if exec == nil {
+		return fmt.Errorf("sql executor is not configured")
+	}
+	if groupIn == nil {
+		return nil
+	}
+	res, err := exec.ExecContext(ctx, `
+		UPDATE groups
+		SET access_mode = $1,
+			min_user_level = $2
+		WHERE id = $3 AND deleted_at IS NULL
+	`, repositoryGroupAccessMode(groupIn), groupIn.MinUserLevel, groupIn.ID)
+	if err != nil {
+		return err
+	}
+	if affected, err := res.RowsAffected(); err == nil && affected == 0 {
+		return service.ErrGroupNotFound
+	}
+	return nil
+}
+
+func repositoryGroupAccessMode(groupIn *service.Group) string {
+	if groupIn == nil {
+		return service.GroupAccessModePublic
+	}
+	switch groupIn.AccessMode {
+	case service.GroupAccessModePublic, service.GroupAccessModeRestricted:
+		return groupIn.AccessMode
+	case "":
+		if groupIn.IsExclusive {
+			return service.GroupAccessModeRestricted
+		}
+		return service.GroupAccessModePublic
+	default:
+		return service.GroupAccessModePublic
+	}
 }
 
 func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {

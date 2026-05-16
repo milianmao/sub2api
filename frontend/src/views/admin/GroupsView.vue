@@ -193,6 +193,25 @@
             </span>
           </template>
 
+          <template #cell-access="{ row }">
+            <div class="space-y-1">
+              <span
+                :class="[
+                  'badge',
+                  row.access_mode === 'restricted' ? 'badge-warning' : 'badge-success',
+                ]"
+              >
+                {{ t("admin.groups.accessModes." + (row.access_mode || "public")) }}
+              </span>
+              <div
+                v-if="row.access_mode === 'restricted'"
+                class="text-xs text-gray-500 dark:text-gray-400"
+              >
+                {{ t("admin.groups.form.minUserLevel") }} {{ row.min_user_level ?? 0 }}
+              </div>
+            </div>
+          </template>
+
           <template #cell-account_count="{ row }">
             <div class="space-y-0.5 text-xs">
               <div>
@@ -511,6 +530,25 @@
             :placeholder="t('admin.groups.form.rpmLimitPlaceholder')"
           />
           <p class="input-hint">{{ t("admin.groups.form.rpmLimitHint") }}</p>
+        </div>
+        <div v-if="canEditAuthorization" class="space-y-4 border-t pt-4">
+          <div>
+            <label class="input-label">{{ t("admin.groups.form.accessMode") }}</label>
+            <Select v-model="createForm.access_mode" :options="accessModeOptions" />
+            <p class="input-hint">{{ t("admin.groups.form.accessModeHint") }}</p>
+          </div>
+          <div v-if="createForm.access_mode === 'restricted'">
+            <label class="input-label">{{ t("admin.groups.form.minUserLevel") }}</label>
+            <input
+              v-model.number="createForm.min_user_level"
+              type="number"
+              min="0"
+              step="1"
+              class="input"
+              :placeholder="t('admin.groups.form.minUserLevelPlaceholder')"
+            />
+            <p class="input-hint">{{ t("admin.groups.form.minUserLevelHint") }}</p>
+          </div>
         </div>
         <div
           v-if="createForm.subscription_type !== 'subscription'"
@@ -1695,6 +1733,25 @@
           />
           <p class="input-hint">{{ t("admin.groups.form.rpmLimitHint") }}</p>
         </div>
+        <div v-if="canEditAuthorization" class="space-y-4 border-t pt-4">
+          <div>
+            <label class="input-label">{{ t("admin.groups.form.accessMode") }}</label>
+            <Select v-model="editForm.access_mode" :options="accessModeOptions" />
+            <p class="input-hint">{{ t("admin.groups.form.accessModeHint") }}</p>
+          </div>
+          <div v-if="editForm.access_mode === 'restricted'">
+            <label class="input-label">{{ t("admin.groups.form.minUserLevel") }}</label>
+            <input
+              v-model.number="editForm.min_user_level"
+              type="number"
+              min="0"
+              step="1"
+              class="input"
+              :placeholder="t('admin.groups.form.minUserLevelPlaceholder')"
+            />
+            <p class="input-hint">{{ t("admin.groups.form.minUserLevelHint") }}</p>
+          </div>
+        </div>
         <div v-if="editForm.subscription_type !== 'subscription'">
           <div class="mb-1.5 flex items-center gap-1">
             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2838,6 +2895,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
+import { useAuthStore } from "@/stores/auth";
 import { adminAPI } from "@/api/admin";
 import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
 import type { Column } from "@/components/common/types";
@@ -2869,6 +2927,8 @@ import {
 const { t } = useI18n();
 const appStore = useAppStore();
 const onboardingStore = useOnboardingStore();
+const authStore = useAuthStore();
+const canEditAuthorization = computed(() => authStore.user?.role === "super_admin");
 
 const columns = computed<Column[]>(() => [
   { key: "name", label: t("admin.groups.columns.name"), sortable: true },
@@ -2891,6 +2951,11 @@ const columns = computed<Column[]>(() => [
     key: "is_exclusive",
     label: t("admin.groups.columns.type"),
     sortable: true,
+  },
+  {
+    key: "access",
+    label: t("admin.groups.columns.access"),
+    sortable: false,
   },
   {
     key: "account_count",
@@ -2943,6 +3008,11 @@ const editStatusOptions = computed(() => [
 const subscriptionTypeOptions = computed(() => [
   { value: "standard", label: t("admin.groups.subscription.standard") },
   { value: "subscription", label: t("admin.groups.subscription.subscription") },
+]);
+
+const accessModeOptions = computed(() => [
+  { value: "public", label: t("admin.groups.accessModes.public") },
+  { value: "restricted", label: t("admin.groups.accessModes.restricted") },
 ]);
 
 // 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
@@ -3105,6 +3175,8 @@ const createForm = reactive({
   platform: "anthropic" as GroupPlatform,
   rate_multiplier: 1.0,
   is_exclusive: false,
+  access_mode: "public" as "public" | "restricted",
+  min_user_level: 0,
   subscription_type: "standard" as SubscriptionType,
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
@@ -3389,6 +3461,8 @@ const editForm = reactive({
   platform: "anthropic" as GroupPlatform,
   rate_multiplier: 1.0,
   is_exclusive: false,
+  access_mode: "public" as "public" | "restricted",
+  min_user_level: 0,
   status: "active" as "active" | "inactive",
   subscription_type: "standard" as SubscriptionType,
   daily_limit_usd: null as number | null,
@@ -3637,6 +3711,8 @@ const closeCreateModal = () => {
   createForm.platform = "anthropic";
   createForm.rate_multiplier = 1.0;
   createForm.is_exclusive = false;
+  createForm.access_mode = "public";
+  createForm.min_user_level = 0;
   createForm.subscription_type = "standard";
   createForm.daily_limit_usd = null;
   createForm.weekly_limit_usd = null;
@@ -3729,6 +3805,12 @@ const handleCreateGroup = async () => {
     requestData.image_rate_multiplier = normalizeImageRateMultiplier(
       requestData.image_rate_multiplier,
     );
+    if (!canEditAuthorization.value) {
+      delete (requestData as Partial<typeof createForm>).access_mode;
+      delete (requestData as Partial<typeof createForm>).min_user_level;
+    } else if (requestData.access_mode === "public") {
+      requestData.min_user_level = 0;
+    }
     await adminAPI.groups.create(requestData);
     appStore.showSuccess(t("admin.groups.groupCreated"));
     closeCreateModal();
@@ -3755,6 +3837,8 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.platform = group.platform;
   editForm.rate_multiplier = group.rate_multiplier;
   editForm.is_exclusive = group.is_exclusive;
+  editForm.access_mode = group.access_mode ?? "public";
+  editForm.min_user_level = group.min_user_level ?? 0;
   editForm.status = group.status;
   editForm.subscription_type = group.subscription_type || "standard";
   editForm.daily_limit_usd = group.daily_limit_usd;
@@ -3808,6 +3892,8 @@ const closeEditModal = () => {
   editingGroup.value = null;
   editModelRoutingRules.value = [];
   editForm.copy_accounts_from_group_ids = [];
+  editForm.access_mode = "public";
+  editForm.min_user_level = 0;
   resetMessagesDispatchFormState(editForm);
 };
 
@@ -3860,6 +3946,12 @@ const handleUpdateGroup = async () => {
     payload.image_rate_multiplier = normalizeImageRateMultiplier(
       payload.image_rate_multiplier,
     );
+    if (!canEditAuthorization.value) {
+      delete (payload as Partial<typeof editForm>).access_mode;
+      delete (payload as Partial<typeof editForm>).min_user_level;
+    } else if (payload.access_mode === "public") {
+      payload.min_user_level = 0;
+    }
     await adminAPI.groups.update(editingGroup.value.id, payload);
     appStore.showSuccess(t("admin.groups.groupUpdated"));
     closeEditModal();

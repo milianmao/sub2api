@@ -1734,6 +1734,7 @@ export default {
       statusFilter: '状态筛选',
       allStatuses: '全部状态',
       admin: '管理员',
+      superAdmin: '超级管理员',
       user: '用户',
       disabled: '禁用',
       email: '邮箱',
@@ -1758,6 +1759,7 @@ export default {
         username: '用户名',
         notes: '备注',
         role: '角色',
+        level: '等级',
         groups: '分组',
         subscriptions: '订阅分组',
         balance: '余额',
@@ -1775,6 +1777,7 @@ export default {
       publicGroupCount: '+{count} 公开',
       exclusiveLabel: '专属',
       publicLabel: '公开',
+      restrictedLabel: '受限',
       daysRemaining: '{days}天',
       expired: '已过期',
       disable: '禁用',
@@ -1807,6 +1810,7 @@ export default {
       deleteConfirm: "确定要删除用户 '{email}' 吗？此操作无法撤销。",
       roles: {
         admin: '管理员',
+        super_admin: '超级管理员',
         user: '用户'
       },
       form: {
@@ -1994,6 +1998,7 @@ export default {
       columns: {
         name: '名称',
         platform: '平台',
+        access: '访问权限',
         rateMultiplier: '费率倍数',
         rpmOverride: 'RPM 覆盖',
         rpmOverrideHint: '该用户在此分组的 RPM 上限；留空 = 使用分组默认；0 = 不限制',
@@ -2027,6 +2032,11 @@ export default {
         rateMultiplier: '费率倍数',
         status: '状态',
         exclusive: '专属分组',
+        accessMode: '访问模式',
+        accessModeHint: '公开分组需要满足最低用户等级；受限分组需要同时满足显式授权和最低用户等级。',
+        minUserLevel: '最低用户等级',
+        minUserLevelPlaceholder: '0 表示不限制等级',
+        minUserLevelHint: '用户必须达到或高于该等级；受限分组仍需要显式授权。',
         nameLabel: '分组名称',
         namePlaceholder: '请输入分组名称',
         descriptionLabel: '描述',
@@ -2083,6 +2093,10 @@ export default {
       exclusiveFilter: '专属',
       nonExclusive: '公开',
       public: '公开',
+      accessModes: {
+        public: '公开',
+        restricted: '受限'
+      },
       rateAndAccounts: '{rate}x 费率 · {count} 个账号',
       accountsCount: '{count} 个账号',
       enterGroupName: '请输入分组名称',

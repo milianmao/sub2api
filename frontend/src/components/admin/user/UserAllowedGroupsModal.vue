@@ -44,6 +44,7 @@
                     <input
                       type="checkbox"
                       :checked="config.isSelected"
+                      :disabled="!canEditAuthorization"
                       @change="toggleExclusiveGroup(config.groupId)"
                       class="peer sr-only"
                     />
@@ -62,6 +63,12 @@
                     <span class="inline-flex items-center rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
                       {{ t('admin.groups.exclusive') }}
                     </span>
+                    <span
+                      v-if="config.accessMode === 'restricted'"
+                      class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                    >
+                      {{ t('admin.groups.accessModes.restricted') }}
+                    </span>
                   </div>
                   <div class="mt-1.5 flex items-center gap-3 text-sm">
                     <span class="inline-flex items-center gap-1 text-gray-500 dark:text-gray-400">
@@ -72,6 +79,12 @@
                     <span class="text-gray-500 dark:text-gray-400">
                       {{ t('admin.users.defaultRate') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.defaultRate }}x</span>
                     </span>
+                    <template v-if="config.accessMode === 'restricted'">
+                      <span class="text-gray-300 dark:text-dark-500">•</span>
+                      <span class="text-gray-500 dark:text-gray-400">
+                        {{ t('admin.groups.form.minUserLevel') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.minUserLevel }}</span>
+                      </span>
+                    </template>
                   </div>
                 </div>
 
@@ -83,9 +96,10 @@
                     step="0.001"
                     min="0.001"
                     :value="config.customRate ?? ''"
+                    :disabled="!canEditAuthorization"
                     @input="updateCustomRate(config.groupId, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(config.defaultRate)"
-                    class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
+                    class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500 dark:disabled:bg-dark-600"
                   />
                 </div>
               </div>
@@ -120,6 +134,12 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2">
                     <span class="text-base font-semibold text-gray-900 dark:text-white">{{ config.groupName }}</span>
+                    <span
+                      v-if="config.accessMode === 'restricted'"
+                      class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+                    >
+                      {{ t('admin.groups.accessModes.restricted') }}
+                    </span>
                   </div>
                   <div class="mt-1.5 flex items-center gap-3 text-sm">
                     <span class="inline-flex items-center gap-1 text-gray-500 dark:text-gray-400">
@@ -130,6 +150,12 @@
                     <span class="text-gray-500 dark:text-gray-400">
                       {{ t('admin.users.defaultRate') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.defaultRate }}x</span>
                     </span>
+                    <template v-if="config.accessMode === 'restricted'">
+                      <span class="text-gray-300 dark:text-dark-500">•</span>
+                      <span class="text-gray-500 dark:text-gray-400">
+                        {{ t('admin.groups.form.minUserLevel') }}: <span class="font-medium text-gray-700 dark:text-gray-300">{{ config.minUserLevel }}</span>
+                      </span>
+                    </template>
                   </div>
                 </div>
 
@@ -141,9 +167,10 @@
                     step="0.001"
                     min="0.001"
                     :value="config.customRate ?? ''"
+                    :disabled="!canEditAuthorization"
                     @input="updateCustomRate(config.groupId, ($event.target as HTMLInputElement).value)"
                     :placeholder="String(config.defaultRate)"
-                    class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500"
+                    class="hide-spinner w-24 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium transition-colors focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400 dark:border-dark-500 dark:bg-dark-700 dark:focus:border-primary-500 dark:disabled:bg-dark-600"
                   />
                 </div>
               </div>
@@ -166,7 +193,7 @@
     <template #footer>
       <div class="flex justify-end gap-3">
         <button @click="$emit('close')" class="btn btn-secondary px-5">{{ t('common.cancel') }}</button>
-        <button @click="handleSave" :disabled="submitting" class="btn btn-primary px-6">
+        <button @click="handleSave" :disabled="submitting || !canEditAuthorization" class="btn btn-primary px-6">
           <svg v-if="submitting" class="-ml-1 mr-2 h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -182,6 +209,7 @@
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { adminAPI } from '@/api/admin'
 import type { AdminUser, Group, GroupPlatform } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
@@ -192,6 +220,8 @@ interface GroupRateConfig {
   groupName: string
   platform: GroupPlatform
   isExclusive: boolean
+  accessMode: 'public' | 'restricted'
+  minUserLevel: number
   defaultRate: number
   customRate: number | null
   isSelected: boolean
@@ -201,6 +231,8 @@ const props = defineProps<{ show: boolean; user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
 const { t } = useI18n()
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canEditAuthorization = computed(() => authStore.user?.role === 'super_admin')
 
 const groups = ref<Group[]>([])
 const groupConfigs = ref<GroupRateConfig[]>([])
@@ -243,11 +275,12 @@ const load = async () => {
       groupName: g.name,
       platform: g.platform,
       isExclusive: g.is_exclusive,
+      accessMode: g.access_mode ?? 'public',
+      minUserLevel: g.min_user_level ?? 0,
       defaultRate: g.rate_multiplier,
       customRate: userGroupRates[g.id] ?? null,
-      // 专属分组：检查是否在 allowed_groups 中
-      // 公开分组：始终选中
-      isSelected: g.is_exclusive ? userAllowedGroups.includes(g.id) : true,
+      // 专属/受限分组：检查是否在 allowed_groups 中；公开分组始终选中。
+      isSelected: g.is_exclusive || g.access_mode === 'restricted' ? userAllowedGroups.includes(g.id) : true,
     }))
   } catch (error) {
     console.error('Failed to load groups:', error)
@@ -257,6 +290,7 @@ const load = async () => {
 }
 
 const toggleExclusiveGroup = (groupId: number) => {
+  if (!canEditAuthorization.value) return
   const config = groupConfigs.value.find((c) => c.groupId === groupId)
   if (config && config.isExclusive) {
     config.isSelected = !config.isSelected
@@ -264,6 +298,7 @@ const toggleExclusiveGroup = (groupId: number) => {
 }
 
 const updateCustomRate = (groupId: number, value: string) => {
+  if (!canEditAuthorization.value) return
   const config = groupConfigs.value.find((c) => c.groupId === groupId)
   if (config) {
     if (value === '' || value === null || value === undefined) {
@@ -277,11 +312,14 @@ const updateCustomRate = (groupId: number, value: string) => {
 
 const handleSave = async () => {
   if (!props.user) return
+  if (!canEditAuthorization.value) return
   submitting.value = true
 
   try {
-    // 构建 allowed_groups（仅包含专属分组中被勾选的）
-    const allowedGroups = groupConfigs.value.filter((c) => c.isExclusive && c.isSelected).map((c) => c.groupId)
+    // 构建 allowed_groups（仅包含需要显式授权且被勾选的分组）
+    const allowedGroups = groupConfigs.value
+      .filter((c) => (c.isExclusive || c.accessMode === 'restricted') && c.isSelected)
+      .map((c) => c.groupId)
 
     // 构建 group_rates
     // - 有新专属倍率: 设置为该值

@@ -99,6 +99,9 @@ func (r *userRepository) Create(ctx context.Context, userIn *service.User) error
 		return translatePersistenceError(err, nil, service.ErrEmailExists)
 	}
 
+	if err := setUserAuthorizationFields(txCtx, txAwareSQLExecutor(txCtx, r.sql, txClient), created.ID, userIn.Level); err != nil {
+		return err
+	}
 	if err := r.syncUserAllowedGroupsWithClient(txCtx, txClient, created.ID, userIn.AllowedGroups); err != nil {
 		return err
 	}
@@ -123,6 +126,9 @@ func (r *userRepository) GetByID(ctx context.Context, id int64) (*service.User, 
 	}
 
 	out := userEntityToService(m)
+	if err := r.hydrateUsers(ctx, []*service.User{out}, false); err != nil {
+		return nil, err
+	}
 	groups, err := r.loadAllowedGroups(ctx, []int64{id})
 	if err != nil {
 		return nil, err
@@ -150,6 +156,9 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (*service
 	m := matches[0]
 
 	out := userEntityToService(m)
+	if err := r.hydrateUsers(ctx, []*service.User{out}, false); err != nil {
+		return nil, err
+	}
 	groups, err := r.loadAllowedGroups(ctx, []int64{m.ID})
 	if err != nil {
 		return nil, err
@@ -239,6 +248,9 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User) error
 		return translatePersistenceError(err, service.ErrUserNotFound, service.ErrEmailExists)
 	}
 
+	if err := setUserAuthorizationFields(txCtx, txAwareSQLExecutor(txCtx, r.sql, txClient), updated.ID, userIn.Level); err != nil {
+		return err
+	}
 	if err := r.syncUserAllowedGroupsWithClient(txCtx, txClient, updated.ID, userIn.AllowedGroups); err != nil {
 		return err
 	}
@@ -473,6 +485,13 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		u := userEntityToService(users[i])
 		outUsers = append(outUsers, *u)
 		userMap[u.ID] = &outUsers[len(outUsers)-1]
+	}
+	userPointers := make([]*service.User, 0, len(userMap))
+	for _, u := range userMap {
+		userPointers = append(userPointers, u)
+	}
+	if err := r.hydrateUsers(ctx, userPointers, false); err != nil {
+		return nil, nil, err
 	}
 
 	shouldLoadSubscriptions := filters.IncludeSubscriptions == nil || *filters.IncludeSubscriptions
@@ -866,6 +885,9 @@ func (r *userRepository) GetFirstAdmin(ctx context.Context) (*service.User, erro
 	}
 
 	out := userEntityToService(m)
+	if err := r.hydrateUsers(ctx, []*service.User{out}, false); err != nil {
+		return nil, err
+	}
 	groups, err := r.loadAllowedGroups(ctx, []int64{m.ID})
 	if err != nil {
 		return nil, err
@@ -874,6 +896,10 @@ func (r *userRepository) GetFirstAdmin(ctx context.Context) (*service.User, erro
 		out.AllowedGroups = v
 	}
 	return out, nil
+}
+
+func (r *userRepository) hydrateUsers(ctx context.Context, users []*service.User, includeAllowedGroups bool) error {
+	return hydrateUserAuthorizationFields(ctx, txAwareSQLExecutor(ctx, r.sql, r.client), users, includeAllowedGroups)
 }
 
 func (r *userRepository) loadAllowedGroups(ctx context.Context, userIDs []int64) (map[int64][]int64, error) {

@@ -103,6 +103,7 @@ func (s *UserRepoSuite) TestCreate() {
 		Username:     "testuser",
 		PasswordHash: "test-password-hash",
 		Role:         service.RoleUser,
+		Level:        3,
 		Status:       service.StatusActive,
 	})
 
@@ -111,6 +112,7 @@ func (s *UserRepoSuite) TestCreate() {
 	got, err := s.repo.GetByID(s.ctx, user.ID)
 	s.Require().NoError(err, "GetByID")
 	s.Require().Equal("create@test.com", got.Email)
+	s.Require().Equal(3, got.Level)
 }
 
 func (s *UserRepoSuite) TestGetByID_NotFound() {
@@ -153,11 +155,13 @@ func (s *UserRepoSuite) TestUpdate() {
 	got, err := s.repo.GetByID(s.ctx, user.ID)
 	s.Require().NoError(err)
 	got.Username = "updated"
+	got.Level = 7
 	s.Require().NoError(s.repo.Update(s.ctx, got), "Update")
 
 	updated, err := s.repo.GetByID(s.ctx, user.ID)
 	s.Require().NoError(err, "GetByID after update")
 	s.Require().Equal("updated", updated.Username)
+	s.Require().Equal(7, updated.Level)
 }
 
 func (s *UserRepoSuite) TestUpdateIgnoresNoRowsFromConflictingEmailIdentityUpsert() {

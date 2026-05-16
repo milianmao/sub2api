@@ -19,6 +19,12 @@ type stubAdminService struct {
 	redeems              []service.RedeemCode
 	boundAuthIdentity    *service.AdminBindAuthIdentityInput
 	boundAuthIdentityFor int64
+	createdUsers         []*service.CreateUserInput
+	updatedUserIDs       []int64
+	updatedUsers         []*service.UpdateUserInput
+	createdGroups        []*service.CreateGroupInput
+	updatedGroupIDs      []int64
+	updatedGroups        []*service.UpdateGroupInput
 	createdAccounts      []*service.CreateAccountInput
 	createdProxies       []*service.CreateProxyInput
 	updatedProxyIDs      []int64
@@ -157,12 +163,31 @@ func (s *stubAdminService) GetUser(ctx context.Context, id int64) (*service.User
 }
 
 func (s *stubAdminService) CreateUser(ctx context.Context, input *service.CreateUserInput) (*service.User, error) {
-	user := service.User{ID: 100, Email: input.Email, Status: service.StatusActive}
+	s.mu.Lock()
+	s.createdUsers = append(s.createdUsers, input)
+	s.mu.Unlock()
+	user := service.User{
+		ID:            100,
+		Email:         input.Email,
+		Status:        service.StatusActive,
+		Level:         input.Level,
+		AllowedGroups: append([]int64(nil), input.AllowedGroups...),
+	}
 	return &user, nil
 }
 
 func (s *stubAdminService) UpdateUser(ctx context.Context, id int64, input *service.UpdateUserInput) (*service.User, error) {
+	s.mu.Lock()
+	s.updatedUserIDs = append(s.updatedUserIDs, id)
+	s.updatedUsers = append(s.updatedUsers, input)
+	s.mu.Unlock()
 	user := service.User{ID: id, Email: "updated@example.com", Status: service.StatusActive}
+	if input.Level != nil {
+		user.Level = *input.Level
+	}
+	if input.AllowedGroups != nil {
+		user.AllowedGroups = append([]int64(nil), (*input.AllowedGroups)...)
+	}
 	return &user, nil
 }
 
@@ -262,12 +287,31 @@ func (s *stubAdminService) GetGroup(ctx context.Context, id int64) (*service.Gro
 }
 
 func (s *stubAdminService) CreateGroup(ctx context.Context, input *service.CreateGroupInput) (*service.Group, error) {
-	group := service.Group{ID: 200, Name: input.Name, Status: service.StatusActive}
+	s.mu.Lock()
+	s.createdGroups = append(s.createdGroups, input)
+	s.mu.Unlock()
+	group := service.Group{
+		ID:           200,
+		Name:         input.Name,
+		Status:       service.StatusActive,
+		AccessMode:   input.AccessMode,
+		MinUserLevel: input.MinUserLevel,
+	}
 	return &group, nil
 }
 
 func (s *stubAdminService) UpdateGroup(ctx context.Context, id int64, input *service.UpdateGroupInput) (*service.Group, error) {
+	s.mu.Lock()
+	s.updatedGroupIDs = append(s.updatedGroupIDs, id)
+	s.updatedGroups = append(s.updatedGroups, input)
+	s.mu.Unlock()
 	group := service.Group{ID: id, Name: input.Name, Status: service.StatusActive}
+	if input.AccessMode != nil {
+		group.AccessMode = *input.AccessMode
+	}
+	if input.MinUserLevel != nil {
+		group.MinUserLevel = *input.MinUserLevel
+	}
 	return &group, nil
 }
 

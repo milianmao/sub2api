@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"fmt"
+
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 
@@ -47,6 +49,20 @@ func (Group) Fields() []ent.Field {
 			Default(1.0),
 		field.Bool("is_exclusive").
 			Default(false),
+		field.String("access_mode").
+			MaxLen(20).
+			Default(domain.GroupAccessModePublic).
+			Validate(func(value string) error {
+				switch value {
+				case domain.GroupAccessModePublic, domain.GroupAccessModeRestricted:
+					return nil
+				default:
+					return fmt.Errorf("must be one of public, restricted")
+				}
+			}),
+		field.Int("min_user_level").
+			Default(0).
+			NonNegative(),
 		field.String("status").
 			MaxLen(20).
 			Default(domain.StatusActive),
@@ -187,6 +203,8 @@ func (Group) Indexes() []ent.Index {
 		index.Fields("platform"),
 		index.Fields("subscription_type"),
 		index.Fields("is_exclusive"),
+		index.Fields("access_mode"),
+		index.Fields("min_user_level"),
 		index.Fields("deleted_at"),
 		index.Fields("sort_order"),
 	}

@@ -125,6 +125,46 @@ func (s *APIKeyRepoSuite) TestGetByKeyForAuth_PreservesMessagesDispatchModelConf
 	s.Require().Equal("gpt-5.4-nano", got.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"])
 }
 
+func (s *APIKeyRepoSuite) TestGetByKeyForAuth_LoadsAuthorizationFields() {
+	user := s.mustCreateUser("getbykey-authz@test.com")
+	_, err := s.repo.sql.ExecContext(s.ctx, "UPDATE users SET level = $1 WHERE id = $2", 5, user.ID)
+	s.Require().NoError(err)
+
+	group := s.mustCreateGroup("g-authz")
+	_, err = s.repo.sql.ExecContext(
+		s.ctx,
+		"UPDATE groups SET access_mode = $1, min_user_level = $2 WHERE id = $3",
+		service.GroupAccessModeRestricted,
+		3,
+		group.ID,
+	)
+	s.Require().NoError(err)
+
+	_, err = s.client.UserAllowedGroup.Create().
+		SetUserID(user.ID).
+		SetGroupID(group.ID).
+		Save(s.ctx)
+	s.Require().NoError(err)
+
+	key := &service.APIKey{
+		UserID:  user.ID,
+		Key:     "sk-getbykey-authz",
+		Name:    "Authz Key",
+		GroupID: &group.ID,
+		Status:  service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	got, err := s.repo.GetByKeyForAuth(s.ctx, key.Key)
+	s.Require().NoError(err)
+	s.Require().NotNil(got.User)
+	s.Require().Equal(5, got.User.Level)
+	s.Require().Contains(got.User.AllowedGroups, group.ID)
+	s.Require().NotNil(got.Group)
+	s.Require().Equal(service.GroupAccessModeRestricted, got.Group.AccessMode)
+	s.Require().Equal(3, got.Group.MinUserLevel)
+}
+
 // --- Update ---
 
 func (s *APIKeyRepoSuite) TestUpdate() {
