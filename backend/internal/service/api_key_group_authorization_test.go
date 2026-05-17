@@ -71,10 +71,10 @@ func TestAPIKeyServiceCanUserBindGroupInternal_GroupAuthorization(t *testing.T) 
 		{
 			name: "legacy exclusive group is restricted when access mode is empty",
 			group: Group{
-				ID:            21,
-				IsExclusive:   true,
-				MinUserLevel:  1,
-				AccessMode:    "",
+				ID:           21,
+				IsExclusive:  true,
+				MinUserLevel: 1,
+				AccessMode:   "",
 			},
 			wantAllowed: false,
 		},
