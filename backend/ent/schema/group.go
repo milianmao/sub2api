@@ -141,6 +141,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("allow_messages_dispatch").
 			Default(false).
 			Comment("是否允许 /v1/messages 调度到此 OpenAI 分组"),
+		field.Bool("allow_openai_compat").
+			Default(false).
+			Comment("Whether Anthropic/Antigravity groups allow OpenAI-compatible endpoint conversion"),
 		field.Bool("require_oauth_only").
 			Default(false).
 			Comment("仅允许非 apikey 类型账号关联到此分组"),

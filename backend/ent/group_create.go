@@ -411,6 +411,20 @@ func (_c *GroupCreate) SetNillableAllowMessagesDispatch(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetAllowOpenAICompat sets the "allow_openai_compat" field.
+func (_c *GroupCreate) SetAllowOpenAICompat(v bool) *GroupCreate {
+	_c.mutation.SetAllowOpenAICompat(v)
+	return _c
+}
+
+// SetNillableAllowOpenAICompat sets the "allow_openai_compat" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableAllowOpenAICompat(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetAllowOpenAICompat(*v)
+	}
+	return _c
+}
+
 // SetRequireOauthOnly sets the "require_oauth_only" field.
 func (_c *GroupCreate) SetRequireOauthOnly(v bool) *GroupCreate {
 	_c.mutation.SetRequireOauthOnly(v)
@@ -682,6 +696,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultAllowMessagesDispatch
 		_c.mutation.SetAllowMessagesDispatch(v)
 	}
+	if _, ok := _c.mutation.AllowOpenAICompat(); !ok {
+		v := group.DefaultAllowOpenAICompat
+		_c.mutation.SetAllowOpenAICompat(v)
+	}
 	if _, ok := _c.mutation.RequireOauthOnly(); !ok {
 		v := group.DefaultRequireOauthOnly
 		_c.mutation.SetRequireOauthOnly(v)
@@ -780,6 +798,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.AllowMessagesDispatch(); !ok {
 		return &ValidationError{Name: "allow_messages_dispatch", err: errors.New(`ent: missing required field "Group.allow_messages_dispatch"`)}
+	}
+	if _, ok := _c.mutation.AllowOpenAICompat(); !ok {
+		return &ValidationError{Name: "allow_openai_compat", err: errors.New(`ent: missing required field "Group.allow_openai_compat"`)}
 	}
 	if _, ok := _c.mutation.RequireOauthOnly(); !ok {
 		return &ValidationError{Name: "require_oauth_only", err: errors.New(`ent: missing required field "Group.require_oauth_only"`)}
@@ -943,6 +964,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.AllowMessagesDispatch(); ok {
 		_spec.SetField(group.FieldAllowMessagesDispatch, field.TypeBool, value)
 		_node.AllowMessagesDispatch = value
+	}
+	if value, ok := _c.mutation.AllowOpenAICompat(); ok {
+		_spec.SetField(group.FieldAllowOpenAICompat, field.TypeBool, value)
+		_node.AllowOpenAICompat = value
 	}
 	if value, ok := _c.mutation.RequireOauthOnly(); ok {
 		_spec.SetField(group.FieldRequireOauthOnly, field.TypeBool, value)

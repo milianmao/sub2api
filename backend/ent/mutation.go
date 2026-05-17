@@ -14787,6 +14787,7 @@ type GroupMutation struct {
 	sort_order                              *int
 	addsort_order                           *int
 	allow_messages_dispatch                 *bool
+	allow_openai_compat                     *bool
 	require_oauth_only                      *bool
 	require_privacy_set                     *bool
 	default_mapped_model                    *string
@@ -16365,6 +16366,40 @@ func (m *GroupMutation) ResetAllowMessagesDispatch() {
 	m.allow_messages_dispatch = nil
 }
 
+// SetAllowOpenAICompat sets the "allow_openai_compat" field.
+func (m *GroupMutation) SetAllowOpenAICompat(b bool) {
+	m.allow_openai_compat = &b
+}
+
+// AllowOpenAICompat returns the value of the "allow_openai_compat" field in the mutation.
+func (m *GroupMutation) AllowOpenAICompat() (r bool, exists bool) {
+	v := m.allow_openai_compat
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowOpenAICompat returns the old "allow_openai_compat" field's value of the Group entity.
+func (m *GroupMutation) OldAllowOpenAICompat(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowOpenAICompat is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowOpenAICompat requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowOpenAICompat: %w", err)
+	}
+	return oldValue.AllowOpenAICompat, nil
+}
+
+// ResetAllowOpenAICompat resets all changes to the "allow_openai_compat" field.
+func (m *GroupMutation) ResetAllowOpenAICompat() {
+	m.allow_openai_compat = nil
+}
+
 // SetRequireOauthOnly sets the "require_oauth_only" field.
 func (m *GroupMutation) SetRequireOauthOnly(b bool) {
 	m.require_oauth_only = &b
@@ -17011,6 +17046,9 @@ func (m *GroupMutation) Fields() []string {
 	if m.allow_messages_dispatch != nil {
 		fields = append(fields, group.FieldAllowMessagesDispatch)
 	}
+	if m.allow_openai_compat != nil {
+		fields = append(fields, group.FieldAllowOpenAICompat)
+	}
 	if m.require_oauth_only != nil {
 		fields = append(fields, group.FieldRequireOauthOnly)
 	}
@@ -17092,6 +17130,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.SortOrder()
 	case group.FieldAllowMessagesDispatch:
 		return m.AllowMessagesDispatch()
+	case group.FieldAllowOpenAICompat:
+		return m.AllowOpenAICompat()
 	case group.FieldRequireOauthOnly:
 		return m.RequireOauthOnly()
 	case group.FieldRequirePrivacySet:
@@ -17169,6 +17209,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldSortOrder(ctx)
 	case group.FieldAllowMessagesDispatch:
 		return m.OldAllowMessagesDispatch(ctx)
+	case group.FieldAllowOpenAICompat:
+		return m.OldAllowOpenAICompat(ctx)
 	case group.FieldRequireOauthOnly:
 		return m.OldRequireOauthOnly(ctx)
 	case group.FieldRequirePrivacySet:
@@ -17390,6 +17432,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAllowMessagesDispatch(v)
+		return nil
+	case group.FieldAllowOpenAICompat:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowOpenAICompat(v)
 		return nil
 	case group.FieldRequireOauthOnly:
 		v, ok := value.(bool)
@@ -17789,6 +17838,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldAllowMessagesDispatch:
 		m.ResetAllowMessagesDispatch()
+		return nil
+	case group.FieldAllowOpenAICompat:
+		m.ResetAllowOpenAICompat()
 		return nil
 	case group.FieldRequireOauthOnly:
 		m.ResetRequireOauthOnly()

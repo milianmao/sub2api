@@ -394,6 +394,29 @@ func TestResponsesToAnthropic_Reasoning(t *testing.T) {
 	assert.Equal(t, "42", anth.Content[1].Text)
 }
 
+func TestAnthropicToResponses_DeepSeekReasoningContentIsNotOutputText(t *testing.T) {
+	resp := &AnthropicResponse{
+		ID:    "msg_deepseek",
+		Model: "deepseek-v4-pro",
+		Content: []AnthropicContentBlock{
+			{Type: "thinking", ReasoningContent: "private reasoning"},
+			{Type: "text", Text: "visible answer"},
+		},
+		StopReason: "end_turn",
+	}
+
+	out := AnthropicToResponsesResponse(resp)
+	require.Len(t, out.Output, 2)
+	assert.Equal(t, "reasoning", out.Output[0].Type)
+	require.Len(t, out.Output[0].Summary, 1)
+	assert.Equal(t, "private reasoning", out.Output[0].Summary[0].Text)
+	assert.Equal(t, "message", out.Output[1].Type)
+	require.Len(t, out.Output[1].Content, 1)
+	assert.Equal(t, "output_text", out.Output[1].Content[0].Type)
+	assert.Equal(t, "visible answer", out.Output[1].Content[0].Text)
+	assert.NotContains(t, out.Output[1].Content[0].Text, "private reasoning")
+}
+
 func TestResponsesToAnthropic_Incomplete(t *testing.T) {
 	resp := &ResponsesResponse{
 		ID:     "resp_inc",
@@ -761,6 +784,52 @@ func TestStreamingReasoning(t *testing.T) {
 	}, state)
 	require.Len(t, events, 1)
 	assert.Equal(t, "content_block_stop", events[0].Type)
+}
+
+func TestAnthropicEventToResponses_DeepSeekReasoningContentDeltaIsNotOutputText(t *testing.T) {
+	state := NewAnthropicEventToResponsesState()
+	AnthropicEventToResponsesEvents(&AnthropicStreamEvent{
+		Type: "message_start",
+		Message: &AnthropicResponse{
+			ID:    "msg_deepseek",
+			Model: "deepseek-v4-pro",
+		},
+	}, state)
+
+	events := AnthropicEventToResponsesEvents(&AnthropicStreamEvent{
+		Type:         "content_block_start",
+		Index:        intPtr(0),
+		ContentBlock: &AnthropicContentBlock{Type: "thinking", ReasoningContent: "private start"},
+	}, state)
+	require.Len(t, events, 2)
+	assert.Equal(t, "response.output_item.added", events[0].Type)
+	assert.Equal(t, "reasoning", events[0].Item.Type)
+	assert.Equal(t, "response.reasoning_summary_text.delta", events[1].Type)
+	assert.Equal(t, "private start", events[1].Delta)
+
+	events = AnthropicEventToResponsesEvents(&AnthropicStreamEvent{
+		Type:  "content_block_delta",
+		Index: intPtr(0),
+		Delta: &AnthropicDelta{
+			Type:             "thinking_delta",
+			ReasoningContent: "private delta",
+		},
+	}, state)
+	require.Len(t, events, 1)
+	assert.Equal(t, "response.reasoning_summary_text.delta", events[0].Type)
+	assert.Equal(t, "private delta", events[0].Delta)
+	assert.NotEqual(t, "response.output_text.delta", events[0].Type)
+
+	events = AnthropicEventToResponsesEvents(&AnthropicStreamEvent{
+		Type:  "content_block_delta",
+		Index: intPtr(0),
+		Delta: &AnthropicDelta{
+			ReasoningContent: "private delta without type",
+		},
+	}, state)
+	require.Len(t, events, 1)
+	assert.Equal(t, "response.reasoning_summary_text.delta", events[0].Type)
+	assert.Equal(t, "private delta without type", events[0].Delta)
 }
 
 func TestStreamingIncomplete(t *testing.T) {
@@ -1519,4 +1588,8 @@ func TestAnthropicToResponses_ToolWithNilSchema(t *testing.T) {
 	require.NoError(t, json.Unmarshal(resp.Tools[0].Parameters, &params))
 	assert.JSONEq(t, `"object"`, string(params["type"]))
 	assert.JSONEq(t, `{}`, string(params["properties"]))
+}
+
+func intPtr(v int) *int {
+	return &v
 }

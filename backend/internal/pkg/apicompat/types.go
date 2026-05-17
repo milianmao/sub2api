@@ -59,7 +59,8 @@ type AnthropicContentBlock struct {
 	Text string `json:"text,omitempty"`
 
 	// type=thinking
-	Thinking string `json:"thinking,omitempty"`
+	Thinking         string `json:"thinking,omitempty"`
+	ReasoningContent string `json:"reasoning_content,omitempty"`
 
 	// type=image
 	Source *AnthropicImageSource `json:"source,omitempty"`
@@ -151,7 +152,8 @@ type AnthropicDelta struct {
 	PartialJSON string `json:"partial_json,omitempty"`
 
 	// thinking_delta
-	Thinking string `json:"thinking,omitempty"`
+	Thinking         string `json:"thinking,omitempty"`
+	ReasoningContent string `json:"reasoning_content,omitempty"`
 
 	// signature_delta
 	Signature string `json:"signature,omitempty"`

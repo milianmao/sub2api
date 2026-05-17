@@ -583,6 +583,69 @@ func TestResponsesToChatCompletions_WebSearch(t *testing.T) {
 	assert.Equal(t, "search results", content)
 }
 
+func TestChatCompletionsResponseToResponses_ReasoningContentExcludedFromOutputText(t *testing.T) {
+	resp := &ChatCompletionsResponse{
+		ID:    "chatcmpl_deepseek",
+		Model: "deepseek-reasoner",
+		Choices: []ChatChoice{
+			{
+				Index: 0,
+				Message: ChatMessage{
+					Role:             "assistant",
+					Content:          json.RawMessage(`"final answer"`),
+					ReasoningContent: "private chain",
+				},
+				FinishReason: "stop",
+			},
+		},
+	}
+
+	out := ChatCompletionsResponseToResponses(resp)
+	require.Len(t, out.Output, 2)
+	assert.Equal(t, "reasoning", out.Output[0].Type)
+	require.Len(t, out.Output[0].Summary, 1)
+	assert.Equal(t, "summary_text", out.Output[0].Summary[0].Type)
+	assert.Equal(t, "private chain", out.Output[0].Summary[0].Text)
+	assert.Equal(t, "message", out.Output[1].Type)
+	require.Len(t, out.Output[1].Content, 1)
+	assert.Equal(t, "output_text", out.Output[1].Content[0].Type)
+	assert.Equal(t, "final answer", out.Output[1].Content[0].Text)
+	assert.NotContains(t, out.Output[1].Content[0].Text, "private chain")
+}
+
+func TestChatCompletionChunkToResponsesEvents_ReasoningContentIsNotOutputTextDelta(t *testing.T) {
+	reasoning := "private delta"
+	content := "visible delta"
+
+	reasoningEvents := ChatCompletionChunkToResponsesEvents(&ChatCompletionsChunk{
+		ID:    "chatcmpl_deepseek",
+		Model: "deepseek-reasoner",
+		Choices: []ChatChunkChoice{
+			{
+				Index: 0,
+				Delta: ChatDelta{ReasoningContent: &reasoning},
+			},
+		},
+	})
+	require.Len(t, reasoningEvents, 1)
+	assert.Equal(t, "response.reasoning_summary_text.delta", reasoningEvents[0].Type)
+	assert.Equal(t, "private delta", reasoningEvents[0].Delta)
+
+	contentEvents := ChatCompletionChunkToResponsesEvents(&ChatCompletionsChunk{
+		ID:    "chatcmpl_deepseek",
+		Model: "deepseek-reasoner",
+		Choices: []ChatChunkChoice{
+			{
+				Index: 0,
+				Delta: ChatDelta{Content: &content},
+			},
+		},
+	})
+	require.Len(t, contentEvents, 1)
+	assert.Equal(t, "response.output_text.delta", contentEvents[0].Type)
+	assert.Equal(t, "visible delta", contentEvents[0].Delta)
+}
+
 // ---------------------------------------------------------------------------
 // Streaming: ResponsesEventToChatChunks tests
 // ---------------------------------------------------------------------------

@@ -98,3 +98,12 @@ func sanitizeGroupMessagesDispatchFields(g *Group) {
 	g.DefaultMappedModel = ""
 	g.MessagesDispatchModelConfig = OpenAIMessagesDispatchModelConfig{}
 }
+
+func sanitizeGroupOpenAICompatFields(g *Group) {
+	if g == nil {
+		return
+	}
+	if g.Platform != PlatformAnthropic && g.Platform != PlatformAntigravity {
+		g.AllowOpenAICompat = false
+	}
+}

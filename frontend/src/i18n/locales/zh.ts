@@ -2184,6 +2184,11 @@ export default {
         targetModelPlaceholder: '例如: gpt-5.4',
         removeExactMapping: '删除精确映射'
       },
+      openaiCompat: {
+        title: 'OpenAI 兼容接口',
+        hint: '开启后允许 OpenAI Chat/Responses 接口转 Claude Messages。',
+        deepseekCodexHint: 'DeepSeek V4 / Codex 兼容客户端请使用 Anthropic 分组，配置 DeepSeek 自定义 base URL，并开启此开关。'
+      },
       invalidRequestFallback: {
         title: '无效请求兜底分组',
         hint: '仅当上游明确返回 prompt too long 时才会触发，留空表示不兜底',

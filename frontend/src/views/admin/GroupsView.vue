@@ -962,6 +962,47 @@
 
         <!-- OpenAI Messages 调度配置（仅 openai 平台） -->
         <div
+          v-if="isOpenAICompatPlatform(createForm.platform)"
+          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="text-sm text-gray-600 dark:text-gray-400">{{
+                t("admin.groups.openaiCompat.title")
+              }}</label>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ t("admin.groups.openaiCompat.hint") }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ t("admin.groups.openaiCompat.deepseekCodexHint") }}
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="
+                createForm.allow_openai_compat =
+                  !createForm.allow_openai_compat
+              "
+              class="relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+              :class="
+                createForm.allow_openai_compat
+                  ? 'bg-primary-500'
+                  : 'bg-gray-300 dark:bg-dark-600'
+              "
+            >
+              <span
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                :class="
+                  createForm.allow_openai_compat
+                    ? 'translate-x-6'
+                    : 'translate-x-1'
+                "
+              />
+            </button>
+          </div>
+        </div>
+
+        <div
           v-if="createForm.platform === 'openai'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
@@ -2143,6 +2184,46 @@
 
         <!-- OpenAI Messages 调度配置（仅 openai 平台） -->
         <div
+          v-if="isOpenAICompatPlatform(editForm.platform)"
+          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
+        >
+          <div class="flex items-center justify-between">
+            <div>
+              <label class="text-sm text-gray-600 dark:text-gray-400">{{
+                t("admin.groups.openaiCompat.title")
+              }}</label>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ t("admin.groups.openaiCompat.hint") }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                {{ t("admin.groups.openaiCompat.deepseekCodexHint") }}
+              </p>
+            </div>
+            <button
+              type="button"
+              @click="
+                editForm.allow_openai_compat = !editForm.allow_openai_compat
+              "
+              class="relative inline-flex h-6 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none"
+              :class="
+                editForm.allow_openai_compat
+                  ? 'bg-primary-500'
+                  : 'bg-gray-300 dark:bg-dark-600'
+              "
+            >
+              <span
+                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                :class="
+                  editForm.allow_openai_compat
+                    ? 'translate-x-6'
+                    : 'translate-x-1'
+                "
+              />
+            </button>
+          </div>
+        </div>
+
+        <div
           v-if="editForm.platform === 'openai'"
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
@@ -2859,9 +2940,12 @@ import { createStableObjectKeyResolver } from "@/utils/stableObjectKey";
 import { useKeyedDebouncedSearch } from "@/composables/useKeyedDebouncedSearch";
 import { getPersistedPageSize } from "@/composables/usePersistedPageSize";
 import {
+  buildOpenAICompatPayload,
   createDefaultMessagesDispatchFormState,
+  isOpenAICompatPlatform,
   messagesDispatchConfigToFormState,
   messagesDispatchFormStateToConfig,
+  resetOpenAICompatFormState,
   resetMessagesDispatchFormState,
   type MessagesDispatchMappingRow,
 } from "./groupsMessagesDispatch";
@@ -3120,6 +3204,7 @@ const createForm = reactive({
   claude_code_only: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
+  allow_openai_compat: false,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
   allow_messages_dispatch: false,
   opus_mapped_model: createMessagesDispatchDefaults.opus_mapped_model,
@@ -3405,6 +3490,7 @@ const editForm = reactive({
   claude_code_only: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
+  allow_openai_compat: false,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
   allow_messages_dispatch: false,
   default_mapped_model: '',
@@ -3650,6 +3736,7 @@ const closeCreateModal = () => {
   createForm.claude_code_only = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
+  createForm.allow_openai_compat = false;
   resetMessagesDispatchFormState(createForm);
   createForm.require_oauth_only = false;
   createForm.require_privacy_set = false;
@@ -3710,6 +3797,7 @@ const handleCreateGroup = async () => {
       model_routing: convertRoutingRulesToApiFormat(
         createModelRoutingRules.value,
       ),
+      ...buildOpenAICompatPayload(createForm),
       messages_dispatch_model_config:
         createForm.platform === "openai"
           ? messagesDispatchFormStateToConfig({
@@ -3770,6 +3858,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.fallback_group_id = group.fallback_group_id;
   editForm.fallback_group_id_on_invalid_request =
     group.fallback_group_id_on_invalid_request;
+  editForm.allow_openai_compat = group.allow_openai_compat ?? false;
   const messagesDispatchFormState = messagesDispatchConfigToFormState(
     group.messages_dispatch_model_config,
   );
@@ -3841,6 +3930,7 @@ const handleUpdateGroup = async () => {
       model_routing: convertRoutingRulesToApiFormat(
         editModelRoutingRules.value,
       ),
+      ...buildOpenAICompatPayload(editForm),
       messages_dispatch_model_config:
         editForm.platform === "openai"
           ? messagesDispatchFormStateToConfig({
@@ -3950,6 +4040,7 @@ watch(
     if (newVal !== "openai") {
       resetMessagesDispatchFormState(createForm);
     }
+    resetOpenAICompatFormState(createForm);
     if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
       createForm.require_oauth_only = false;
       createForm.require_privacy_set = false;
@@ -3966,6 +4057,7 @@ watch(
     if (newVal !== "openai") {
       resetMessagesDispatchFormState(editForm);
     }
+    resetOpenAICompatFormState(editForm);
     if (!["openai", "antigravity", "anthropic", "gemini"].includes(newVal)) {
       editForm.require_oauth_only = false;
       editForm.require_privacy_set = false;
@@ -3983,6 +4075,7 @@ watch(
       editForm.allow_messages_dispatch = false
       editForm.default_mapped_model = ''
     }
+    resetOpenAICompatFormState(editForm)
   }
 )
 

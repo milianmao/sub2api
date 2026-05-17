@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildOpenAICompatPayload,
   createDefaultMessagesDispatchFormState,
+  isOpenAICompatPlatform,
   messagesDispatchConfigToFormState,
   messagesDispatchFormStateToConfig,
+  resetOpenAICompatFormState,
   resetMessagesDispatchFormState,
 } from "../groupsMessagesDispatch";
 
@@ -90,5 +93,40 @@ describe("groupsMessagesDispatch", () => {
       haiku_mapped_model: "gpt-5.4-mini",
       exact_model_mappings: [],
     });
+  });
+
+  it("only treats anthropic and antigravity as OpenAI-compatible platforms", () => {
+    expect(isOpenAICompatPlatform("anthropic")).toBe(true);
+    expect(isOpenAICompatPlatform("antigravity")).toBe(true);
+    expect(isOpenAICompatPlatform("openai")).toBe(false);
+    expect(isOpenAICompatPlatform("gemini")).toBe(false);
+    expect(isOpenAICompatPlatform("deepseek" as any)).toBe(false);
+  });
+
+  it("normalizes the OpenAI compatibility payload by platform", () => {
+    expect(
+      buildOpenAICompatPayload({
+        platform: "anthropic",
+        allow_openai_compat: true,
+      }),
+    ).toEqual({ allow_openai_compat: true });
+
+    expect(
+      buildOpenAICompatPayload({
+        platform: "openai",
+        allow_openai_compat: true,
+      }),
+    ).toEqual({ allow_openai_compat: false });
+  });
+
+  it("resets OpenAI compatibility state when platform switches away", () => {
+    const state = {
+      platform: "gemini" as const,
+      allow_openai_compat: true,
+    };
+
+    resetOpenAICompatFormState(state);
+
+    expect(state.allow_openai_compat).toBe(false);
   });
 });

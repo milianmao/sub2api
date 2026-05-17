@@ -1,4 +1,4 @@
-import type { OpenAIMessagesDispatchModelConfig } from "@/types";
+import type { GroupPlatform, OpenAIMessagesDispatchModelConfig } from "@/types";
 
 export interface MessagesDispatchMappingRow {
   claude_model: string;
@@ -11,6 +11,11 @@ export interface MessagesDispatchFormState {
   sonnet_mapped_model: string;
   haiku_mapped_model: string;
   exact_model_mappings: MessagesDispatchMappingRow[];
+}
+
+export interface OpenAICompatFormState {
+  platform: GroupPlatform;
+  allow_openai_compat?: boolean;
 }
 
 export function createDefaultMessagesDispatchFormState(): MessagesDispatchFormState {
@@ -69,4 +74,26 @@ export function resetMessagesDispatchFormState(
   target.sonnet_mapped_model = defaults.sonnet_mapped_model;
   target.haiku_mapped_model = defaults.haiku_mapped_model;
   target.exact_model_mappings = [];
+}
+
+export function isOpenAICompatPlatform(platform: GroupPlatform): boolean {
+  return platform === "anthropic" || platform === "antigravity";
+}
+
+export function buildOpenAICompatPayload(
+  state: OpenAICompatFormState,
+): { allow_openai_compat: boolean } {
+  return {
+    allow_openai_compat: isOpenAICompatPlatform(state.platform)
+      ? Boolean(state.allow_openai_compat)
+      : false,
+  };
+}
+
+export function resetOpenAICompatFormState(
+  target: OpenAICompatFormState,
+): void {
+  if (!isOpenAICompatPlatform(target.platform)) {
+    target.allow_openai_compat = false;
+  }
 }

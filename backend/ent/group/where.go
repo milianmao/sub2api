@@ -190,6 +190,11 @@ func AllowMessagesDispatch(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldAllowMessagesDispatch, v))
 }
 
+// AllowOpenAICompat applies equality check predicate on the "allow_openai_compat" field. It's identical to AllowOpenAICompatEQ.
+func AllowOpenAICompat(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAllowOpenAICompat, v))
+}
+
 // RequireOauthOnly applies equality check predicate on the "require_oauth_only" field. It's identical to RequireOauthOnlyEQ.
 func RequireOauthOnly(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldRequireOauthOnly, v))
@@ -1313,6 +1318,16 @@ func AllowMessagesDispatchEQ(v bool) predicate.Group {
 // AllowMessagesDispatchNEQ applies the NEQ predicate on the "allow_messages_dispatch" field.
 func AllowMessagesDispatchNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldAllowMessagesDispatch, v))
+}
+
+// AllowOpenAICompatEQ applies the EQ predicate on the "allow_openai_compat" field.
+func AllowOpenAICompatEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAllowOpenAICompat, v))
+}
+
+// AllowOpenAICompatNEQ applies the NEQ predicate on the "allow_openai_compat" field.
+func AllowOpenAICompatNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldAllowOpenAICompat, v))
 }
 
 // RequireOauthOnlyEQ applies the EQ predicate on the "require_oauth_only" field.

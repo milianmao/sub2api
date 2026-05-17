@@ -2100,6 +2100,11 @@ export default {
         targetModelPlaceholder: 'e.g., gpt-5.4',
         removeExactMapping: 'Remove Exact Mapping'
       },
+      openaiCompat: {
+        title: 'OpenAI-Compatible API',
+        hint: 'Allow OpenAI Chat/Responses requests to convert to Claude Messages.',
+        deepseekCodexHint: 'For DeepSeek V4 / Codex-compatible clients, use an Anthropic group with a custom DeepSeek base URL and enable this switch.'
+      },
       invalidRequestFallback: {
         title: 'Invalid Request Fallback Group',
         hint: 'Triggered only when upstream explicitly returns prompt too long. Leave empty to disable fallback.',

@@ -33,13 +33,13 @@ func AnthropicToResponsesResponse(resp *AnthropicResponse) *ResponsesResponse {
 	for _, block := range resp.Content {
 		switch block.Type {
 		case "thinking":
-			if block.Thinking != "" {
+			if reasoningText := anthropicReasoningContent(block); reasoningText != "" {
 				outputs = append(outputs, ResponsesOutput{
 					Type: "reasoning",
 					ID:   generateItemID(),
 					Summary: []ResponsesSummary{{
 						Type: "summary_text",
-						Text: block.Thinking,
+						Text: reasoningText,
 					}},
 				})
 			}
@@ -254,8 +254,16 @@ func anthToResHandleContentBlockStart(evt *AnthropicStreamEvent, state *Anthropi
 			Item: &ResponsesOutput{
 				Type: "reasoning",
 				ID:   state.CurrentItemID,
-			},
-		}))
+				},
+			}))
+		if reasoningText := anthropicReasoningContent(*evt.ContentBlock); reasoningText != "" {
+			events = append(events, makeResponsesEvent(state, "response.reasoning_summary_text.delta", &ResponsesStreamEvent{
+				OutputIndex:  state.OutputIndex,
+				SummaryIndex: 0,
+				Delta:        reasoningText,
+				ItemID:       state.CurrentItemID,
+			}))
+		}
 
 	case "text":
 		// If we don't have an open message item, open one
@@ -303,6 +311,14 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 	if evt.Delta == nil {
 		return nil
 	}
+	if evt.Delta.Type == "" && evt.Delta.ReasoningContent != "" {
+		return []ResponsesStreamEvent{makeResponsesEvent(state, "response.reasoning_summary_text.delta", &ResponsesStreamEvent{
+			OutputIndex:  state.OutputIndex,
+			SummaryIndex: 0,
+			Delta:        evt.Delta.ReasoningContent,
+			ItemID:       state.CurrentItemID,
+		})}
+	}
 
 	switch evt.Delta.Type {
 	case "text_delta":
@@ -317,13 +333,14 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 		})}
 
 	case "thinking_delta":
-		if evt.Delta.Thinking == "" {
+		reasoningText := anthropicReasoningDelta(evt.Delta)
+		if reasoningText == "" {
 			return nil
 		}
 		return []ResponsesStreamEvent{makeResponsesEvent(state, "response.reasoning_summary_text.delta", &ResponsesStreamEvent{
 			OutputIndex:  state.OutputIndex,
 			SummaryIndex: 0,
-			Delta:        evt.Delta.Thinking,
+			Delta:        reasoningText,
 			ItemID:       state.CurrentItemID,
 		})}
 
@@ -345,6 +362,23 @@ func anthToResHandleContentBlockDelta(evt *AnthropicStreamEvent, state *Anthropi
 	}
 
 	return nil
+}
+
+func anthropicReasoningContent(block AnthropicContentBlock) string {
+	if block.Thinking != "" {
+		return block.Thinking
+	}
+	return block.ReasoningContent
+}
+
+func anthropicReasoningDelta(delta *AnthropicDelta) string {
+	if delta == nil {
+		return ""
+	}
+	if delta.Thinking != "" {
+		return delta.Thinking
+	}
+	return delta.ReasoningContent
 }
 
 func anthToResHandleContentBlockStop(evt *AnthropicStreamEvent, state *AnthropicEventToResponsesState) []ResponsesStreamEvent {

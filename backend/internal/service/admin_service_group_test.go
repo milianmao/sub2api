@@ -445,6 +445,91 @@ func TestAdminService_UpdateGroup_ClearsMessagesDispatchFieldsWhenPlatformChange
 	require.Equal(t, OpenAIMessagesDispatchModelConfig{}, repo.updated.MessagesDispatchModelConfig)
 }
 
+func TestAdminService_CreateGroup_AllowsOpenAICompatForAnthropicPlatforms(t *testing.T) {
+	tests := []string{PlatformAnthropic, PlatformAntigravity}
+
+	for _, platform := range tests {
+		t.Run(platform, func(t *testing.T) {
+			repo := &groupRepoStubForAdmin{}
+			svc := &adminServiceImpl{groupRepo: repo}
+
+			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+				Name:              "compat-group",
+				Platform:          platform,
+				RateMultiplier:    1.0,
+				AllowOpenAICompat: true,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, group)
+			require.NotNil(t, repo.created)
+			require.True(t, repo.created.AllowOpenAICompat)
+		})
+	}
+}
+
+func TestAdminService_CreateGroup_ClearsOpenAICompatForUnsupportedPlatforms(t *testing.T) {
+	tests := []string{PlatformOpenAI, PlatformGemini}
+
+	for _, platform := range tests {
+		t.Run(platform, func(t *testing.T) {
+			repo := &groupRepoStubForAdmin{}
+			svc := &adminServiceImpl{groupRepo: repo}
+
+			group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+				Name:              "compat-group",
+				Platform:          platform,
+				RateMultiplier:    1.0,
+				AllowOpenAICompat: true,
+			})
+			require.NoError(t, err)
+			require.NotNil(t, group)
+			require.NotNil(t, repo.created)
+			require.False(t, repo.created.AllowOpenAICompat)
+		})
+	}
+}
+
+func TestAdminService_UpdateGroup_AllowsOpenAICompatForAnthropicPlatforms(t *testing.T) {
+	existingGroup := &Group{
+		ID:       1,
+		Name:     "existing-group",
+		Platform: PlatformAnthropic,
+		Status:   StatusActive,
+	}
+	repo := &groupRepoStubForAdmin{getByID: existingGroup}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	allow := true
+	group, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{
+		AllowOpenAICompat: &allow,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, repo.updated)
+	require.True(t, repo.updated.AllowOpenAICompat)
+}
+
+func TestAdminService_UpdateGroup_ClearsOpenAICompatWhenPlatformChangesAway(t *testing.T) {
+	existingGroup := &Group{
+		ID:                1,
+		Name:              "existing-group",
+		Platform:          PlatformAnthropic,
+		Status:            StatusActive,
+		AllowOpenAICompat: true,
+	}
+	repo := &groupRepoStubForAdmin{getByID: existingGroup}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	group, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{
+		Platform: PlatformOpenAI,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, group)
+	require.NotNil(t, repo.updated)
+	require.Equal(t, PlatformOpenAI, repo.updated.Platform)
+	require.False(t, repo.updated.AllowOpenAICompat)
+}
+
 func TestAdminService_ListGroups_WithSearch(t *testing.T) {
 	// 测试：
 	// 1. search 参数正常传递到 repository 层
