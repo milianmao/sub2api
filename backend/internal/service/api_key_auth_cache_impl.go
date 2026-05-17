@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 10 // v10: user/group authorization fields
+const apiKeyAuthSnapshotVersion = 11 // v11: group visible-user authorization fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -225,6 +225,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			Status:                     apiKey.User.Status,
 			Role:                       apiKey.User.Role,
 			Level:                      apiKey.User.Level,
+			AllowedGroups:              apiKey.User.AllowedGroups,
 			Balance:                    apiKey.User.Balance,
 			Concurrency:                apiKey.User.Concurrency,
 			Email:                      apiKey.User.Email,
@@ -256,6 +257,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			RateMultiplier:                  apiKey.Group.RateMultiplier,
 			AccessMode:                      apiKey.Group.AccessMode,
 			MinUserLevel:                    apiKey.Group.MinUserLevel,
+			VisibleUserIDs:                  apiKey.Group.VisibleUserIDs,
 			DailyLimitUSD:                   apiKey.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  apiKey.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 apiKey.Group.MonthlyLimitUSD,
@@ -306,6 +308,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			Status:                     snapshot.User.Status,
 			Role:                       snapshot.User.Role,
 			Level:                      snapshot.User.Level,
+			AllowedGroups:              snapshot.User.AllowedGroups,
 			Balance:                    snapshot.User.Balance,
 			Concurrency:                snapshot.User.Concurrency,
 			Email:                      snapshot.User.Email,
@@ -330,6 +333,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			RateMultiplier:                  snapshot.Group.RateMultiplier,
 			AccessMode:                      snapshot.Group.AccessMode,
 			MinUserLevel:                    snapshot.Group.MinUserLevel,
+			VisibleUserIDs:                  snapshot.Group.VisibleUserIDs,
 			DailyLimitUSD:                   snapshot.Group.DailyLimitUSD,
 			WeeklyLimitUSD:                  snapshot.Group.WeeklyLimitUSD,
 			MonthlyLimitUSD:                 snapshot.Group.MonthlyLimitUSD,

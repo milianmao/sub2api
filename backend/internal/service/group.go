@@ -18,6 +18,7 @@ type Group struct {
 	IsExclusive    bool
 	AccessMode     string
 	MinUserLevel   int
+	VisibleUserIDs []int64
 	Status         string
 	Hydrated       bool // indicates the group was loaded from a trusted repository source
 
@@ -98,6 +99,15 @@ func (g *Group) EffectiveAccessMode() string {
 
 func (g *Group) IsRestrictedAccess() bool {
 	return g.EffectiveAccessMode() == GroupAccessModeRestricted
+}
+
+func (g *Group) HasVisibleUser(userID int64) bool {
+	for _, id := range g.VisibleUserIDs {
+		if id == userID {
+			return true
+		}
+	}
+	return false
 }
 
 func (g *Group) HasDailyLimit() bool {

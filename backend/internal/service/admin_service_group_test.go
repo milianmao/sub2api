@@ -31,6 +31,7 @@ type groupRepoStubForAdmin struct {
 	listWithFiltersGroups      []Group
 	listWithFiltersResult      *pagination.PaginationResult
 	listWithFiltersErr         error
+	visibleUserIDs            []int64
 }
 
 func (s *groupRepoStubForAdmin) Create(_ context.Context, g *Group) error {
@@ -122,6 +123,11 @@ func (s *groupRepoStubForAdmin) GetAccountIDsByGroupIDs(_ context.Context, _ []i
 }
 
 func (s *groupRepoStubForAdmin) UpdateSortOrders(_ context.Context, _ []GroupSortOrderUpdate) error {
+	return nil
+}
+
+func (s *groupRepoStubForAdmin) SyncVisibleUsersForGroup(_ context.Context, _ int64, userIDs []int64) error {
+	s.visibleUserIDs = append([]int64(nil), userIDs...)
 	return nil
 }
 
@@ -692,6 +698,7 @@ type groupRepoStubForInvalidRequestFallback struct {
 	groups  map[int64]*Group
 	created *Group
 	updated *Group
+	visibleUserIDs []int64
 }
 
 func (s *groupRepoStubForInvalidRequestFallback) Create(_ context.Context, g *Group) error {
@@ -760,6 +767,11 @@ func (s *groupRepoStubForInvalidRequestFallback) BindAccountsToGroup(_ context.C
 }
 
 func (s *groupRepoStubForInvalidRequestFallback) UpdateSortOrders(_ context.Context, _ []GroupSortOrderUpdate) error {
+	return nil
+}
+
+func (s *groupRepoStubForInvalidRequestFallback) SyncVisibleUsersForGroup(_ context.Context, _ int64, userIDs []int64) error {
+	s.visibleUserIDs = append([]int64(nil), userIDs...)
 	return nil
 }
 

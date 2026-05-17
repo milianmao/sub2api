@@ -799,13 +799,13 @@ func userCanAccessGroup(user *User, group *Group) bool {
 	if user == nil || group == nil {
 		return false
 	}
-	if user.Level < group.MinUserLevel {
-		return false
+	if user.HasAllowedGroup(group.ID) || group.HasVisibleUser(user.ID) {
+		return true
 	}
 	if group.IsRestrictedAccess() {
-		return user.HasAllowedGroup(group.ID)
+		return false
 	}
-	return true
+	return user.Level >= group.MinUserLevel
 }
 
 func (s *APIKeyService) SearchAPIKeys(ctx context.Context, userID int64, keyword string, limit int) ([]APIKey, error) {

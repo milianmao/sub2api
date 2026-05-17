@@ -740,7 +740,11 @@ func hydrateUserAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, 
 	if err := rows.Close(); err != nil {
 		return err
 	}
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func hydrateGroupAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, groups []*service.Group) error {
@@ -790,6 +794,38 @@ func hydrateGroupAuthorizationFields(ctx context.Context, exec sqlQueryExecutor,
 		if group, ok := byID[groupID]; ok {
 			group.AccessMode = accessMode
 			group.MinUserLevel = minUserLevel
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	for _, group := range byID {
+		group.VisibleUserIDs = nil
+	}
+	rows, err = exec.QueryContext(ctx, `
+		SELECT group_id, user_id
+		FROM user_allowed_groups
+		WHERE group_id = ANY($1)
+		ORDER BY group_id, user_id
+	`, pq.Array(ids))
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var (
+			groupID int64
+			userID  int64
+		)
+		if err := rows.Scan(&groupID, &userID); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		if group, ok := byID[groupID]; ok {
+			group.VisibleUserIDs = append(group.VisibleUserIDs, userID)
 		}
 	}
 	if err := rows.Close(); err != nil {

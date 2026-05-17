@@ -25,6 +25,26 @@
         <label class="input-label">{{ t('admin.users.username') }}</label>
         <input v-model="form.username" type="text" class="input" :placeholder="t('admin.users.enterUsername')" />
       </div>
+      <div v-if="canEditRole">
+        <label class="input-label">{{ t('admin.users.form.roleLabel') }}</label>
+        <select v-model="form.role" class="input">
+          <option value="user">{{ t('admin.users.roles.user') }}</option>
+          <option value="admin">{{ t('admin.users.roles.admin') }}</option>
+          <option value="super_admin">{{ t('admin.users.roles.super_admin') }}</option>
+        </select>
+      </div>
+      <div v-if="canEditLevel">
+        <label class="input-label">{{ t('admin.users.form.level') }}</label>
+        <input
+          v-model.number="form.level"
+          type="number"
+          min="0"
+          step="1"
+          class="input"
+          :placeholder="t('admin.users.form.levelPlaceholder')"
+        />
+        <p class="input-hint">{{ t('admin.users.form.levelHint') }}</p>
+      </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="input-label">{{ t('admin.users.columns.balance') }}</label>
@@ -60,27 +80,43 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue'
+import { computed, reactive, watch } from 'vue'
 import { useI18n } from 'vue-i18n'; import { adminAPI } from '@/api/admin'
+import { useAuthStore } from '@/stores/auth'
 import { useForm } from '@/composables/useForm'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
+import type { UserRole } from '@/types'
 
 const props = defineProps<{ show: boolean }>()
 const emit = defineEmits(['close', 'success']); const { t } = useI18n()
+const authStore = useAuthStore()
+const canEditLevel = computed(() => authStore.user?.role === 'admin' || authStore.user?.role === 'super_admin')
+const canEditRole = computed(() => authStore.user?.role === 'super_admin')
 
-const form = reactive({ email: '', password: '', username: '', notes: '', balance: 0, concurrency: 1, rpm_limit: 0 })
+const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, level: 0, balance: 0, concurrency: 1, rpm_limit: 0 })
 
 const { loading, submit } = useForm({
   form,
   submitFn: async (data) => {
-    await adminAPI.users.create(data)
+    const payload: any = {
+      email: data.email,
+      password: data.password,
+      username: data.username,
+      notes: data.notes,
+      balance: data.balance,
+      concurrency: data.concurrency,
+      rpm_limit: data.rpm_limit,
+    }
+    if (canEditLevel.value) payload.level = data.level || 0
+    if (canEditRole.value) payload.role = data.role
+    await adminAPI.users.create(payload)
     emit('success'); emit('close')
   },
   successMsg: t('admin.users.userCreated')
 })
 
-watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', balance: 0, concurrency: 1, rpm_limit: 0 }) })
+watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', role: 'user', level: 0, balance: 0, concurrency: 1, rpm_limit: 0 }) })
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*'

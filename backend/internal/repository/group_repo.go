@@ -855,3 +855,55 @@ func (r *groupRepository) UpdateSortOrders(ctx context.Context, updates []servic
 	}
 	return nil
 }
+
+func (r *groupRepository) SyncVisibleUsersForGroup(ctx context.Context, groupID int64, userIDs []int64) error {
+	if groupID <= 0 {
+		return service.ErrGroupNotFound
+	}
+	exec := txAwareSQLExecutor(ctx, r.sql, r.client)
+	if exec == nil {
+		return fmt.Errorf("sql executor is not configured")
+	}
+
+	var existing int64
+	if err := scanSingleRow(ctx, exec,
+		"SELECT id FROM groups WHERE id = $1 AND deleted_at IS NULL",
+		[]any{groupID},
+		&existing,
+	); err != nil {
+		if isSQLNoRowsError(err) {
+			return service.ErrGroupNotFound
+		}
+		return err
+	}
+	if existing == 0 {
+		return service.ErrGroupNotFound
+	}
+
+	if _, err := exec.ExecContext(ctx, "DELETE FROM user_allowed_groups WHERE group_id = $1", groupID); err != nil {
+		return err
+	}
+
+	unique := make([]int64, 0, len(userIDs))
+	seen := make(map[int64]struct{}, len(userIDs))
+	for _, id := range userIDs {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	if len(unique) == 0 {
+		return nil
+	}
+
+	_, err := exec.ExecContext(ctx, `
+		INSERT INTO user_allowed_groups (user_id, group_id, created_at)
+		SELECT unnest($1::bigint[]), $2, NOW()
+		ON CONFLICT (user_id, group_id) DO NOTHING
+	`, pq.Array(unique), groupID)
+	return err
+}

@@ -120,6 +120,7 @@ type CreateUserInput struct {
 	Password      string
 	Username      string
 	Notes         string
+	Role          string
 	Balance       float64
 	Concurrency   int
 	RPMLimit      int
@@ -136,6 +137,7 @@ type UpdateUserInput struct {
 	Concurrency   *int     // 使用指针区分"未提供"和"设置为0"
 	RPMLimit      *int     // 使用指针区分"未提供"和"设置为0"
 	Level         *int
+	Role          *string
 	Status        string
 	AllowedGroups *[]int64 // 使用指针区分"未提供"和"设置为空数组"
 	// GroupRates 用户专属分组倍率配置
@@ -189,6 +191,7 @@ type CreateGroupInput struct {
 	IsExclusive      bool
 	AccessMode       string
 	MinUserLevel     int
+	VisibleUserIDs   []int64
 	SubscriptionType string   // standard/subscription
 	DailyLimitUSD    *float64 // 日限额 (USD)
 	WeeklyLimitUSD   *float64 // 周限额 (USD)
@@ -231,6 +234,7 @@ type UpdateGroupInput struct {
 	IsExclusive      *bool
 	AccessMode       *string
 	MinUserLevel     *int
+	VisibleUserIDs   *[]int64
 	Status           string
 	SubscriptionType string   // standard/subscription
 	DailyLimitUSD    *float64 // 日限额 (USD)
@@ -473,6 +477,10 @@ type groupExistenceBatchReader interface {
 	ExistsByIDs(ctx context.Context, ids []int64) (map[int64]bool, error)
 }
 
+type groupVisibleUsersSynchronizer interface {
+	SyncVisibleUsersForGroup(ctx context.Context, groupID int64, userIDs []int64) error
+}
+
 type proxyQualityTarget struct {
 	Target          string
 	URL             string
@@ -672,12 +680,16 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	if input.Level < 0 {
 		return nil, fmt.Errorf("level must be >= 0")
 	}
+	role := normalizeUserRole(input.Role)
+	if role == "" {
+		return nil, fmt.Errorf("invalid role")
+	}
 
 	user := &User{
 		Email:         input.Email,
 		Username:      input.Username,
 		Notes:         input.Notes,
-		Role:          RoleUser, // Always create as regular user, never admin
+		Role:          role,
 		Balance:       input.Balance,
 		Concurrency:   input.Concurrency,
 		RPMLimit:      input.RPMLimit,
@@ -693,6 +705,19 @@ func (s *adminServiceImpl) CreateUser(ctx context.Context, input *CreateUserInpu
 	}
 	s.assignDefaultSubscriptions(ctx, user.ID)
 	return user, nil
+}
+
+func normalizeUserRole(role string) string {
+	switch strings.TrimSpace(role) {
+	case "", RoleUser:
+		return RoleUser
+	case RoleAdmin:
+		return RoleAdmin
+	case RoleSuperAdmin:
+		return RoleSuperAdmin
+	default:
+		return ""
+	}
 }
 
 func (s *adminServiceImpl) assignDefaultSubscriptions(ctx context.Context, userID int64) {
@@ -728,7 +753,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 	}
 
 	// Protect admin users: cannot disable admin accounts
-	if user.Role == "admin" && input.Status == "disabled" {
+	if user.IsAdmin() && input.Status == "disabled" {
 		return nil, errors.New("cannot disable admin user")
 	}
 
@@ -771,6 +796,13 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 			return nil, fmt.Errorf("level must be >= 0")
 		}
 		user.Level = *input.Level
+	}
+	if input.Role != nil {
+		role := normalizeUserRole(*input.Role)
+		if role == "" {
+			return nil, fmt.Errorf("invalid role")
+		}
+		user.Role = role
 	}
 
 	if input.AllowedGroups != nil {
@@ -826,7 +858,7 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 	if err != nil {
 		return err
 	}
-	if user.Role == "admin" {
+	if user.IsAdmin() {
 		return errors.New("cannot delete admin user")
 	}
 	if err := s.userRepo.Delete(ctx, id); err != nil {
@@ -1697,6 +1729,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		IsExclusive:                     input.IsExclusive,
 		AccessMode:                      accessMode,
 		MinUserLevel:                    input.MinUserLevel,
+		VisibleUserIDs:                  input.VisibleUserIDs,
 		Status:                          StatusActive,
 		SubscriptionType:                subscriptionType,
 		DailyLimitUSD:                   dailyLimit,
@@ -1726,6 +1759,12 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	sanitizeGroupOpenAICompatFields(group)
 	if err := s.groupRepo.Create(ctx, group); err != nil {
 		return nil, err
+	}
+	if len(input.VisibleUserIDs) > 0 {
+		if err := s.syncGroupVisibleUsers(ctx, group.ID, input.VisibleUserIDs); err != nil {
+			return nil, err
+		}
+		group.VisibleUserIDs = dedupePositiveInt64(input.VisibleUserIDs)
 	}
 
 	// require_oauth_only: 过滤掉 apikey 类型账号
@@ -1788,6 +1827,34 @@ func normalizeGroupAccessMode(accessMode string, isExclusive bool) (string, erro
 	default:
 		return "", fmt.Errorf("access_mode must be %q or %q", GroupAccessModePublic, GroupAccessModeRestricted)
 	}
+}
+
+func (s *adminServiceImpl) syncGroupVisibleUsers(ctx context.Context, groupID int64, userIDs []int64) error {
+	syncer, ok := s.groupRepo.(groupVisibleUsersSynchronizer)
+	if !ok {
+		return errors.New("group repository does not support visible users")
+	}
+	return syncer.SyncVisibleUsersForGroup(ctx, groupID, dedupePositiveInt64(userIDs))
+}
+
+func dedupePositiveInt64(values []int64) []int64 {
+	if len(values) == 0 {
+		return nil
+	}
+	seen := make(map[int64]struct{}, len(values))
+	out := make([]int64, 0, len(values))
+	for _, value := range values {
+		if value <= 0 {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
 // validateFallbackGroup 校验降级分组的有效性
@@ -1864,6 +1931,7 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if err != nil {
 		return nil, err
 	}
+	oldVisibleUserIDs := append([]int64(nil), group.VisibleUserIDs...)
 
 	if input.Name != "" {
 		group.Name = input.Name
@@ -1902,6 +1970,9 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 			return nil, fmt.Errorf("min_user_level must be >= 0")
 		}
 		group.MinUserLevel = *input.MinUserLevel
+	}
+	if input.VisibleUserIDs != nil {
+		group.VisibleUserIDs = dedupePositiveInt64(*input.VisibleUserIDs)
 	}
 	if input.Status != "" {
 		group.Status = input.Status
@@ -2014,9 +2085,20 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if err := s.groupRepo.Update(ctx, group); err != nil {
 		return nil, err
 	}
+	if input.VisibleUserIDs != nil {
+		if err := s.syncGroupVisibleUsers(ctx, id, *input.VisibleUserIDs); err != nil {
+			return nil, err
+		}
+	}
 
 	if s.authCacheInvalidator != nil {
 		s.authCacheInvalidator.InvalidateAuthCacheByGroupID(ctx, id)
+		if input.VisibleUserIDs != nil {
+			affectedUserIDs := append(oldVisibleUserIDs, (*input.VisibleUserIDs)...)
+			for _, userID := range dedupePositiveInt64(affectedUserIDs) {
+				s.authCacheInvalidator.InvalidateAuthCacheByUserID(ctx, userID)
+			}
+		}
 	}
 
 	// 如果指定了复制账号的源分组，同步绑定（替换当前分组的账号）

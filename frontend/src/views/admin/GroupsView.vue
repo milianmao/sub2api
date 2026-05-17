@@ -69,7 +69,7 @@
               {{ t("admin.groups.sortOrder") }}
             </button>
             <button
-              @click="showCreateModal = true"
+              @click="openCreateModal"
               class="btn btn-primary"
               data-tour="groups-create-btn"
             >
@@ -208,6 +208,12 @@
                 class="text-xs text-gray-500 dark:text-gray-400"
               >
                 {{ t("admin.groups.form.minUserLevel") }} {{ row.min_user_level ?? 0 }}
+              </div>
+              <div
+                v-if="canEditAuthorization && (row.visible_user_ids?.length || 0) > 0"
+                class="text-xs text-gray-500 dark:text-gray-400"
+              >
+                {{ t("admin.groups.form.visibleUsers") }} {{ row.visible_user_ids?.length || 0 }}
               </div>
             </div>
           </template>
@@ -351,7 +357,7 @@
               :title="t('admin.groups.noGroupsYet')"
               :description="t('admin.groups.createFirstGroup')"
               :action-text="t('admin.groups.createGroup')"
-              @action="showCreateModal = true"
+              @action="openCreateModal"
             />
           </template>
         </DataTable>
@@ -548,6 +554,41 @@
               :placeholder="t('admin.groups.form.minUserLevelPlaceholder')"
             />
             <p class="input-hint">{{ t("admin.groups.form.minUserLevelHint") }}</p>
+          </div>
+          <div>
+            <label class="input-label">{{ t("admin.groups.form.visibleUsers") }}</label>
+            <select
+              class="input"
+              data-test="create-visible-users"
+              @change="addVisibleUser(createForm.visible_user_ids, $event)"
+            >
+              <option value="">{{ t("admin.groups.form.visibleUsersPlaceholder") }}</option>
+              <option
+                v-for="user in visibleUserOptions"
+                :key="user.id"
+                :value="user.id"
+                :disabled="createForm.visible_user_ids.includes(user.id)"
+              >
+                {{ user.email }}
+              </option>
+            </select>
+            <div v-if="createForm.visible_user_ids.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+              <span
+                v-for="userId in createForm.visible_user_ids"
+                :key="userId"
+                class="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
+              >
+                {{ getVisibleUserLabel(userId) }}
+                <button
+                  type="button"
+                  @click="removeVisibleUser(createForm.visible_user_ids, userId)"
+                  class="text-primary-500 hover:text-primary-700 dark:hover:text-primary-200"
+                >
+                  <Icon name="x" size="xs" />
+                </button>
+              </span>
+            </div>
+            <p class="input-hint">{{ t("admin.groups.form.visibleUsersHint") }}</p>
           </div>
         </div>
         <div
@@ -1792,6 +1833,41 @@
             />
             <p class="input-hint">{{ t("admin.groups.form.minUserLevelHint") }}</p>
           </div>
+          <div>
+            <label class="input-label">{{ t("admin.groups.form.visibleUsers") }}</label>
+            <select
+              class="input"
+              data-test="edit-visible-users"
+              @change="addVisibleUser(editForm.visible_user_ids, $event)"
+            >
+              <option value="">{{ t("admin.groups.form.visibleUsersPlaceholder") }}</option>
+              <option
+                v-for="user in visibleUserOptions"
+                :key="user.id"
+                :value="user.id"
+                :disabled="editForm.visible_user_ids.includes(user.id)"
+              >
+                {{ user.email }}
+              </option>
+            </select>
+            <div v-if="editForm.visible_user_ids.length > 0" class="mt-2 flex flex-wrap gap-1.5">
+              <span
+                v-for="userId in editForm.visible_user_ids"
+                :key="userId"
+                class="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
+              >
+                {{ getVisibleUserLabel(userId) }}
+                <button
+                  type="button"
+                  @click="removeVisibleUser(editForm.visible_user_ids, userId)"
+                  class="text-primary-500 hover:text-primary-700 dark:hover:text-primary-200"
+                >
+                  <Icon name="x" size="xs" />
+                </button>
+              </span>
+            </div>
+            <p class="input-hint">{{ t("admin.groups.form.visibleUsersHint") }}</p>
+          </div>
         </div>
         <div v-if="editForm.subscription_type !== 'subscription'">
           <div class="mb-1.5 flex items-center gap-1">
@@ -2978,7 +3054,7 @@ import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { useAuthStore } from "@/stores/auth";
 import { adminAPI } from "@/api/admin";
-import type { AdminGroup, GroupPlatform, SubscriptionType } from "@/types";
+import type { AdminGroup, AdminUser, GroupPlatform, SubscriptionType } from "@/types";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
@@ -3099,6 +3175,31 @@ const accessModeOptions = computed(() => [
   { value: "restricted", label: t("admin.groups.accessModes.restricted") },
 ]);
 
+const visibleUserOptions = computed(() =>
+  visibleUsers.value.filter((user) => user.status === "active"),
+);
+
+const getVisibleUserLabel = (userId: number) => {
+  const user = visibleUsers.value.find((item) => item.id === userId);
+  return user ? user.email : `#${userId}`;
+};
+
+const addVisibleUser = (target: number[], event: Event) => {
+  const select = event.target as HTMLSelectElement;
+  const userId = Number(select.value);
+  if (userId && !target.includes(userId)) {
+    target.push(userId);
+  }
+  select.value = "";
+};
+
+const removeVisibleUser = (target: number[], userId: number) => {
+  const index = target.indexOf(userId);
+  if (index !== -1) {
+    target.splice(index, 1);
+  }
+};
+
 // 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
 const fallbackGroupOptions = computed(() => {
   const options: { value: number | null; label: string }[] = [
@@ -3200,6 +3301,7 @@ const copyAccountsGroupOptionsForEdit = computed(() => {
 });
 
 const groups = ref<AdminGroup[]>([]);
+const visibleUsers = ref<AdminUser[]>([]);
 const loading = ref(false);
 const usageMap = ref<Map<number, { today_cost: number; total_cost: number }>>(
   new Map(),
@@ -3261,6 +3363,7 @@ const createForm = reactive({
   is_exclusive: false,
   access_mode: "public" as "public" | "restricted",
   min_user_level: 0,
+  visible_user_ids: [] as number[],
   subscription_type: "standard" as SubscriptionType,
   daily_limit_usd: null as number | null,
   weekly_limit_usd: null as number | null,
@@ -3548,6 +3651,7 @@ const editForm = reactive({
   is_exclusive: false,
   access_mode: "public" as "public" | "restricted",
   min_user_level: 0,
+  visible_user_ids: [] as number[],
   status: "active" as "active" | "inactive",
   subscription_type: "standard" as SubscriptionType,
   daily_limit_usd: null as number | null,
@@ -3703,6 +3807,23 @@ const loadGroups = async () => {
   }
 };
 
+const loadVisibleUsers = async () => {
+  if (!canEditAuthorization.value || visibleUsers.value.length > 0) {
+    return;
+  }
+  try {
+    const response = await adminAPI.users.list(1, 1000, { status: "active" });
+    visibleUsers.value = response.items;
+  } catch (error) {
+    console.error("Error loading visible user options:", error);
+  }
+};
+
+const openCreateModal = () => {
+  showCreateModal.value = true;
+  loadVisibleUsers();
+};
+
 const formatCost = (cost: number): string => {
   if (cost >= 1000) return cost.toFixed(0);
   if (cost >= 100) return cost.toFixed(1);
@@ -3799,6 +3920,7 @@ const closeCreateModal = () => {
   createForm.is_exclusive = false;
   createForm.access_mode = "public";
   createForm.min_user_level = 0;
+  createForm.visible_user_ids = [];
   createForm.subscription_type = "standard";
   createForm.daily_limit_usd = null;
   createForm.weekly_limit_usd = null;
@@ -3896,6 +4018,7 @@ const handleCreateGroup = async () => {
     if (!canEditAuthorization.value) {
       delete (requestData as Partial<typeof createForm>).access_mode;
       delete (requestData as Partial<typeof createForm>).min_user_level;
+      delete (requestData as Partial<typeof createForm>).visible_user_ids;
     } else if (requestData.access_mode === "public") {
       requestData.min_user_level = 0;
     }
@@ -3919,6 +4042,7 @@ const handleCreateGroup = async () => {
 };
 
 const handleEdit = async (group: AdminGroup) => {
+  loadVisibleUsers();
   editingGroup.value = group;
   editForm.name = group.name;
   editForm.description = group.description || "";
@@ -3927,6 +4051,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.is_exclusive = group.is_exclusive;
   editForm.access_mode = group.access_mode ?? "public";
   editForm.min_user_level = group.min_user_level ?? 0;
+  editForm.visible_user_ids = [...(group.visible_user_ids || [])];
   editForm.status = group.status;
   editForm.subscription_type = group.subscription_type || "standard";
   editForm.daily_limit_usd = group.daily_limit_usd;
@@ -3983,6 +4108,7 @@ const closeEditModal = () => {
   editForm.copy_accounts_from_group_ids = [];
   editForm.access_mode = "public";
   editForm.min_user_level = 0;
+  editForm.visible_user_ids = [];
   resetMessagesDispatchFormState(editForm);
 };
 
@@ -4039,6 +4165,7 @@ const handleUpdateGroup = async () => {
     if (!canEditAuthorization.value) {
       delete (payload as Partial<typeof editForm>).access_mode;
       delete (payload as Partial<typeof editForm>).min_user_level;
+      delete (payload as Partial<typeof editForm>).visible_user_ids;
     } else if (payload.access_mode === "public") {
       payload.min_user_level = 0;
     }

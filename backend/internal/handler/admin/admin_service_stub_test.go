@@ -169,6 +169,7 @@ func (s *stubAdminService) CreateUser(ctx context.Context, input *service.Create
 	user := service.User{
 		ID:            100,
 		Email:         input.Email,
+		Role:          input.Role,
 		Status:        service.StatusActive,
 		Level:         input.Level,
 		AllowedGroups: append([]int64(nil), input.AllowedGroups...),
@@ -187,6 +188,9 @@ func (s *stubAdminService) UpdateUser(ctx context.Context, id int64, input *serv
 	}
 	if input.AllowedGroups != nil {
 		user.AllowedGroups = append([]int64(nil), (*input.AllowedGroups)...)
+	}
+	if input.Role != nil {
+		user.Role = *input.Role
 	}
 	return &user, nil
 }
@@ -296,6 +300,7 @@ func (s *stubAdminService) CreateGroup(ctx context.Context, input *service.Creat
 		Status:       service.StatusActive,
 		AccessMode:   input.AccessMode,
 		MinUserLevel: input.MinUserLevel,
+		VisibleUserIDs: append([]int64(nil), input.VisibleUserIDs...),
 	}
 	return &group, nil
 }
@@ -311,6 +316,9 @@ func (s *stubAdminService) UpdateGroup(ctx context.Context, id int64, input *ser
 	}
 	if input.MinUserLevel != nil {
 		group.MinUserLevel = *input.MinUserLevel
+	}
+	if input.VisibleUserIDs != nil {
+		group.VisibleUserIDs = append([]int64(nil), (*input.VisibleUserIDs)...)
 	}
 	return &group, nil
 }

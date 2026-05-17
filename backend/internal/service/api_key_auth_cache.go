@@ -30,12 +30,13 @@ type APIKeyAuthSnapshot struct {
 
 // APIKeyAuthUserSnapshot 用户快照
 type APIKeyAuthUserSnapshot struct {
-	ID          int64   `json:"id"`
-	Status      string  `json:"status"`
-	Role        string  `json:"role"`
-	Level       int     `json:"level"`
-	Balance     float64 `json:"balance"`
-	Concurrency int     `json:"concurrency"`
+	ID            int64   `json:"id"`
+	Status        string  `json:"status"`
+	Role          string  `json:"role"`
+	Level         int     `json:"level"`
+	AllowedGroups []int64 `json:"allowed_groups,omitempty"`
+	Balance       float64 `json:"balance"`
+	Concurrency   int     `json:"concurrency"`
 
 	// Balance notification fields (required for CheckBalanceAfterDeduction)
 	Email                      string             `json:"email"`
@@ -64,6 +65,7 @@ type APIKeyAuthGroupSnapshot struct {
 	RateMultiplier                  float64  `json:"rate_multiplier"`
 	AccessMode                      string   `json:"access_mode"`
 	MinUserLevel                    int      `json:"min_user_level"`
+	VisibleUserIDs                  []int64  `json:"visible_user_ids,omitempty"`
 	DailyLimitUSD                   *float64 `json:"daily_limit_usd,omitempty"`
 	WeeklyLimitUSD                  *float64 `json:"weekly_limit_usd,omitempty"`
 	MonthlyLimitUSD                 *float64 `json:"monthly_limit_usd,omitempty"`

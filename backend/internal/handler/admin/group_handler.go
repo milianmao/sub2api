@@ -89,6 +89,7 @@ type CreateGroupRequest struct {
 	IsExclusive      bool               `json:"is_exclusive"`
 	AccessMode       *string            `json:"access_mode" binding:"omitempty,oneof=public restricted"`
 	MinUserLevel     *int               `json:"min_user_level" binding:"omitempty,min=0"`
+	VisibleUserIDs   *[]int64           `json:"visible_user_ids"`
 	SubscriptionType string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
 	DailyLimitUSD    optionalLimitField `json:"daily_limit_usd"`
 	WeeklyLimitUSD   optionalLimitField `json:"weekly_limit_usd"`
@@ -131,6 +132,7 @@ type UpdateGroupRequest struct {
 	IsExclusive      *bool              `json:"is_exclusive"`
 	AccessMode       *string            `json:"access_mode" binding:"omitempty,oneof=public restricted"`
 	MinUserLevel     *int               `json:"min_user_level" binding:"omitempty,min=0"`
+	VisibleUserIDs   *[]int64           `json:"visible_user_ids"`
 	Status           string             `json:"status" binding:"omitempty,oneof=active inactive"`
 	SubscriptionType string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
 	DailyLimitUSD    optionalLimitField `json:"daily_limit_usd"`
@@ -252,7 +254,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive) {
+	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive || req.VisibleUserIDs != nil) {
 		return
 	}
 
@@ -264,6 +266,10 @@ func (h *GroupHandler) Create(c *gin.Context) {
 	if req.MinUserLevel != nil {
 		minUserLevel = *req.MinUserLevel
 	}
+	var visibleUserIDs []int64
+	if req.VisibleUserIDs != nil {
+		visibleUserIDs = *req.VisibleUserIDs
+	}
 
 	group, err := h.adminService.CreateGroup(c.Request.Context(), &service.CreateGroupInput{
 		Name:                            req.Name,
@@ -273,6 +279,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		IsExclusive:                     req.IsExclusive,
 		AccessMode:                      accessMode,
 		MinUserLevel:                    minUserLevel,
+		VisibleUserIDs:                  visibleUserIDs,
 		SubscriptionType:                req.SubscriptionType,
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
 		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
@@ -321,7 +328,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive != nil) {
+	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive != nil || req.VisibleUserIDs != nil) {
 		return
 	}
 
@@ -333,6 +340,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		IsExclusive:                     req.IsExclusive,
 		AccessMode:                      req.AccessMode,
 		MinUserLevel:                    req.MinUserLevel,
+		VisibleUserIDs:                  req.VisibleUserIDs,
 		Status:                          req.Status,
 		SubscriptionType:                req.SubscriptionType,
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),

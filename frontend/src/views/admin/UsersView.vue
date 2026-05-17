@@ -870,15 +870,16 @@ const getUserGroups = (user: AdminUser) => {
   const userLevel = user.level ?? 0
   for (const g of allGroups.value) {
     if (g.status !== 'active' || g.subscription_type !== 'standard') continue
+    const hasExplicitAccess = user.allowed_groups?.includes(g.id) || g.visible_user_ids?.includes(user.id)
     if (g.is_exclusive) {
-      if (user.allowed_groups?.includes(g.id)) {
+      if (hasExplicitAccess) {
         exclusive.push(g)
       }
     } else if (g.access_mode === 'restricted') {
-      if (user.allowed_groups?.includes(g.id) && userLevel >= (g.min_user_level ?? 0)) {
+      if (hasExplicitAccess) {
         restricted.push(g)
       }
-    } else if (userLevel >= (g.min_user_level ?? 0)) {
+    } else if (hasExplicitAccess || userLevel >= (g.min_user_level ?? 0)) {
       publicGroups.push(g)
     }
   }

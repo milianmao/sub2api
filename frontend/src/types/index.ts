@@ -509,6 +509,7 @@ export interface Group {
   is_exclusive: boolean
   access_mode?: GroupAccessMode
   min_user_level?: number
+  visible_user_ids?: number[]
   status: 'active' | 'inactive'
   subscription_type: SubscriptionType
   daily_limit_usd: number | null
@@ -626,6 +627,7 @@ export interface CreateGroupRequest {
   is_exclusive?: boolean
   access_mode?: GroupAccessMode
   min_user_level?: number
+  visible_user_ids?: number[]
   subscription_type?: SubscriptionType
   daily_limit_usd?: number | null
   weekly_limit_usd?: number | null
@@ -656,6 +658,7 @@ export interface UpdateGroupRequest {
   is_exclusive?: boolean
   access_mode?: GroupAccessMode
   min_user_level?: number
+  visible_user_ids?: number[]
   status?: 'active' | 'inactive'
   subscription_type?: SubscriptionType
   daily_limit_usd?: number | null

@@ -7,6 +7,7 @@ import type { AdminGroup, AdminUser, ApiKey, PublicSettings } from '@/types'
 import UsersView from '../UsersView.vue'
 import GroupsView from '../GroupsView.vue'
 import KeysView from '@/views/user/KeysView.vue'
+import UserAllowedGroupsModal from '@/components/admin/user/UserAllowedGroupsModal.vue'
 
 const authState = vi.hoisted(() => ({
   user: { id: 1, email: 'root@example.com', username: 'root', role: 'admin' },
@@ -19,6 +20,7 @@ const {
   getBatchUsersUsage,
   listEnabledDefinitions,
   getBatchUserAttributes,
+  updateUser,
   updateKey,
   listKeys,
   getDashboardApiKeysUsage,
@@ -26,6 +28,8 @@ const {
   getUserGroupRates,
   getPublicSettings,
   listGroups,
+  createGroupRequest,
+  updateGroupRequest,
   getGroupUsageSummary,
   getGroupCapacitySummary,
 } = vi.hoisted(() => ({
@@ -34,6 +38,7 @@ const {
   getBatchUsersUsage: vi.fn(),
   listEnabledDefinitions: vi.fn(),
   getBatchUserAttributes: vi.fn(),
+  updateUser: vi.fn(),
   updateKey: vi.fn(),
   listKeys: vi.fn(),
   getDashboardApiKeysUsage: vi.fn(),
@@ -41,6 +46,8 @@ const {
   getUserGroupRates: vi.fn(),
   getPublicSettings: vi.fn(),
   listGroups: vi.fn(),
+  createGroupRequest: vi.fn(),
+  updateGroupRequest: vi.fn(),
   getGroupUsageSummary: vi.fn(),
   getGroupCapacitySummary: vi.fn(),
 }))
@@ -67,12 +74,15 @@ vi.mock('@/api/admin', () => ({
   adminAPI: {
     users: {
       list: listUsers,
+      update: updateUser,
       toggleStatus: vi.fn(),
       delete: vi.fn(),
     },
     groups: {
       getAll: getAllGroups,
       list: listGroups,
+      create: createGroupRequest,
+      update: updateGroupRequest,
       getUsageSummary: getGroupUsageSummary,
       getCapacitySummary: getGroupCapacitySummary,
     },
@@ -281,7 +291,10 @@ const mountGroupsView = async () => {
         Pagination: true,
         EmptyState: true,
         ConfirmDialog: true,
-        BaseDialog: true,
+        BaseDialog: {
+          props: ['show'],
+          template: '<div v-if="show"><slot /><slot name="footer" /></div>',
+        },
         Select: true,
         PlatformIcon: true,
         GroupCapacityBadge: true,
@@ -358,6 +371,35 @@ const mountKeysView = async () => {
   return wrapper
 }
 
+const mountAllowedGroupsModal = async (user = createUser({ allowed_groups: [] })) => {
+  authState.user = {
+    id: 1,
+    email: 'root@example.com',
+    username: 'root',
+    role: 'super_admin',
+  }
+  const wrapper = mount(UserAllowedGroupsModal, {
+    props: {
+      show: false,
+      user,
+    },
+    global: {
+      stubs: {
+        BaseDialog: {
+          props: ['show'],
+          template: '<div v-if="show"><slot /><slot name="footer" /></div>',
+        },
+        PlatformIcon: true,
+      },
+    },
+  })
+  mountedWrappers.push(wrapper)
+  await wrapper.setProps({ show: true })
+  await flushPromises()
+  await nextTick()
+  return wrapper
+}
+
 describe('group authorization frontend behavior', () => {
   afterEach(() => {
     for (const wrapper of mountedWrappers.splice(0)) {
@@ -392,6 +434,8 @@ describe('group authorization frontend behavior', () => {
     })
     getGroupUsageSummary.mockReset().mockResolvedValue([])
     getGroupCapacitySummary.mockReset().mockResolvedValue([])
+    createGroupRequest.mockReset().mockResolvedValue(createGroup())
+    updateGroupRequest.mockReset().mockResolvedValue(createGroup())
 
     listKeys.mockReset().mockResolvedValue({
       items: [createKey()],
@@ -405,6 +449,7 @@ describe('group authorization frontend behavior', () => {
     getUserGroupRates.mockReset().mockResolvedValue({})
     getPublicSettings.mockReset().mockResolvedValue(publicSettings)
     updateKey.mockReset().mockResolvedValue(createKey({ name: 'Updated' }))
+    updateUser.mockReset().mockResolvedValue(createUser())
   })
 
   it('shows user level column and hides allowed-groups action for non-super admins', async () => {
@@ -434,7 +479,37 @@ describe('group authorization frontend behavior', () => {
     expect(document.body.textContent).toContain('admin.users.groups')
   })
 
-  it('shows restricted groups only when level and allowed-groups both match', async () => {
+  it('lets super admins grant restricted non-exclusive groups', async () => {
+    listGroups.mockResolvedValue({
+      items: [
+        createGroup({
+          id: 10,
+          name: 'Restricted',
+          is_exclusive: false,
+          access_mode: 'restricted',
+          min_user_level: 1,
+        }),
+      ],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+
+    const wrapper = await mountAllowedGroupsModal()
+
+    const checkbox = wrapper.get('input[type="checkbox"]')
+    await checkbox.setValue(true)
+    await wrapper.get('button.btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(updateUser).toHaveBeenCalledWith(
+      42,
+      expect.objectContaining({ allowed_groups: [10] }),
+    )
+  })
+
+  it('shows restricted groups for explicitly assigned users even below level', async () => {
     localStorage.setItem('user-hidden-columns', JSON.stringify(['notes', 'subscriptions', 'usage', 'concurrency']))
     listUsers.mockResolvedValue({
       items: [
@@ -453,7 +528,7 @@ describe('group authorization frontend behavior', () => {
 
     const wrapper = await mountUsersView()
 
-    expect(wrapper.text().match(/admin\.users\.restrictedLabel/g) ?? []).toHaveLength(1)
+    expect(wrapper.text().match(/admin\.users\.restrictedLabel/g) ?? []).toHaveLength(2)
   })
 
   it('shows group authorization column with access mode and min user level', async () => {
@@ -462,6 +537,36 @@ describe('group authorization frontend behavior', () => {
     expect(wrapper.get('[data-test="columns"]').text().split(',')).toContain('access')
     expect(wrapper.text()).toContain('admin.groups.accessModes.restricted')
     expect(wrapper.text()).toContain('5')
+  })
+
+  it('lets super admins specify visible users when creating a group', async () => {
+    authState.user = {
+      id: 1,
+      email: 'root@example.com',
+      username: 'root',
+      role: 'super_admin',
+    }
+    listUsers.mockResolvedValue({
+      items: [
+        createUser({ id: 7, email: 'target@example.com' }),
+      ],
+      total: 1,
+      page: 1,
+      page_size: 1000,
+      pages: 1,
+    })
+    const wrapper = await mountGroupsView()
+
+    await wrapper.find('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('input[data-tour="group-form-name"]').setValue('VIP')
+    await wrapper.get('[data-test="create-visible-users"]').setValue('7')
+    await wrapper.find('form#create-group-form').trigger('submit')
+    await flushPromises()
+
+    expect(createGroupRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ visible_user_ids: [7] }),
+    )
   })
 
   it('does not submit group_id when a non-super admin edits an API key', async () => {

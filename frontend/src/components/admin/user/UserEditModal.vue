@@ -33,7 +33,15 @@
         <label class="input-label">{{ t('admin.users.notes') }}</label>
         <textarea v-model="form.notes" rows="3" class="input"></textarea>
       </div>
-      <div v-if="canEditAuthorization">
+      <div v-if="canEditRole">
+        <label class="input-label">{{ t('admin.users.form.roleLabel') }}</label>
+        <select v-model="form.role" class="input">
+          <option value="user">{{ t('admin.users.roles.user') }}</option>
+          <option value="admin">{{ t('admin.users.roles.admin') }}</option>
+          <option value="super_admin">{{ t('admin.users.roles.super_admin') }}</option>
+        </select>
+      </div>
+      <div v-if="canEditLevel">
         <label class="input-label">{{ t('admin.users.form.level') }}</label>
         <input
           v-model.number="form.level"
@@ -81,7 +89,7 @@ import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import { useClipboard } from '@/composables/useClipboard'
 import { adminAPI } from '@/api/admin'
-import type { AdminUser, UserAttributeValuesMap } from '@/types'
+import type { AdminUser, UserAttributeValuesMap, UserRole } from '@/types'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import UserAttributeForm from '@/components/user/UserAttributeForm.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -90,14 +98,15 @@ const props = defineProps<{ show: boolean, user: AdminUser | null }>()
 const emit = defineEmits(['close', 'success'])
 const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard } = useClipboard()
 const authStore = useAuthStore()
-const canEditAuthorization = computed(() => authStore.user?.role === 'super_admin')
+const canEditLevel = computed(() => authStore.user?.role === 'admin' || authStore.user?.role === 'super_admin')
+const canEditRole = computed(() => authStore.user?.role === 'super_admin')
 
 const submitting = ref(false); const passwordCopied = ref(false)
-const form = reactive({ email: '', password: '', username: '', notes: '', level: 0, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
+const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, level: 0, concurrency: 1, rpm_limit: 0, customAttributes: {} as UserAttributeValuesMap })
 
 watch(() => props.user, (u) => {
   if (u) {
-    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', level: u.level ?? 0, concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
+    Object.assign(form, { email: u.email, password: '', username: u.username || '', notes: u.notes || '', role: u.role || 'user', level: u.level ?? 0, concurrency: u.concurrency, rpm_limit: u.rpm_limit ?? 0, customAttributes: {} })
     passwordCopied.value = false
   }
 }, { immediate: true })
@@ -126,7 +135,8 @@ const handleUpdateUser = async () => {
   try {
     const data: any = { email: form.email, username: form.username, notes: form.notes, concurrency: form.concurrency, rpm_limit: form.rpm_limit }
     if (form.password.trim()) data.password = form.password.trim()
-    if (canEditAuthorization.value) data.level = form.level || 0
+    if (canEditLevel.value) data.level = form.level || 0
+    if (canEditRole.value) data.role = form.role
     await adminAPI.users.update(props.user.id, data)
     if (Object.keys(form.customAttributes).length > 0) await adminAPI.userAttributes.updateUserAttributeValues(props.user.id, form.customAttributes)
     appStore.showSuccess(t('admin.users.userUpdated'))

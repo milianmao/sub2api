@@ -51,11 +51,20 @@ func TestAPIKeyServiceCanUserBindGroupInternal_GroupAuthorization(t *testing.T) 
 			wantAllowed: false,
 		},
 		{
-			name: "restricted group allows explicit user grant",
+			name: "restricted group allows explicit user grant below level",
 			group: Group{
 				ID:           20,
 				AccessMode:   GroupAccessModeRestricted,
-				MinUserLevel: 1,
+				MinUserLevel: 5,
+			},
+			wantAllowed: true,
+		},
+		{
+			name: "public group allows explicit user grant below level",
+			group: Group{
+				ID:           20,
+				AccessMode:   GroupAccessModePublic,
+				MinUserLevel: 5,
 			},
 			wantAllowed: true,
 		},

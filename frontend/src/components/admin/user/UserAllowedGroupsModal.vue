@@ -241,11 +241,15 @@ const loading = ref(false)
 const submitting = ref(false)
 
 // 分离专属分组和公开分组
-const exclusiveGroups = computed(() => groups.value.filter((g) => g.is_exclusive))
-const publicGroups = computed(() => groups.value.filter((g) => !g.is_exclusive))
+const exclusiveGroups = computed(() => groups.value.filter((g) => g.is_exclusive || g.access_mode === 'restricted'))
+const publicGroups = computed(() => groups.value.filter((g) => !g.is_exclusive && g.access_mode !== 'restricted'))
 
-const exclusiveGroupConfigs = computed(() => groupConfigs.value.filter((c) => c.isExclusive))
-const publicGroupConfigs = computed(() => groupConfigs.value.filter((c) => !c.isExclusive))
+const exclusiveGroupConfigs = computed(() =>
+  groupConfigs.value.filter((c) => c.isExclusive || c.accessMode === 'restricted')
+)
+const publicGroupConfigs = computed(() =>
+  groupConfigs.value.filter((c) => !c.isExclusive && c.accessMode !== 'restricted')
+)
 
 watch(
   () => props.show,
@@ -292,7 +296,7 @@ const load = async () => {
 const toggleExclusiveGroup = (groupId: number) => {
   if (!canEditAuthorization.value) return
   const config = groupConfigs.value.find((c) => c.groupId === groupId)
-  if (config && config.isExclusive) {
+  if (config && (config.isExclusive || config.accessMode === 'restricted')) {
     config.isSelected = !config.isSelected
   }
 }

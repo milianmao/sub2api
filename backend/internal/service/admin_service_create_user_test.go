@@ -22,6 +22,7 @@ func TestAdminService_CreateUser_Success(t *testing.T) {
 		Notes:         "note",
 		Balance:       12.5,
 		Concurrency:   7,
+		Role:          RoleAdmin,
 		AllowedGroups: []int64{3, 5},
 	}
 
@@ -35,7 +36,7 @@ func TestAdminService_CreateUser_Success(t *testing.T) {
 	require.Equal(t, input.Balance, user.Balance)
 	require.Equal(t, input.Concurrency, user.Concurrency)
 	require.Equal(t, input.AllowedGroups, user.AllowedGroups)
-	require.Equal(t, RoleUser, user.Role)
+	require.Equal(t, RoleAdmin, user.Role)
 	require.Equal(t, StatusActive, user.Status)
 	require.True(t, user.CheckPassword(input.Password))
 	require.Len(t, repo.created, 1)

@@ -1727,6 +1727,10 @@ export default {
       creating: 'Creating...',
       updating: 'Updating...',
       form: {
+        roleLabel: 'Role',
+        level: 'User Level',
+        levelPlaceholder: '0 = regular level',
+        levelHint: 'User level is used to match group minimum visibility level.',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
         rpmLimitHint: 'Max requests per minute for this user; 0 = unlimited. Acts as a fallback only when the group has no rpm_limit set.'
@@ -1990,6 +1994,9 @@ export default {
         minUserLevel: 'Minimum User Level',
         minUserLevelPlaceholder: '0 = no level requirement',
         minUserLevelHint: 'Users must be at or above this level. Restricted groups still require explicit access.',
+        visibleUsers: 'Specified Visible Users',
+        visibleUsersPlaceholder: 'Select user',
+        visibleUsersHint: 'Specified users can see this group with higher priority. Super admins only.',
         rpmLimit: 'Requests Per Minute (RPM)',
         rpmLimitPlaceholder: '0 = unlimited',
         rpmLimitHint: 'Max requests per minute for each user in this group; 0 = unlimited. Once set, it takes over per-user rate limiting in this group (overrides the user-level rpm_limit fallback).'
