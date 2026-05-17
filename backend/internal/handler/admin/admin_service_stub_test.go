@@ -295,11 +295,11 @@ func (s *stubAdminService) CreateGroup(ctx context.Context, input *service.Creat
 	s.createdGroups = append(s.createdGroups, input)
 	s.mu.Unlock()
 	group := service.Group{
-		ID:           200,
-		Name:         input.Name,
-		Status:       service.StatusActive,
-		AccessMode:   input.AccessMode,
-		MinUserLevel: input.MinUserLevel,
+		ID:             200,
+		Name:           input.Name,
+		Status:         service.StatusActive,
+		AccessMode:     input.AccessMode,
+		MinUserLevel:   input.MinUserLevel,
 		VisibleUserIDs: append([]int64(nil), input.VisibleUserIDs...),
 	}
 	return &group, nil
