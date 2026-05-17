@@ -26,9 +26,9 @@ func TestGatewayChatCompletions_RejectsWhenOpenAICompatDisabled(t *testing.T) {
 		ID:      10,
 		GroupID: &groupID,
 		Group: &service.Group{
-			Platform:            service.PlatformAnthropic,
-			AllowOpenAICompat:   false,
-			ClaudeCodeOnly:      false,
+			Platform:              service.PlatformAnthropic,
+			AllowOpenAICompat:     false,
+			ClaudeCodeOnly:        false,
 			AllowMessagesDispatch: false,
 		},
 	})

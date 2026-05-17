@@ -30,6 +30,10 @@ const (
 	FieldRateMultiplier = "rate_multiplier"
 	// FieldIsExclusive holds the string denoting the is_exclusive field in the database.
 	FieldIsExclusive = "is_exclusive"
+	// FieldAccessMode holds the string denoting the access_mode field in the database.
+	FieldAccessMode = "access_mode"
+	// FieldMinUserLevel holds the string denoting the min_user_level field in the database.
+	FieldMinUserLevel = "min_user_level"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldPlatform holds the string denoting the platform field in the database.
@@ -168,6 +172,8 @@ var Columns = []string{
 	FieldDescription,
 	FieldRateMultiplier,
 	FieldIsExclusive,
+	FieldAccessMode,
+	FieldMinUserLevel,
 	FieldStatus,
 	FieldPlatform,
 	FieldSubscriptionType,

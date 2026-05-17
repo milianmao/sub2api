@@ -27,6 +27,8 @@ const (
 	FieldPasswordHash = "password_hash"
 	// FieldRole holds the string denoting the role field in the database.
 	FieldRole = "role"
+	// FieldLevel holds the string denoting the level field in the database.
+	FieldLevel = "level"
 	// FieldBalance holds the string denoting the balance field in the database.
 	FieldBalance = "balance"
 	// FieldConcurrency holds the string denoting the concurrency field in the database.
@@ -189,6 +191,7 @@ var Columns = []string{
 	FieldEmail,
 	FieldPasswordHash,
 	FieldRole,
+	FieldLevel,
 	FieldBalance,
 	FieldConcurrency,
 	FieldStatus,

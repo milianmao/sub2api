@@ -29,6 +29,8 @@ type User struct {
 	PasswordHash string `json:"password_hash,omitempty"`
 	// Role holds the value of the "role" field.
 	Role string `json:"role,omitempty"`
+	// Level holds the value of the "level" field.
+	Level int `json:"level,omitempty"`
 	// Balance holds the value of the "balance" field.
 	Balance float64 `json:"balance,omitempty"`
 	// Concurrency holds the value of the "concurrency" field.
@@ -228,7 +230,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case user.FieldBalance, user.FieldBalanceNotifyThreshold, user.FieldTotalRecharged:
 			values[i] = new(sql.NullFloat64)
-		case user.FieldID, user.FieldConcurrency, user.FieldRpmLimit:
+		case user.FieldID, user.FieldLevel, user.FieldConcurrency, user.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
 		case user.FieldEmail, user.FieldPasswordHash, user.FieldRole, user.FieldStatus, user.FieldUsername, user.FieldNotes, user.FieldTotpSecretEncrypted, user.FieldSignupSource, user.FieldBalanceNotifyThresholdType, user.FieldBalanceNotifyExtraEmails:
 			values[i] = new(sql.NullString)
@@ -291,6 +293,12 @@ func (_m *User) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field role", values[i])
 			} else if value.Valid {
 				_m.Role = value.String
+			}
+		case user.FieldLevel:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field level", values[i])
+			} else if value.Valid {
+				_m.Level = int(value.Int64)
 			}
 		case user.FieldBalance:
 			if value, ok := values[i].(*sql.NullFloat64); !ok {

@@ -13,7 +13,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/service"
-	"github.com/lib/pq"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 
@@ -680,11 +679,12 @@ func hydrateUserAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, 
 		return nil
 	}
 
+	userIDPlaceholders, userIDArgs := numberedPlaceholders(ids, 1)
 	rows, err := exec.QueryContext(ctx, `
 		SELECT id, level
 		FROM users
-		WHERE id = ANY($1) AND deleted_at IS NULL
-	`, pq.Array(ids))
+		WHERE id IN (`+userIDPlaceholders+`) AND deleted_at IS NULL
+	`, userIDArgs...)
 	if err != nil {
 		return err
 	}
@@ -718,9 +718,9 @@ func hydrateUserAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, 
 	rows, err = exec.QueryContext(ctx, `
 		SELECT user_id, group_id
 		FROM user_allowed_groups
-		WHERE user_id = ANY($1)
+		WHERE user_id IN (`+userIDPlaceholders+`)
 		ORDER BY user_id, group_id
-	`, pq.Array(ids))
+	`, userIDArgs...)
 	if err != nil {
 		return err
 	}
@@ -771,13 +771,15 @@ func hydrateGroupAuthorizationFields(ctx context.Context, exec sqlQueryExecutor,
 		return nil
 	}
 
+	groupIDPlaceholders, groupIDArgs := numberedPlaceholders(ids, 1)
+	groupArgs := append(groupIDArgs, service.GroupAccessModeRestricted, service.GroupAccessModePublic)
 	rows, err := exec.QueryContext(ctx, `
 		SELECT id,
-			COALESCE(NULLIF(access_mode, ''), CASE WHEN is_exclusive THEN $2 ELSE $3 END) AS access_mode,
+			COALESCE(NULLIF(access_mode, ''), CASE WHEN is_exclusive THEN $`+fmt.Sprint(len(ids)+1)+` ELSE $`+fmt.Sprint(len(ids)+2)+` END) AS access_mode,
 			COALESCE(min_user_level, 0) AS min_user_level
 		FROM groups
-		WHERE id = ANY($1) AND deleted_at IS NULL
-	`, pq.Array(ids), service.GroupAccessModeRestricted, service.GroupAccessModePublic)
+		WHERE id IN (`+groupIDPlaceholders+`) AND deleted_at IS NULL
+	`, groupArgs...)
 	if err != nil {
 		return err
 	}
@@ -809,9 +811,9 @@ func hydrateGroupAuthorizationFields(ctx context.Context, exec sqlQueryExecutor,
 	rows, err = exec.QueryContext(ctx, `
 		SELECT group_id, user_id
 		FROM user_allowed_groups
-		WHERE group_id = ANY($1)
+		WHERE group_id IN (`+groupIDPlaceholders+`)
 		ORDER BY group_id, user_id
-	`, pq.Array(ids))
+	`, groupIDArgs...)
 	if err != nil {
 		return err
 	}
@@ -832,6 +834,16 @@ func hydrateGroupAuthorizationFields(ctx context.Context, exec sqlQueryExecutor,
 		return err
 	}
 	return rows.Err()
+}
+
+func numberedPlaceholders(ids []int64, start int) (string, []any) {
+	parts := make([]string, 0, len(ids))
+	args := make([]any, 0, len(ids))
+	for i, id := range ids {
+		parts = append(parts, fmt.Sprintf("$%d", start+i))
+		args = append(args, id)
+	}
+	return strings.Join(parts, ","), args
 }
 
 func setUserAuthorizationFields(ctx context.Context, exec sqlQueryExecutor, userID int64, level int) error {
@@ -975,6 +987,8 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		Platform:                        g.Platform,
 		RateMultiplier:                  g.RateMultiplier,
 		IsExclusive:                     g.IsExclusive,
+		AccessMode:                      g.AccessMode,
+		MinUserLevel:                    g.MinUserLevel,
 		Status:                          g.Status,
 		Hydrated:                        true,
 		SubscriptionType:                g.SubscriptionType,

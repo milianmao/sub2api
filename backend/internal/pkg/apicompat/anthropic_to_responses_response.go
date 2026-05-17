@@ -254,8 +254,8 @@ func anthToResHandleContentBlockStart(evt *AnthropicStreamEvent, state *Anthropi
 			Item: &ResponsesOutput{
 				Type: "reasoning",
 				ID:   state.CurrentItemID,
-				},
-			}))
+			},
+		}))
 		if reasoningText := anthropicReasoningContent(*evt.ContentBlock); reasoningText != "" {
 			events = append(events, makeResponsesEvent(state, "response.reasoning_summary_text.delta", &ResponsesStreamEvent{
 				OutputIndex:  state.OutputIndex,

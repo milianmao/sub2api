@@ -33,6 +33,10 @@ type Group struct {
 	RateMultiplier float64 `json:"rate_multiplier,omitempty"`
 	// IsExclusive holds the value of the "is_exclusive" field.
 	IsExclusive bool `json:"is_exclusive,omitempty"`
+	// AccessMode holds the value of the "access_mode" field.
+	AccessMode string `json:"access_mode,omitempty"`
+	// MinUserLevel holds the value of the "min_user_level" field.
+	MinUserLevel int `json:"min_user_level,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
 	// Platform holds the value of the "platform" field.
@@ -197,13 +201,13 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldModelRouting, group.FieldSupportedModelScopes, group.FieldMessagesDispatchModelConfig:
 			values[i] = new([]byte)
-		case group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldImageRateIndependent, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet:
+		case group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldImageRateIndependent, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowOpenAICompat, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet:
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k:
 			values[i] = new(sql.NullFloat64)
-		case group.FieldID, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder, group.FieldRpmLimit:
+		case group.FieldID, group.FieldMinUserLevel, group.FieldDefaultValidityDays, group.FieldFallbackGroupID, group.FieldFallbackGroupIDOnInvalidRequest, group.FieldSortOrder, group.FieldRpmLimit:
 			values[i] = new(sql.NullInt64)
-		case group.FieldName, group.FieldDescription, group.FieldStatus, group.FieldPlatform, group.FieldSubscriptionType, group.FieldDefaultMappedModel:
+		case group.FieldName, group.FieldDescription, group.FieldAccessMode, group.FieldStatus, group.FieldPlatform, group.FieldSubscriptionType, group.FieldDefaultMappedModel:
 			values[i] = new(sql.NullString)
 		case group.FieldCreatedAt, group.FieldUpdatedAt, group.FieldDeletedAt:
 			values[i] = new(sql.NullTime)
@@ -271,6 +275,18 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field is_exclusive", values[i])
 			} else if value.Valid {
 				_m.IsExclusive = value.Bool
+			}
+		case group.FieldAccessMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field access_mode", values[i])
+			} else if value.Valid {
+				_m.AccessMode = value.String
+			}
+		case group.FieldMinUserLevel:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field min_user_level", values[i])
+			} else if value.Valid {
+				_m.MinUserLevel = int(value.Int64)
 			}
 		case group.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {

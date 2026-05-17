@@ -1564,7 +1564,7 @@ const handleSubmit = async () => {
         rate_limit_7d: rateLimitData.rate_limit_7d,
       }
       if (canReassignKeyGroup.value) {
-        ;(updates as typeof updates & { group_id: number | null }).group_id = formData.value.group_id
+        (updates as typeof updates & { group_id: number | null }).group_id = formData.value.group_id
       }
       await keysAPI.update(selectedKey.value.id, updates)
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
