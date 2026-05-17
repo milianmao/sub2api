@@ -83,6 +83,10 @@ func (r *groupRepository) Create(ctx context.Context, groupIn *service.Group) er
 		groupIn.ID = created.ID
 		groupIn.CreatedAt = created.CreatedAt
 		groupIn.UpdatedAt = created.UpdatedAt
+		groupIn.AccessMode = repositoryGroupAccessMode(groupIn)
+		if err := setGroupAuthorizationFields(ctx, txAwareSQLExecutor(ctx, r.sql, r.client), groupIn); err != nil {
+			return err
+		}
 		if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil); err != nil {
 			logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group create failed: group=%d err=%v", groupIn.ID, err)
 		}
@@ -109,7 +113,11 @@ func (r *groupRepository) GetByIDLite(ctx context.Context, id int64) (*service.G
 	if err != nil {
 		return nil, translatePersistenceError(err, service.ErrGroupNotFound, nil)
 	}
-	return groupEntityToService(m), nil
+	out := groupEntityToService(m)
+	if err := r.hydrateGroups(ctx, []*service.Group{out}); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) error {
@@ -201,6 +209,10 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 	if err != nil {
 		return translatePersistenceError(err, service.ErrGroupNotFound, service.ErrGroupExists)
 	}
+	groupIn.AccessMode = repositoryGroupAccessMode(groupIn)
+	if err := setGroupAuthorizationFields(ctx, txAwareSQLExecutor(ctx, r.sql, r.client), groupIn); err != nil {
+		return err
+	}
 	groupIn.UpdatedAt = updated.UpdatedAt
 	if err := enqueueSchedulerOutbox(ctx, r.sql, service.SchedulerOutboxEventGroupChanged, nil, &groupIn.ID, nil); err != nil {
 		logger.LegacyPrintf("repository.group", "[SchedulerOutbox] enqueue group update failed: group=%d err=%v", groupIn.ID, err)
@@ -270,6 +282,9 @@ func (r *groupRepository) ListWithFilters(ctx context.Context, params pagination
 		outGroups = append(outGroups, *g)
 		groupIDs = append(groupIDs, g.ID)
 	}
+	if err := r.hydrateGroupSlice(ctx, outGroups); err != nil {
+		return nil, nil, err
+	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
 	if err == nil {
@@ -298,6 +313,9 @@ func (r *groupRepository) listWithAccountCountSort(ctx context.Context, q *dbent
 		g := groupEntityToService(groups[i])
 		outGroups = append(outGroups, *g)
 		groupIDs = append(groupIDs, g.ID)
+	}
+	if err := r.hydrateGroupSlice(ctx, outGroups); err != nil {
+		return nil, nil, err
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
@@ -382,6 +400,18 @@ func groupListOrder(params pagination.PaginationParams) []func(*entsql.Selector)
 	return []func(*entsql.Selector){dbent.Asc(field), dbent.Asc(tieField)}
 }
 
+func (r *groupRepository) hydrateGroupSlice(ctx context.Context, groups []service.Group) error {
+	ptrs := make([]*service.Group, 0, len(groups))
+	for i := range groups {
+		ptrs = append(ptrs, &groups[i])
+	}
+	return r.hydrateGroups(ctx, ptrs)
+}
+
+func (r *groupRepository) hydrateGroups(ctx context.Context, groups []*service.Group) error {
+	return hydrateGroupAuthorizationFields(ctx, txAwareSQLExecutor(ctx, r.sql, r.client), groups)
+}
+
 func (r *groupRepository) ListActive(ctx context.Context) ([]service.Group, error) {
 	groups, err := r.client.Group.Query().
 		Where(group.StatusEQ(service.StatusActive)).
@@ -397,6 +427,9 @@ func (r *groupRepository) ListActive(ctx context.Context) ([]service.Group, erro
 		g := groupEntityToService(groups[i])
 		outGroups = append(outGroups, *g)
 		groupIDs = append(groupIDs, g.ID)
+	}
+	if err := r.hydrateGroupSlice(ctx, outGroups); err != nil {
+		return nil, err
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
@@ -427,6 +460,9 @@ func (r *groupRepository) ListActiveByPlatform(ctx context.Context, platform str
 		g := groupEntityToService(groups[i])
 		outGroups = append(outGroups, *g)
 		groupIDs = append(groupIDs, g.ID)
+	}
+	if err := r.hydrateGroupSlice(ctx, outGroups); err != nil {
+		return nil, err
 	}
 
 	counts, err := r.loadAccountCounts(ctx, groupIDs)

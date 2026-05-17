@@ -28,6 +28,7 @@
                 v-model="filters.role"
                 :options="[
                   { value: '', label: t('admin.users.allRoles') },
+                  { value: 'super_admin', label: t('admin.users.superAdmin') },
                   { value: 'admin', label: t('admin.users.admin') },
                   { value: 'user', label: t('admin.users.user') }
                 ]"
@@ -293,8 +294,14 @@
           </template>
 
           <template #cell-role="{ value }">
-            <span :class="['badge', value === 'admin' ? 'badge-purple' : 'badge-gray']">
+            <span :class="['badge', value === 'super_admin' ? 'badge-primary' : value === 'admin' ? 'badge-purple' : 'badge-gray']">
               {{ t('admin.users.roles.' + value) }}
+            </span>
+          </template>
+
+          <template #cell-level="{ value }">
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {{ value ?? 0 }}
             </span>
           </template>
 
@@ -303,8 +310,9 @@
               <!-- 专属分组行 -->
               <span
                 v-if="getUserGroups(row).exclusive.length > 0"
-                class="group/ex relative inline-flex cursor-pointer items-center gap-1 whitespace-nowrap text-xs"
-                @click.stop="toggleExpandedGroup(row.id)"
+                class="group/ex relative inline-flex items-center gap-1 whitespace-nowrap text-xs"
+                :class="canEditAuthorization ? 'cursor-pointer' : 'cursor-default'"
+                @click.stop="canEditAuthorization && toggleExpandedGroup(row.id)"
               >
                 <Icon name="shield" size="xs" class="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
                 <span class="font-medium text-purple-600 dark:text-purple-400">{{ getUserGroups(row).exclusive.length }}</span>
@@ -316,12 +324,12 @@
                 >
                   <div class="absolute left-4 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-dark-600"></div>
                   <div class="flex flex-col gap-0.5 whitespace-nowrap">
-                    <span v-for="g in getUserGroups(row).exclusive" :key="g.id">{{ g.name }}</span>
+                    <span v-for="g in getUserGroups(row).exclusive" :key="'exclusive-tip-' + g.id">{{ g.name }}</span>
                   </div>
                 </div>
                 <!-- 点击展开分组操作菜单 -->
                 <div
-                  v-if="expandedGroupUserId === row.id"
+                  v-if="canEditAuthorization && expandedGroupUserId === row.id"
                   class="absolute left-0 top-full z-50 mt-1.5 min-w-[160px] overflow-hidden rounded-lg border border-gray-200 bg-white py-1 text-xs shadow-xl dark:border-dark-600 dark:bg-dark-700"
                 >
                   <div class="border-b border-gray-100 px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400 dark:border-dark-600 dark:text-dark-400">
@@ -335,6 +343,23 @@
                   >
                     <Icon name="swap" size="xs" class="h-3.5 w-3.5 flex-shrink-0 opacity-50" />
                     <span class="flex-1">{{ g.name }}</span>
+                  </div>
+                </div>
+              </span>
+              <!-- 授权分组行 -->
+              <span
+                v-if="getUserGroups(row).restricted.length > 0"
+                class="group/restricted relative inline-flex cursor-default items-center gap-1 whitespace-nowrap text-xs"
+              >
+                <Icon name="shield" size="xs" class="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+                <span class="font-medium text-amber-600 dark:text-amber-400">{{ getUserGroups(row).restricted.length }}</span>
+                <span class="text-gray-500 dark:text-dark-400">{{ t('admin.users.restrictedLabel') }}</span>
+                <div class="pointer-events-none absolute left-0 top-full z-50 mt-1.5 rounded bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-lg transition-opacity duration-75 group-hover/restricted:opacity-100 dark:bg-dark-600">
+                  <div class="absolute left-4 bottom-full border-4 border-transparent border-b-gray-900 dark:border-b-dark-600"></div>
+                  <div class="flex flex-col gap-0.5 whitespace-nowrap">
+                    <span v-for="g in getUserGroups(row).restricted" :key="g.id">
+                      {{ g.name }} · {{ t('admin.groups.form.minUserLevel') }} {{ g.min_user_level ?? 0 }}
+                    </span>
                   </div>
                 </div>
               </span>
@@ -356,7 +381,7 @@
               </span>
               <!-- 都没有 -->
               <span
-                v-if="getUserGroups(row).exclusive.length === 0 && getUserGroups(row).publicGroups.length === 0"
+                v-if="getUserGroups(row).exclusive.length === 0 && getUserGroups(row).restricted.length === 0 && getUserGroups(row).publicGroups.length === 0"
                 class="text-xs text-gray-400 dark:text-dark-500"
               >-</span>
             </div>
@@ -551,6 +576,7 @@
 
               <!-- Allowed Groups -->
               <button
+                v-if="canEditAuthorization"
                 @click="handleAllowedGroups(user); closeActionMenu()"
                 class="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-dark-700"
               >
@@ -622,6 +648,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
 import { formatDateTime } from '@/utils/format'
 import Icon from '@/components/icons/Icon.vue'
@@ -650,6 +677,8 @@ import UserBalanceHistoryModal from '@/components/admin/user/UserBalanceHistoryM
 import GroupReplaceModal from '@/components/admin/user/GroupReplaceModal.vue'
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
+const canEditAuthorization = computed(() => authStore.user?.role === 'super_admin')
 
 // Generate dynamic attribute columns from enabled definitions
 const attributeColumns = computed<Column[]>(() =>
@@ -706,6 +735,7 @@ const allColumns = computed<Column[]>(() => [
   // Dynamic attribute columns
   ...attributeColumns.value,
   { key: 'role', label: t('admin.users.columns.role'), sortable: true },
+  { key: 'level', label: t('admin.users.columns.level'), sortable: true },
   { key: 'groups', label: t('admin.users.columns.groups'), sortable: false },
   { key: 'subscriptions', label: t('admin.users.columns.subscriptions'), sortable: false },
   { key: 'balance', label: t('admin.users.columns.balance'), sortable: true },
@@ -805,7 +835,7 @@ const searchQuery = ref('')
 const USER_SORT_STORAGE_KEY = 'admin-users-table-sort'
 const loadInitialSortState = (): { sort_by: string; sort_order: 'asc' | 'desc' } => {
   const fallback = { sort_by: 'created_at', sort_order: 'desc' as 'asc' | 'desc' }
-  const sortable = new Set(['email', 'id', 'username', 'role', 'balance', 'concurrency', 'status', 'last_used_at', 'last_active_at', 'created_at'])
+  const sortable = new Set(['email', 'id', 'username', 'role', 'level', 'balance', 'concurrency', 'status', 'last_used_at', 'last_active_at', 'created_at'])
   try {
     const raw = localStorage.getItem(USER_SORT_STORAGE_KEY)
     if (!raw) return fallback
@@ -832,21 +862,27 @@ const loadAllGroups = async () => {
     console.error('Failed to load groups:', e)
   }
 }
-// Resolve user's accessible groups: exclusive groups first, then public groups
+// Resolve user's accessible groups by business authorization mode.
 const getUserGroups = (user: AdminUser) => {
   const exclusive: AdminGroup[] = []
+  const restricted: AdminGroup[] = []
   const publicGroups: AdminGroup[] = []
+  const userLevel = user.level ?? 0
   for (const g of allGroups.value) {
     if (g.status !== 'active' || g.subscription_type !== 'standard') continue
     if (g.is_exclusive) {
       if (user.allowed_groups?.includes(g.id)) {
         exclusive.push(g)
       }
-    } else {
+    } else if (g.access_mode === 'restricted') {
+      if (user.allowed_groups?.includes(g.id) && userLevel >= (g.min_user_level ?? 0)) {
+        restricted.push(g)
+      }
+    } else if (userLevel >= (g.min_user_level ?? 0)) {
       publicGroups.push(g)
     }
   }
-  return { exclusive, publicGroups }
+  return { exclusive, restricted, publicGroups }
 }
 
 // Group filter options: "All Groups" + active exclusive groups (value = group name for fuzzy match)

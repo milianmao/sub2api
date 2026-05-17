@@ -87,6 +87,8 @@ type CreateGroupRequest struct {
 	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity"`
 	RateMultiplier   float64            `json:"rate_multiplier"`
 	IsExclusive      bool               `json:"is_exclusive"`
+	AccessMode       *string            `json:"access_mode" binding:"omitempty,oneof=public restricted"`
+	MinUserLevel     *int               `json:"min_user_level" binding:"omitempty,min=0"`
 	SubscriptionType string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
 	DailyLimitUSD    optionalLimitField `json:"daily_limit_usd"`
 	WeeklyLimitUSD   optionalLimitField `json:"weekly_limit_usd"`
@@ -127,6 +129,8 @@ type UpdateGroupRequest struct {
 	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity"`
 	RateMultiplier   *float64           `json:"rate_multiplier"`
 	IsExclusive      *bool              `json:"is_exclusive"`
+	AccessMode       *string            `json:"access_mode" binding:"omitempty,oneof=public restricted"`
+	MinUserLevel     *int               `json:"min_user_level" binding:"omitempty,min=0"`
 	Status           string             `json:"status" binding:"omitempty,oneof=active inactive"`
 	SubscriptionType string             `json:"subscription_type" binding:"omitempty,oneof=standard subscription"`
 	DailyLimitUSD    optionalLimitField `json:"daily_limit_usd"`
@@ -248,6 +252,18 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive) {
+		return
+	}
+
+	accessMode := ""
+	if req.AccessMode != nil {
+		accessMode = *req.AccessMode
+	}
+	minUserLevel := 0
+	if req.MinUserLevel != nil {
+		minUserLevel = *req.MinUserLevel
+	}
 
 	group, err := h.adminService.CreateGroup(c.Request.Context(), &service.CreateGroupInput{
 		Name:                            req.Name,
@@ -255,6 +271,8 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		Platform:                        req.Platform,
 		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
+		AccessMode:                      accessMode,
+		MinUserLevel:                    minUserLevel,
 		SubscriptionType:                req.SubscriptionType,
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),
 		WeeklyLimitUSD:                  req.WeeklyLimitUSD.ToServiceInput(),
@@ -303,6 +321,9 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive != nil) {
+		return
+	}
 
 	group, err := h.adminService.UpdateGroup(c.Request.Context(), groupID, &service.UpdateGroupInput{
 		Name:                            req.Name,
@@ -310,6 +331,8 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		Platform:                        req.Platform,
 		RateMultiplier:                  req.RateMultiplier,
 		IsExclusive:                     req.IsExclusive,
+		AccessMode:                      req.AccessMode,
+		MinUserLevel:                    req.MinUserLevel,
 		Status:                          req.Status,
 		SubscriptionType:                req.SubscriptionType,
 		DailyLimitUSD:                   req.DailyLimitUSD.ToServiceInput(),

@@ -16,6 +16,8 @@ type Group struct {
 	Platform       string
 	RateMultiplier float64
 	IsExclusive    bool
+	AccessMode     string
+	MinUserLevel   int
 	Status         string
 	Hydrated       bool // indicates the group was loaded from a trusted repository source
 
@@ -82,6 +84,20 @@ func (g *Group) IsActive() bool {
 
 func (g *Group) IsSubscriptionType() bool {
 	return g.SubscriptionType == SubscriptionTypeSubscription
+}
+
+func (g *Group) EffectiveAccessMode() string {
+	if g.AccessMode == "" {
+		if g.IsExclusive {
+			return GroupAccessModeRestricted
+		}
+		return GroupAccessModePublic
+	}
+	return g.AccessMode
+}
+
+func (g *Group) IsRestrictedAccess() bool {
+	return g.EffectiveAccessMode() == GroupAccessModeRestricted
 }
 
 func (g *Group) HasDailyLimit() bool {

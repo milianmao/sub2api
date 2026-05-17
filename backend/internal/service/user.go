@@ -18,6 +18,7 @@ type User struct {
 	AvatarSHA256   string
 	PasswordHash   string
 	Role           string
+	Level          int
 	Balance        float64
 	Concurrency    int
 	Status         string
@@ -63,7 +64,15 @@ type User struct {
 }
 
 func (u *User) IsAdmin() bool {
-	return u.Role == RoleAdmin
+	return IsAdminRole(u.Role)
+}
+
+func (u *User) IsSuperAdmin() bool {
+	return u.Role == RoleSuperAdmin
+}
+
+func IsAdminRole(role string) bool {
+	return role == RoleAdmin || role == RoleSuperAdmin
 }
 
 func (u *User) IsActive() bool {
@@ -80,6 +89,15 @@ func (u *User) CanBindGroup(groupID int64, isExclusive bool) bool {
 		return true
 	}
 	// 专属分组：需要在 AllowedGroups 中
+	for _, id := range u.AllowedGroups {
+		if id == groupID {
+			return true
+		}
+	}
+	return false
+}
+
+func (u *User) HasAllowedGroup(groupID int64) bool {
 	for _, id := range u.AllowedGroups {
 		if id == groupID {
 			return true
