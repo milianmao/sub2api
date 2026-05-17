@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"testing"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -22,17 +23,29 @@ type GroupRepoSuite struct {
 }
 
 type forbidSQLExecutor struct {
-	called bool
+	delegate sqlExecutor
+	called   bool
 }
 
 func (s *forbidSQLExecutor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	s.called = true
-	return nil, errors.New("unexpected sql exec")
+	if queryTouchesAccountCount(query) {
+		s.called = true
+		return nil, errors.New("unexpected account count sql exec")
+	}
+	return s.delegate.ExecContext(ctx, query, args...)
 }
 
 func (s *forbidSQLExecutor) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	s.called = true
-	return nil, errors.New("unexpected sql query")
+	if queryTouchesAccountCount(query) {
+		s.called = true
+		return nil, errors.New("unexpected account count sql query")
+	}
+	return s.delegate.QueryContext(ctx, query, args...)
+}
+
+func queryTouchesAccountCount(query string) bool {
+	normalized := strings.ToLower(query)
+	return strings.Contains(normalized, "account_groups") || strings.Contains(normalized, "join accounts")
 }
 
 func (s *GroupRepoSuite) SetupTest() {
@@ -88,7 +101,7 @@ func (s *GroupRepoSuite) TestGetByIDLite_DoesNotUseAccountCount() {
 	}
 	s.Require().NoError(s.repo.Create(s.ctx, group))
 
-	spy := &forbidSQLExecutor{}
+	spy := &forbidSQLExecutor{delegate: s.tx}
 	repo := newGroupRepositoryWithSQL(s.tx.Client(), spy)
 
 	got, err := repo.GetByIDLite(s.ctx, group.ID)
