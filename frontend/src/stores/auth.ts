@@ -87,7 +87,7 @@ export const useAuthStore = defineStore('auth', () => {
   })
 
   const isAdmin = computed(() => {
-    return user.value?.role === 'admin'
+    return user.value?.role === 'admin' || user.value?.role === 'super_admin'
   })
 
   const isSimpleMode = computed(() => runMode.value === 'simple')

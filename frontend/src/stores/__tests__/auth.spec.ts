@@ -43,6 +43,14 @@ const fakeAdminUser = {
   role: 'admin' as const,
 }
 
+const fakeSuperAdminUser = {
+  ...fakeUser,
+  id: 3,
+  username: 'super-admin',
+  email: 'super-admin@example.com',
+  role: 'super_admin' as const,
+}
+
 const fakeAuthResponse = {
   access_token: 'test-token-123',
   refresh_token: 'refresh-token-456',
@@ -323,6 +331,16 @@ describe('useAuthStore', () => {
       const store = useAuthStore()
 
       await store.login({ email: 'admin@example.com', password: '123456' })
+
+      expect(store.isAdmin).toBe(true)
+    })
+
+    it('super_admin users return true', async () => {
+      const superAdminResponse = { ...fakeAuthResponse, user: { ...fakeSuperAdminUser } }
+      mockLogin.mockResolvedValue(superAdminResponse)
+      const store = useAuthStore()
+
+      await store.login({ email: 'super-admin@example.com', password: '123456' })
 
       expect(store.isAdmin).toBe(true)
     })
