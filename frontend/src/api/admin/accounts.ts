@@ -637,6 +637,11 @@ export async function setPrivacy(id: number): Promise<Account> {
   return data
 }
 
+export async function generateCheckoutLink(id: number): Promise<{ url: string }> {
+  const { data } = await apiClient.post<{ url: string }>(`/admin/accounts/${id}/checkout-link`)
+  return data
+}
+
 export const accountsAPI = {
   list,
   listWithEtag,
@@ -674,7 +679,8 @@ export const accountsAPI = {
   getAntigravityDefaultModelMapping,
   batchClearError,
   batchRefresh,
-  setPrivacy
+  setPrivacy,
+  generateCheckoutLink
 }
 
 export default accountsAPI

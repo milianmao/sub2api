@@ -981,6 +981,41 @@ func (h *AccountHandler) Refresh(c *gin.Context) {
 	response.Success(c, h.buildAccountResponseWithRuntime(c.Request.Context(), updatedAccount))
 }
 
+// CreateCheckoutLink generates a hosted ChatGPT Plus checkout URL for one OpenAI OAuth account.
+// POST /api/v1/admin/accounts/:id/checkout-link
+func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
+	accountID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		response.BadRequest(c, "Invalid account ID")
+		return
+	}
+
+	ctx := c.Request.Context()
+	account, err := h.adminService.GetAccount(ctx, accountID)
+	if err != nil {
+		response.NotFound(c, "Account not found")
+		return
+	}
+	if account.Platform != service.PlatformOpenAI || account.Type != service.AccountTypeOAuth {
+		response.BadRequest(c, "Only OpenAI OAuth accounts support checkout link generation")
+		return
+	}
+	if h.openaiOAuthService == nil {
+		response.InternalError(c, "OpenAI OAuth service is unavailable")
+		return
+	}
+
+	accessToken := account.GetCredential("access_token")
+	proxyURL := h.openaiOAuthService.ResolveAccountProxyURL(ctx, account)
+	checkoutURL, err := h.openaiOAuthService.CreateCheckoutLink(ctx, accessToken, proxyURL)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	response.Success(c, gin.H{"url": checkoutURL})
+}
+
 // GetStats handles getting account statistics
 // GET /api/v1/admin/accounts/:id/stats
 func (h *AccountHandler) GetStats(c *gin.Context) {
