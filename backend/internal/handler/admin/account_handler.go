@@ -1006,8 +1006,16 @@ func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
 	}
 
 	accessToken := account.GetCredential("access_token")
+	cookies := strings.TrimSpace(account.GetCredential("cookies"))
+	if cookies == "" {
+		cookies = strings.TrimSpace(account.GetCredential("cookie"))
+	}
 	proxyURL := h.openaiOAuthService.ResolveAccountProxyURL(ctx, account)
-	checkoutURL, err := h.openaiOAuthService.CreateCheckoutLink(ctx, accessToken, proxyURL)
+	checkoutURL, err := h.openaiOAuthService.CreateCheckoutLink(ctx, service.CreateCheckoutLinkRequest{
+		AccessToken: accessToken,
+		ProxyURL:    proxyURL,
+		Cookies:     cookies,
+	})
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return

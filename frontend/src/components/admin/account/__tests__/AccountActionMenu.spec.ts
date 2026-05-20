@@ -37,6 +37,29 @@ function mountMenu(account: Record<string, unknown>) {
 }
 
 describe('AccountActionMenu checkout link action', () => {
+  it('shows copy access token action for OAuth accounts and emits the selected account', async () => {
+    const wrapper = mountMenu(baseAccount)
+
+    expect(wrapper.text()).toContain('admin.accounts.copyAccessToken')
+
+    const button = wrapper.findAll('button').find(item => item.text().includes('admin.accounts.copyAccessToken'))
+    expect(button).toBeTruthy()
+
+    await button!.trigger('click')
+
+    expect(wrapper.emitted('copy-access-token')?.[0]).toEqual([baseAccount])
+    expect(wrapper.emitted('close')).toBeTruthy()
+  })
+
+  it('hides copy access token action for non OAuth accounts', () => {
+    const wrapper = mountMenu({
+      ...baseAccount,
+      type: 'apikey'
+    })
+
+    expect(wrapper.text()).not.toContain('admin.accounts.copyAccessToken')
+  })
+
   it('shows checkout link action for OpenAI OAuth accounts and emits the selected account', async () => {
     const wrapper = mountMenu(baseAccount)
 

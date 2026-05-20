@@ -10,6 +10,7 @@ const {
   getAllProxies,
   getAllGroups,
   generateCheckoutLink,
+  copyToClipboard,
   showSuccess,
   showError,
   windowOpen
@@ -20,6 +21,7 @@ const {
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
   generateCheckoutLink: vi.fn(),
+  copyToClipboard: vi.fn(),
   showSuccess: vi.fn(),
   showError: vi.fn(),
   windowOpen: vi.fn()
@@ -60,6 +62,12 @@ vi.mock('@/stores/auth', () => ({
   })
 }))
 
+vi.mock('@/composables/useClipboard', () => ({
+  useClipboard: () => ({
+    copyToClipboard
+  })
+}))
+
 vi.mock('vue-i18n', async () => {
   const actual = await vi.importActual<typeof import('vue-i18n')>('vue-i18n')
   return {
@@ -87,8 +95,13 @@ const BulkEditAccountModalStub = {
 }
 
 const AccountActionMenuStub = {
-  emits: ['generate-checkout-link'],
-  template: '<button data-test="generate-checkout-link" @click="$emit(\'generate-checkout-link\', { id: 42 })">generate</button>'
+  emits: ['generate-checkout-link', 'copy-access-token'],
+  template: `
+    <div>
+      <button data-test="generate-checkout-link" @click="$emit('generate-checkout-link', { id: 42 })">generate</button>
+      <button data-test="copy-access-token" @click="$emit('copy-access-token', { id: 42, credentials: { access_token: 'account-access-token' } })">copy</button>
+    </div>
+  `
 }
 
 describe('admin AccountsView bulk edit scope', () => {
@@ -101,6 +114,7 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockReset()
     getAllGroups.mockReset()
     generateCheckoutLink.mockReset()
+    copyToClipboard.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
     windowOpen.mockReset()
@@ -122,6 +136,7 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
     generateCheckoutLink.mockResolvedValue('https://chatgpt.com/checkout/example')
+    copyToClipboard.mockResolvedValue(true)
   })
 
   it('opens bulk edit in filtered-results mode from the bulk actions dropdown', async () => {
@@ -274,5 +289,102 @@ describe('admin AccountsView bulk edit scope', () => {
 
     expect(windowOpen).not.toHaveBeenCalled()
     expect(showError).toHaveBeenCalledWith('Checkout unavailable for this account')
+  })
+
+  it('copies an account access token from the account action menu', async () => {
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.get('[data-test="copy-access-token"]').trigger('click')
+    await flushPromises()
+
+    expect(copyToClipboard).toHaveBeenCalledWith('account-access-token', 'admin.accounts.accessTokenCopied')
+    expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('shows a clear error when the account has no access token to copy', async () => {
+    const AccountActionMenuWithoutTokenStub = {
+      emits: ['copy-access-token'],
+      template: '<button data-test="copy-access-token" @click="$emit(\'copy-access-token\', { id: 42, credentials: {} })">copy</button>'
+    }
+
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuWithoutTokenStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.get('[data-test="copy-access-token"]').trigger('click')
+    await flushPromises()
+
+    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(showError).toHaveBeenCalledWith('admin.accounts.accessTokenUnavailable')
   })
 })

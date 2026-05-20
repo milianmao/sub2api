@@ -113,6 +113,46 @@ func TestAccountHandlerCreateCheckoutLink_ReturnsPlainTextURL(t *testing.T) {
 	require.Equal(t, "https://chatgpt.com/payments/checkout/session-1", rec.Body.String())
 }
 
+func TestAccountHandlerCreateCheckoutLink_ForwardsAccountCookies(t *testing.T) {
+	checkoutServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "foo=bar; oai-did=device-123", r.Header.Get("Cookie"))
+		require.Equal(t, "device-123", r.Header.Get("oai-device-id"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"url":"https://chatgpt.com/payments/checkout/session-1"}`))
+	}))
+	defer checkoutServer.Close()
+
+	oldURL := service.SetChatGPTCheckoutURLForTest(checkoutServer.URL)
+	defer service.SetChatGPTCheckoutURLForTest(oldURL)
+
+	adminSvc := &checkoutLinkAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       43,
+			Platform: service.PlatformOpenAI,
+			Type:     service.AccountTypeOAuth,
+			Status:   service.StatusActive,
+			Credentials: map[string]any{
+				"access_token": "access-token-1",
+				"cookies":      "foo=bar; oai-did=device-123",
+			},
+		},
+	}
+	oauthSvc := service.NewOpenAIOAuthService(nil, &checkoutLinkOAuthClient{})
+	oauthSvc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+	router := setupCheckoutLinkRouter(adminSvc, oauthSvc)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/43/checkout-link", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Header().Get("Content-Type"), "text/plain")
+	require.Equal(t, "https://chatgpt.com/payments/checkout/session-1", rec.Body.String())
+}
+
 type checkoutLinkOAuthClient struct{}
 
 func (c *checkoutLinkOAuthClient) ExchangeCode(context.Context, string, string, string, string, string) (*openai.TokenResponse, error) {
