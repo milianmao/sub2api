@@ -42,9 +42,8 @@ func TestOpenAIOAuthService_CreateCheckoutLink_PostsExpectedPayloadWithProxy(t *
 	}))
 	defer server.Close()
 
-	oldURL := chatGPTCheckoutURL
-	chatGPTCheckoutURL = server.URL
-	defer func() { chatGPTCheckoutURL = oldURL }()
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
 
 	svc := NewOpenAIOAuthService(nil, nil)
 	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
@@ -65,9 +64,8 @@ func TestOpenAIOAuthService_CreateCheckoutLink_RejectsNonHTTPURL(t *testing.T) {
 	}))
 	defer server.Close()
 
-	oldURL := chatGPTCheckoutURL
-	chatGPTCheckoutURL = server.URL
-	defer func() { chatGPTCheckoutURL = oldURL }()
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
 
 	svc := NewOpenAIOAuthService(nil, nil)
 	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
@@ -85,9 +83,8 @@ func TestOpenAIOAuthService_CreateCheckoutLink_MapsUpstreamUnauthorizedToBadGate
 	}))
 	defer server.Close()
 
-	oldURL := chatGPTCheckoutURL
-	chatGPTCheckoutURL = server.URL
-	defer func() { chatGPTCheckoutURL = oldURL }()
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
 
 	svc := NewOpenAIOAuthService(nil, nil)
 	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {

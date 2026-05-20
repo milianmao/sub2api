@@ -637,8 +637,8 @@ export async function setPrivacy(id: number): Promise<Account> {
   return data
 }
 
-export async function generateCheckoutLink(id: number): Promise<{ url: string }> {
-  const { data } = await apiClient.post<{ url: string }>(`/admin/accounts/${id}/checkout-link`)
+export async function generateCheckoutLink(id: number): Promise<string> {
+  const { data } = await apiClient.post<string>(`/admin/accounts/${id}/checkout-link`, undefined, { responseType: 'text' })
   return data
 }
 

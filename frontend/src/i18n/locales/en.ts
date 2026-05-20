@@ -3061,7 +3061,6 @@ export default {
       reAuthorize: 'Re-Authorize',
       refreshToken: 'Refresh Token',
       generateCheckoutLink: 'Generate Payment Link',
-      checkoutLinkCopied: 'Payment link copied',
       checkoutLinkFailed: 'Failed to generate payment link',
       noAccountsYet: 'No accounts yet',
       createFirstAccount: 'Create your first account to start using AI services.',

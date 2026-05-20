@@ -10,9 +10,9 @@ const {
   getAllProxies,
   getAllGroups,
   generateCheckoutLink,
-  copyToClipboard,
   showSuccess,
-  showError
+  showError,
+  windowOpen
 } = vi.hoisted(() => ({
   listAccounts: vi.fn(),
   listWithEtag: vi.fn(),
@@ -20,9 +20,9 @@ const {
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
   generateCheckoutLink: vi.fn(),
-  copyToClipboard: vi.fn(),
   showSuccess: vi.fn(),
-  showError: vi.fn()
+  showError: vi.fn(),
+  windowOpen: vi.fn()
 }))
 
 vi.mock('@/api/admin', () => ({
@@ -51,12 +51,6 @@ vi.mock('@/stores/app', () => ({
     showError,
     showSuccess,
     showInfo: vi.fn()
-  })
-}))
-
-vi.mock('@/composables/useClipboard', () => ({
-  useClipboard: () => ({
-    copyToClipboard
   })
 }))
 
@@ -107,9 +101,10 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockReset()
     getAllGroups.mockReset()
     generateCheckoutLink.mockReset()
-    copyToClipboard.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
+    windowOpen.mockReset()
+    vi.stubGlobal('open', windowOpen)
 
     listAccounts.mockResolvedValue({
       items: [],
@@ -126,8 +121,7 @@ describe('admin AccountsView bulk edit scope', () => {
     getBatchTodayStats.mockResolvedValue({ stats: {} })
     getAllProxies.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
-    generateCheckoutLink.mockResolvedValue({ url: 'https://chatgpt.com/checkout/example' })
-    copyToClipboard.mockResolvedValue(true)
+    generateCheckoutLink.mockResolvedValue('https://chatgpt.com/checkout/example')
   })
 
   it('opens bulk edit in filtered-results mode from the bulk actions dropdown', async () => {
@@ -176,7 +170,7 @@ describe('admin AccountsView bulk edit scope', () => {
     expect(wrapper.get('[data-test="bulk-edit-modal"]').attributes('data-target-mode')).toBe('filtered')
   })
 
-  it('generates and copies an OpenAI checkout link from the account action menu', async () => {
+  it('generates and opens an OpenAI checkout link from the account action menu', async () => {
     const wrapper = mount(AccountsView, {
       global: {
         stubs: {
@@ -219,9 +213,10 @@ describe('admin AccountsView bulk edit scope', () => {
     await flushPromises()
 
     expect(generateCheckoutLink).toHaveBeenCalledWith(42)
-    expect(copyToClipboard).toHaveBeenCalledWith(
+    expect(windowOpen).toHaveBeenCalledWith(
       'https://chatgpt.com/checkout/example',
-      'admin.accounts.checkoutLinkCopied'
+      '_blank',
+      'noopener,noreferrer'
     )
     expect(showSuccess).not.toHaveBeenCalled()
     expect(showError).not.toHaveBeenCalled()
@@ -277,7 +272,7 @@ describe('admin AccountsView bulk edit scope', () => {
     await wrapper.get('[data-test="generate-checkout-link"]').trigger('click')
     await flushPromises()
 
-    expect(copyToClipboard).not.toHaveBeenCalled()
+    expect(windowOpen).not.toHaveBeenCalled()
     expect(showError).toHaveBeenCalledWith('Checkout unavailable for this account')
   })
 })

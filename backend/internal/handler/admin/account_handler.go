@@ -1013,7 +1013,7 @@ func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"url": checkoutURL})
+	c.String(http.StatusOK, checkoutURL)
 }
 
 // GetStats handles getting account statistics

@@ -13,6 +13,12 @@ import (
 
 var chatGPTCheckoutURL = "https://chatgpt.com/backend-api/payments/checkout"
 
+func SetChatGPTCheckoutURLForTest(url string) string {
+	oldURL := chatGPTCheckoutURL
+	chatGPTCheckoutURL = url
+	return oldURL
+}
+
 type chatGPTCheckoutPayload struct {
 	PlanName       string                 `json:"plan_name"`
 	BillingDetails map[string]string      `json:"billing_details"`

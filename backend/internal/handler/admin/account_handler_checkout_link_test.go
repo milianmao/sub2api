@@ -8,8 +8,10 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/imroc/req/v3"
 	"github.com/stretchr/testify/require"
 )
 
@@ -71,6 +73,46 @@ func TestAccountHandlerCreateCheckoutLink_RequiresAccessToken(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestAccountHandlerCreateCheckoutLink_ReturnsPlainTextURL(t *testing.T) {
+	checkoutServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"url":"https://chatgpt.com/payments/checkout/session-1"}`))
+	}))
+	defer checkoutServer.Close()
+
+	oldURL := service.SetChatGPTCheckoutURLForTest(checkoutServer.URL)
+	defer service.SetChatGPTCheckoutURLForTest(oldURL)
+
+	proxyID := int64(7)
+	adminSvc := &checkoutLinkAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       43,
+			Platform: service.PlatformOpenAI,
+			Type:     service.AccountTypeOAuth,
+			Status:   service.StatusActive,
+			ProxyID:  &proxyID,
+			Credentials: map[string]any{
+				"access_token": "access-token-1",
+			},
+		},
+	}
+	oauthSvc := service.NewOpenAIOAuthService(&checkoutLinkProxyRepo{}, &checkoutLinkOAuthClient{})
+	oauthSvc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		require.Equal(t, "http://127.0.0.1:8080", proxyURL)
+		return req.C(), nil
+	})
+	router := setupCheckoutLinkRouter(adminSvc, oauthSvc)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/43/checkout-link", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Header().Get("Content-Type"), "text/plain")
+	require.Equal(t, "https://chatgpt.com/payments/checkout/session-1", rec.Body.String())
+}
+
 type checkoutLinkOAuthClient struct{}
 
 func (c *checkoutLinkOAuthClient) ExchangeCode(context.Context, string, string, string, string, string) (*openai.TokenResponse, error) {
@@ -82,5 +124,68 @@ func (c *checkoutLinkOAuthClient) RefreshToken(context.Context, string, string) 
 }
 
 func (c *checkoutLinkOAuthClient) RefreshTokenWithClientID(context.Context, string, string, string) (*openai.TokenResponse, error) {
+	return nil, errors.New("not implemented")
+}
+
+type checkoutLinkProxyRepo struct{}
+
+func (r *checkoutLinkProxyRepo) Create(context.Context, *service.Proxy) error {
+	return errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) GetByID(_ context.Context, id int64) (*service.Proxy, error) {
+	if id != 7 {
+		return nil, service.ErrProxyNotFound
+	}
+	return &service.Proxy{
+		ID:       id,
+		Protocol: "http",
+		Host:     "127.0.0.1",
+		Port:     8080,
+		Status:   service.StatusActive,
+	}, nil
+}
+
+func (r *checkoutLinkProxyRepo) ListByIDs(context.Context, []int64) ([]service.Proxy, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) Update(context.Context, *service.Proxy) error {
+	return errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) Delete(context.Context, int64) error {
+	return errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) List(context.Context, pagination.PaginationParams) ([]service.Proxy, *pagination.PaginationResult, error) {
+	return nil, nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) ListWithFilters(context.Context, pagination.PaginationParams, string, string, string) ([]service.Proxy, *pagination.PaginationResult, error) {
+	return nil, nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) ListWithFiltersAndAccountCount(context.Context, pagination.PaginationParams, string, string, string) ([]service.ProxyWithAccountCount, *pagination.PaginationResult, error) {
+	return nil, nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) ListActive(context.Context) ([]service.Proxy, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) ListActiveWithAccountCount(context.Context) ([]service.ProxyWithAccountCount, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) ExistsByHostPortAuth(context.Context, string, int, string, string) (bool, error) {
+	return false, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) CountAccountsByProxyID(context.Context, int64) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) ListAccountSummariesByProxyID(context.Context, int64) ([]service.ProxyAccountSummary, error) {
 	return nil, errors.New("not implemented")
 }

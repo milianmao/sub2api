@@ -17,12 +17,12 @@ describe('admin accounts api', () => {
     post.mockReset()
   })
 
-  it('generates checkout links through the account checkout endpoint', async () => {
-    post.mockResolvedValueOnce({ data: { url: 'https://chatgpt.com/checkout/example' } })
+  it('generates checkout links through the account checkout endpoint as text', async () => {
+    post.mockResolvedValueOnce({ data: 'https://chatgpt.com/checkout/example' })
 
     const result = await accountsAPI.generateCheckoutLink(42)
 
-    expect(post).toHaveBeenCalledWith('/admin/accounts/42/checkout-link')
-    expect(result).toEqual({ url: 'https://chatgpt.com/checkout/example' })
+    expect(post).toHaveBeenCalledWith('/admin/accounts/42/checkout-link', undefined, { responseType: 'text' })
+    expect(result).toBe('https://chatgpt.com/checkout/example')
   })
 })

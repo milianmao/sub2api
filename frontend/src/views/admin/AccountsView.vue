@@ -384,7 +384,6 @@ import { adminAPI } from '@/api/admin'
 import { useTableLoader } from '@/composables/useTableLoader'
 import { useSwipeSelect, type SwipeSelectVirtualContext } from '@/composables/useSwipeSelect'
 import { useTableSelection } from '@/composables/useTableSelection'
-import { useClipboard } from '@/composables/useClipboard'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
 import DataTable from '@/components/common/DataTable.vue'
@@ -417,7 +416,6 @@ import type { Account, AccountPlatform, AccountType, Proxy as AccountProxy, Admi
 const { t } = useI18n()
 const appStore = useAppStore()
 const authStore = useAuthStore()
-const { copyToClipboard } = useClipboard()
 
 const proxies = ref<AccountProxy[]>([])
 const groups = ref<AdminGroup[]>([])
@@ -1587,13 +1585,25 @@ const handleSetPrivacy = async (a: Account) => {
     appStore.showError(error?.response?.data?.message || t('admin.accounts.privacyFailed'))
   }
 }
+const extractCheckoutLinkErrorMessage = (error: any) => {
+  const data = error?.response?.data
+  if (typeof data === 'string') {
+    try {
+      const parsed = JSON.parse(data)
+      return parsed?.message || parsed?.detail
+    } catch {
+      return data || undefined
+    }
+  }
+  return data?.message || data?.detail || error?.message
+}
 const handleGenerateCheckoutLink = async (a: Account) => {
   try {
-    const { url } = await adminAPI.accounts.generateCheckoutLink(a.id)
-    await copyToClipboard(url, t('admin.accounts.checkoutLinkCopied'))
+    const url = await adminAPI.accounts.generateCheckoutLink(a.id)
+    window.open(url, '_blank', 'noopener,noreferrer')
   } catch (error: any) {
     console.error('Failed to generate checkout link:', error)
-    appStore.showError(error?.response?.data?.message || error?.response?.data?.detail || error?.message || t('admin.accounts.checkoutLinkFailed'))
+    appStore.showError(extractCheckoutLinkErrorMessage(error) || t('admin.accounts.checkoutLinkFailed'))
   }
 }
 const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
