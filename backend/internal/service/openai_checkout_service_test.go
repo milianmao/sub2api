@@ -408,6 +408,108 @@ func TestOpenAIOAuthService_CreateCheckoutLink_MapsUpstreamUnauthorizedToBadGate
 	require.Equal(t, http.StatusBadGateway, infraerrors.Code(err))
 }
 
+func TestOpenAIOAuthService_CreateCheckoutLink_UsesCloudCheckoutFirst(t *testing.T) {
+	localCalled := false
+	localServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		localCalled = true
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"checkout_session_id":"cs_live_local_123"}`))
+	}))
+	defer localServer.Close()
+
+	cloudServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, http.MethodPost, r.Method)
+		require.Equal(t, "cloud-key", r.Header.Get("X-API-Key"))
+		require.Contains(t, r.Header.Get("Content-Type"), "application/json")
+
+		var payload map[string]any
+		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "access-token-1", payload["accessToken"])
+		require.Equal(t, "paypal", payload["paymentMethod"])
+		require.Equal(t, "US", payload["country"])
+		require.Equal(t, "USD", payload["currency"])
+
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"preferredCheckoutUrl":"https://chatgpt.com/checkout/openai_llc/cs_live_cloud_123"}`))
+	}))
+	defer cloudServer.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(localServer.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetCheckoutCloudConfigForTest(cloudServer.URL, "cloud-key")
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_cloud_123", checkoutURL)
+	require.False(t, localCalled)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLink_FallsBackToLocalWhenCloudFails(t *testing.T) {
+	localCalls := 0
+	localServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		localCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"checkout_session_id":"cs_live_local_123"}`))
+	}))
+	defer localServer.Close()
+
+	cloudServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"detail":"cloud unavailable"}`))
+	}))
+	defer cloudServer.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(localServer.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetCheckoutCloudConfigForTest(cloudServer.URL, "cloud-key")
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_local_123", checkoutURL)
+	require.Equal(t, 1, localCalls)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLink_FallsBackToLocalWhenCloudURLUntrusted(t *testing.T) {
+	localCalls := 0
+	localServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		localCalls++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"checkout_session_id":"cs_live_local_123"}`))
+	}))
+	defer localServer.Close()
+
+	cloudServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"preferredCheckoutUrl":"https://evil.example/pay"}`))
+	}))
+	defer cloudServer.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(localServer.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetCheckoutCloudConfigForTest(cloudServer.URL, "cloud-key")
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_local_123", checkoutURL)
+	require.Equal(t, 1, localCalls)
+}
+
 func TestOpenAIOAuthService_CreateCheckoutLink_ManualUpstream(t *testing.T) {
 	accessToken := os.Getenv("CHECKOUT_TOKEN")
 	if accessToken == "" {

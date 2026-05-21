@@ -10,11 +10,17 @@ import (
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
+	"github.com/imroc/req/v3"
 )
 
 var chatGPTCheckoutURL = "https://chatgpt.com/backend-api/payments/checkout"
 
 var chatGPTTeamCheckoutBaseURL = "https://chatgpt.com/checkout/openai_llc/"
+
+const (
+	defaultOpenAICheckoutCloudURL    = "https://gujumpgate.zg.fyi/api/checkout"
+	defaultOpenAICheckoutCloudAPIKey = "2KwVxE6f0ABH002JLkoQJ9ReRf4_d01y"
+)
 
 var chatGPTCountryCurrency = map[string]string{
 	"SG": "SGD",
@@ -51,6 +57,21 @@ type chatGPTCheckoutResponse struct {
 	StripeHostedURL   string `json:"stripe_hosted_url"`
 	CheckoutURL       string `json:"checkout_url"`
 	CheckoutSessionID string `json:"checkout_session_id"`
+}
+
+type openAICheckoutCloudPayload struct {
+	AccessToken   string `json:"accessToken"`
+	PaymentMethod string `json:"paymentMethod"`
+	Country       string `json:"country"`
+	Currency      string `json:"currency"`
+}
+
+type openAICheckoutCloudResponse struct {
+	PreferredCheckoutURL string `json:"preferredCheckoutUrl"`
+	HostedCheckoutURL    string `json:"hostedCheckoutUrl"`
+	ConvertedCheckoutURL string `json:"convertedCheckoutUrl"`
+	ChatGPTCheckoutURL   string `json:"chatgptCheckoutUrl"`
+	CheckoutURL          string `json:"checkoutUrl"`
 }
 
 type CheckoutLinkStatus string
@@ -110,6 +131,18 @@ func (s *OpenAIOAuthService) CreateCheckoutLinkResult(ctx context.Context, check
 	}
 
 	billingDetails := resolveCheckoutBillingDetails(checkoutReq.Country, checkoutReq.Currency)
+	if cloudResult, cloudErr := s.createCheckoutLinkViaCloud(ctx, client, accessToken, billingDetails); cloudErr == nil {
+		return cloudResult, nil
+	} else {
+		slog.Warn("openai_checkout_cloud_failed_fallback_local",
+			"cloud_url_configured", strings.TrimSpace(s.checkoutCloudURL) != "",
+			"cloud_api_key_configured", strings.TrimSpace(s.checkoutCloudAPIKey) != "",
+			"proxy_configured", strings.TrimSpace(checkoutReq.ProxyURL) != "",
+			"country", billingDetails["country"],
+			"currency", billingDetails["currency"],
+			"error", cloudErr.Error(),
+		)
+	}
 	payloadBytes, err := json.Marshal(chatGPTCheckoutPayload{
 		EntryPoint:     "all_plans_pricing_modal",
 		PlanName:       "chatgptplusplan",
@@ -220,6 +253,46 @@ func (s *OpenAIOAuthService) CreateCheckoutLinkResult(ctx context.Context, check
 	return CreateCheckoutLinkResult{URL: checkoutURL, Status: CheckoutLinkStatusURL}, nil
 }
 
+func (s *OpenAIOAuthService) createCheckoutLinkViaCloud(ctx context.Context, client *req.Client, accessToken string, billingDetails map[string]string) (CreateCheckoutLinkResult, error) {
+	cloudURL := strings.TrimSpace(s.checkoutCloudURL)
+	if cloudURL == "" {
+		return CreateCheckoutLinkResult{}, infraerrors.InternalServer("OPENAI_CHECKOUT_CLOUD_URL_REQUIRED", "cloud checkout url is required")
+	}
+	payloadBytes, err := json.Marshal(openAICheckoutCloudPayload{
+		AccessToken:   strings.TrimSpace(accessToken),
+		PaymentMethod: "paypal",
+		Country:       billingDetails["country"],
+		Currency:      billingDetails["currency"],
+	})
+	if err != nil {
+		return CreateCheckoutLinkResult{}, err
+	}
+
+	request := client.R().
+		SetContext(ctx).
+		SetHeader("Accept", "application/json").
+		SetHeader("Accept-Language", "zh-CN,zh;q=0.9,en;q=0.8").
+		SetHeader("Content-Type", "application/json").
+		SetBody(payloadBytes)
+	if apiKey := strings.TrimSpace(s.checkoutCloudAPIKey); apiKey != "" {
+		request.SetHeader("X-API-Key", apiKey)
+	}
+
+	resp, err := request.Post(cloudURL)
+	if err != nil {
+		return CreateCheckoutLinkResult{}, err
+	}
+	if !resp.IsSuccessState() {
+		return CreateCheckoutLinkResult{}, infraerrors.Newf(http.StatusBadGateway, "OPENAI_CHECKOUT_CLOUD_UPSTREAM_FAILED", "cloud checkout request failed with status %d", resp.StatusCode)
+	}
+
+	checkoutURL := checkoutURLFromCloudRawResponse(resp.String())
+	if !isTrustedCheckoutURL(checkoutURL) {
+		return CreateCheckoutLinkResult{}, infraerrors.BadRequest("OPENAI_CHECKOUT_CLOUD_INVALID_URL", "cloud checkout response did not include a valid url")
+	}
+	return CreateCheckoutLinkResult{URL: checkoutURL, Status: CheckoutLinkStatusURL}, nil
+}
+
 // ResolveAccountProxyURL returns the account proxy URL when one is configured.
 func (s *OpenAIOAuthService) ResolveAccountProxyURL(ctx context.Context, account *Account) string {
 	if s == nil || s.proxyRepo == nil || account == nil || account.ProxyID == nil {
@@ -271,6 +344,21 @@ func firstCheckoutURL(result chatGPTCheckoutResponse) string {
 	}
 	if checkoutSessionID := strings.TrimSpace(result.CheckoutSessionID); checkoutSessionID != "" {
 		return checkoutURLFromSessionID(checkoutSessionID)
+	}
+	return ""
+}
+
+func firstCloudCheckoutURL(result openAICheckoutCloudResponse) string {
+	for _, value := range []string{
+		result.PreferredCheckoutURL,
+		result.HostedCheckoutURL,
+		result.ConvertedCheckoutURL,
+		result.ChatGPTCheckoutURL,
+		result.CheckoutURL,
+	} {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
 	}
 	return ""
 }
@@ -394,6 +482,14 @@ func checkoutURLFromRawResponse(value string) string {
 		}
 	}
 	return checkoutURLFromSessionID(extractCheckoutSessionID(value))
+}
+
+func checkoutURLFromCloudRawResponse(value string) string {
+	var result openAICheckoutCloudResponse
+	if json.Unmarshal([]byte(value), &result) == nil {
+		return firstCloudCheckoutURL(result)
+	}
+	return ""
 }
 
 func extractCheckoutSessionID(value string) string {
