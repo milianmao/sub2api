@@ -38,6 +38,7 @@ func SetChatGPTCheckoutURLForTest(url string) string {
 }
 
 type chatGPTCheckoutPayload struct {
+	EntryPoint     string            `json:"entry_point"`
 	PlanName       string            `json:"plan_name"`
 	BillingDetails map[string]string `json:"billing_details"`
 	CancelURL      string            `json:"cancel_url"`
@@ -110,6 +111,7 @@ func (s *OpenAIOAuthService) CreateCheckoutLinkResult(ctx context.Context, check
 
 	billingDetails := resolveCheckoutBillingDetails(checkoutReq.Country, checkoutReq.Currency)
 	payloadBytes, err := json.Marshal(chatGPTCheckoutPayload{
+		EntryPoint:     "all_plans_pricing_modal",
 		PlanName:       "chatgptplusplan",
 		BillingDetails: billingDetails,
 		CancelURL:      "https://chatgpt.com/#pricing",

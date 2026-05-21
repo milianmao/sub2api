@@ -34,6 +34,7 @@ func TestOpenAIOAuthService_CreateCheckoutLink_PostsExpectedPayloadWithProxy(t *
 
 		var payload map[string]any
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&payload))
+		require.Equal(t, "all_plans_pricing_modal", payload["entry_point"])
 		require.Equal(t, "chatgptplusplan", payload["plan_name"])
 		require.Equal(t, "https://chatgpt.com/#pricing", payload["cancel_url"])
 		require.Equal(t, "hosted", payload["checkout_ui_mode"])
