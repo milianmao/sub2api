@@ -323,9 +323,6 @@ func (r *groupRepository) listWithAccountCountSort(ctx context.Context, q *dbent
 		groupIDs[i] = r.ID
 		entries = append(entries, sortEntry{id: r.ID, sortOrder: r.SortOrder})
 	}
-	if err := r.hydrateGroupSlice(ctx, outGroups); err != nil {
-		return nil, nil, err
-	}
 
 	// 第二步：批量加载 account counts（一次 SQL）。
 	counts, err := r.loadAccountCounts(ctx, groupIDs)
