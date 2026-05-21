@@ -1005,11 +1005,8 @@ func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
 		return
 	}
 
-	accessToken := account.GetCredential("access_token")
-	cookies := strings.TrimSpace(account.GetCredential("cookies"))
-	if cookies == "" {
-		cookies = strings.TrimSpace(account.GetCredential("cookie"))
-	}
+	accessToken := checkoutCredential(account, "access_token", "token", "accessToken", "legacy_token", "session_token")
+	cookies := checkoutCredential(account, "cookies", "cookie")
 	proxyURL := h.openaiOAuthService.ResolveAccountProxyURL(ctx, account)
 	checkoutURL, err := h.openaiOAuthService.CreateCheckoutLink(ctx, service.CreateCheckoutLinkRequest{
 		AccessToken: accessToken,
@@ -1022,6 +1019,15 @@ func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
 	}
 
 	c.String(http.StatusOK, checkoutURL)
+}
+
+func checkoutCredential(account *service.Account, keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(account.GetCredential(key)); value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // GetStats handles getting account statistics
