@@ -132,6 +132,70 @@ func TestOpenAIOAuthService_CreateCheckoutLink_AcceptsAlternateURLFields(t *test
 	}
 }
 
+func TestOpenAIOAuthService_CreateCheckoutLinkResult_DetectsZeroAmountTrial(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"amount_total":0,"currency":"usd","checkout_session_id":"cs_live_trial_123"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	result, err := svc.CreateCheckoutLinkResult(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, CheckoutLinkStatusTrialEligible, result.Status)
+	require.Empty(t, result.URL)
+	require.Equal(t, "账号具备 0 元试用资格", result.Text())
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLinkResult_IgnoresNonCheckoutZeroAmount(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"metadata":{"total":0},"checkout_session_id":"cs_live_test_123"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	result, err := svc.CreateCheckoutLinkResult(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, CheckoutLinkStatusURL, result.Status)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_test_123", result.URL)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLinkResult_DetectsNestedCheckoutZeroAmount(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"checkout":{"total":"0.00"},"checkout_session_id":"cs_live_trial_123"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	result, err := svc.CreateCheckoutLinkResult(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, CheckoutLinkStatusTrialEligible, result.Status)
+	require.Empty(t, result.URL)
+}
+
 func TestOpenAIOAuthService_CreateCheckoutLink_AcceptsCheckoutSessionID(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -150,6 +214,74 @@ func TestOpenAIOAuthService_CreateCheckoutLink_AcceptsCheckoutSessionID(t *testi
 	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
 	require.NoError(t, err)
 	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_test_123", checkoutURL)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLinkResult_DetectsAlreadySubscribedSuccess(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"detail":"account already has subscription"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	result, err := svc.CreateCheckoutLinkResult(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, CheckoutLinkStatusSubscribed, result.Status)
+	require.Empty(t, result.URL)
+	require.Equal(t, "账号已订阅，无需生成支付链接", result.Text())
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLinkResult_DetectsAlreadySubscribedUpstreamError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"detail":"subscription already active"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	result, err := svc.CreateCheckoutLinkResult(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, CheckoutLinkStatusSubscribed, result.Status)
+	require.Empty(t, result.URL)
+	require.Equal(t, "账号已订阅，无需生成支付链接", result.Text())
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLinkResult_DoesNotTreatMissingActiveSubscriptionAsSubscribed(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"detail":"no active subscription"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	result, err := svc.CreateCheckoutLinkResult(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.Error(t, err)
+	require.Empty(t, result.URL)
+	require.Empty(t, result.Status)
+	require.Equal(t, http.StatusBadGateway, infraerrors.Code(err))
 }
 
 func TestOpenAIOAuthService_CreateCheckoutLink_DecodesCheckoutSessionIDWithoutJSONContentType(t *testing.T) {

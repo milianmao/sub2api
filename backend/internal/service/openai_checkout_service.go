@@ -52,6 +52,27 @@ type chatGPTCheckoutResponse struct {
 	CheckoutSessionID string `json:"checkout_session_id"`
 }
 
+type CheckoutLinkStatus string
+
+const (
+	CheckoutLinkStatusURL           CheckoutLinkStatus = "url"
+	CheckoutLinkStatusTrialEligible CheckoutLinkStatus = "trial_eligible"
+	CheckoutLinkStatusSubscribed    CheckoutLinkStatus = "subscribed"
+)
+
+type CreateCheckoutLinkResult struct {
+	URL     string
+	Status  CheckoutLinkStatus
+	Message string
+}
+
+func (r CreateCheckoutLinkResult) Text() string {
+	if message := strings.TrimSpace(r.Message); message != "" {
+		return message
+	}
+	return strings.TrimSpace(r.URL)
+}
+
 type CreateCheckoutLinkRequest struct {
 	AccessToken string
 	ProxyURL    string
@@ -62,12 +83,21 @@ type CreateCheckoutLinkRequest struct {
 
 // CreateCheckoutLink creates a hosted ChatGPT Plus checkout URL using an OpenAI OAuth access token.
 func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq CreateCheckoutLinkRequest) (string, error) {
+	result, err := s.CreateCheckoutLinkResult(ctx, checkoutReq)
+	if err != nil {
+		return "", err
+	}
+	return result.Text(), nil
+}
+
+// CreateCheckoutLinkResult creates a ChatGPT Plus checkout result using an OpenAI OAuth access token.
+func (s *OpenAIOAuthService) CreateCheckoutLinkResult(ctx context.Context, checkoutReq CreateCheckoutLinkRequest) (CreateCheckoutLinkResult, error) {
 	accessToken := strings.TrimSpace(checkoutReq.AccessToken)
 	if accessToken == "" {
-		return "", infraerrors.BadRequest("OPENAI_CHECKOUT_ACCESS_TOKEN_REQUIRED", "access token is required")
+		return CreateCheckoutLinkResult{}, infraerrors.BadRequest("OPENAI_CHECKOUT_ACCESS_TOKEN_REQUIRED", "access token is required")
 	}
 	if s == nil || s.privacyClientFactory == nil {
-		return "", infraerrors.InternalServer("OPENAI_CHECKOUT_CLIENT_UNAVAILABLE", "checkout client is unavailable")
+		return CreateCheckoutLinkResult{}, infraerrors.InternalServer("OPENAI_CHECKOUT_CLIENT_UNAVAILABLE", "checkout client is unavailable")
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -75,7 +105,7 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 
 	client, err := s.privacyClientFactory(checkoutReq.ProxyURL)
 	if err != nil {
-		return "", infraerrors.InternalServer("OPENAI_CHECKOUT_CLIENT_FAILED", "failed to create checkout client").WithCause(err)
+		return CreateCheckoutLinkResult{}, infraerrors.InternalServer("OPENAI_CHECKOUT_CLIENT_FAILED", "failed to create checkout client").WithCause(err)
 	}
 
 	billingDetails := resolveCheckoutBillingDetails(checkoutReq.Country, checkoutReq.Currency)
@@ -90,7 +120,7 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 		CheckoutUIMode: "hosted",
 	})
 	if err != nil {
-		return "", infraerrors.InternalServer("OPENAI_CHECKOUT_PAYLOAD_FAILED", "failed to build checkout payload").WithCause(err)
+		return CreateCheckoutLinkResult{}, infraerrors.InternalServer("OPENAI_CHECKOUT_PAYLOAD_FAILED", "failed to build checkout payload").WithCause(err)
 	}
 
 	cookies := strings.TrimSpace(checkoutReq.Cookies)
@@ -121,9 +151,12 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 	resp, err := request.Post(chatGPTCheckoutURL)
 	if err != nil {
 		if resp != nil && resp.IsSuccessState() {
+			if result := checkoutResultFromRawResponse(resp.String()); result.Status != "" {
+				return result, nil
+			}
 			checkoutURL := checkoutURLFromRawResponse(resp.String())
 			if isTrustedCheckoutURL(checkoutURL) {
-				return checkoutURL, nil
+				return CreateCheckoutLinkResult{URL: checkoutURL, Status: CheckoutLinkStatusURL}, nil
 			}
 		}
 		slog.Warn("openai_checkout_request_failed",
@@ -134,9 +167,12 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 			"currency", billingDetails["currency"],
 			"error", err.Error(),
 		)
-		return "", infraerrors.InternalServer("OPENAI_CHECKOUT_REQUEST_FAILED", "checkout request failed").WithCause(err)
+		return CreateCheckoutLinkResult{}, infraerrors.InternalServer("OPENAI_CHECKOUT_REQUEST_FAILED", "checkout request failed").WithCause(err)
 	}
 	if !resp.IsSuccessState() {
+		if result := subscribedCheckoutResultFromRawResponse(resp.String()); result.Status != "" {
+			return result, nil
+		}
 		slog.Warn("openai_checkout_upstream_failed",
 			"status", resp.StatusCode,
 			"body", truncateCheckoutDiagnostic(resp.String(), 300),
@@ -146,9 +182,12 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 			"country", billingDetails["country"],
 			"currency", billingDetails["currency"],
 		)
-		return "", infraerrors.Newf(http.StatusBadGateway, "OPENAI_CHECKOUT_UPSTREAM_FAILED", "checkout request failed with upstream status %d", resp.StatusCode)
+		return CreateCheckoutLinkResult{}, infraerrors.Newf(http.StatusBadGateway, "OPENAI_CHECKOUT_UPSTREAM_FAILED", "checkout request failed with upstream status %d", resp.StatusCode)
 	}
 
+	if result := checkoutResultFromRawResponse(resp.String()); result.Status != "" {
+		return result, nil
+	}
 	checkoutURL := checkoutURLFromRawResponse(resp.String())
 	if !isTrustedCheckoutURL(checkoutURL) {
 		rawCheckoutSessionID := extractCheckoutSessionID(resp.String())
@@ -174,9 +213,9 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 			"country", billingDetails["country"],
 			"currency", billingDetails["currency"],
 		)
-		return "", infraerrors.BadRequest("OPENAI_CHECKOUT_INVALID_URL", "checkout response did not include a valid url")
+		return CreateCheckoutLinkResult{}, infraerrors.BadRequest("OPENAI_CHECKOUT_INVALID_URL", "checkout response did not include a valid url")
 	}
-	return checkoutURL, nil
+	return CreateCheckoutLinkResult{URL: checkoutURL, Status: CheckoutLinkStatusURL}, nil
 }
 
 // ResolveAccountProxyURL returns the account proxy URL when one is configured.
@@ -236,6 +275,113 @@ func firstCheckoutURL(result chatGPTCheckoutResponse) string {
 
 func decodeCheckoutResponse(value string, result *chatGPTCheckoutResponse) error {
 	return json.Unmarshal([]byte(value), result)
+}
+
+func checkoutResultFromRawResponse(value string) CreateCheckoutLinkResult {
+	if result := subscribedCheckoutResultFromRawResponse(value); result.Status != "" {
+		return result
+	}
+	if checkoutHasZeroAmount(value) {
+		return CreateCheckoutLinkResult{
+			Status:  CheckoutLinkStatusTrialEligible,
+			Message: "账号具备 0 元试用资格",
+		}
+	}
+	return CreateCheckoutLinkResult{}
+}
+
+func subscribedCheckoutResultFromRawResponse(value string) CreateCheckoutLinkResult {
+	if checkoutIndicatesSubscribed(value) {
+		return CreateCheckoutLinkResult{Status: CheckoutLinkStatusSubscribed, Message: "账号已订阅，无需生成支付链接"}
+	}
+	return CreateCheckoutLinkResult{}
+}
+
+func checkoutIndicatesSubscribed(value string) bool {
+	lower := strings.ToLower(value)
+	for _, phrase := range []string{"already subscribed", "already has subscription", "subscription already active"} {
+		if strings.Contains(lower, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+func checkoutHasZeroAmount(value string) bool {
+	var decoded any
+	decoder := json.NewDecoder(strings.NewReader(value))
+	decoder.UseNumber()
+	if err := decoder.Decode(&decoded); err != nil {
+		return false
+	}
+	return containsZeroCheckoutAmount(decoded)
+}
+
+func containsZeroCheckoutAmount(value any) bool {
+	return containsZeroCheckoutAmountInContext(value, false)
+}
+
+func containsZeroCheckoutAmountInContext(value any, checkoutContext bool) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, nested := range typed {
+			if isCheckoutAmountField(key) && (checkoutContext || isSpecificCheckoutAmountField(key)) && isZeroCheckoutAmount(nested) {
+				return true
+			}
+			if containsZeroCheckoutAmountInContext(nested, checkoutContext || isCheckoutAmountContextField(key)) {
+				return true
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if containsZeroCheckoutAmountInContext(nested, checkoutContext) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isCheckoutAmountContextField(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "checkout", "payment", "invoice", "order", "line_items", "items":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSpecificCheckoutAmountField(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "amount_total", "amount_due":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCheckoutAmountField(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "amount_total", "total", "amount_due", "unit_amount", "subtotal":
+		return true
+	default:
+		return false
+	}
+}
+
+func isZeroCheckoutAmount(value any) bool {
+	switch typed := value.(type) {
+	case float64:
+		return typed == 0
+	case json.Number:
+		amount, err := typed.Float64()
+		return err == nil && amount == 0
+	case string:
+		trimmed := strings.TrimSpace(typed)
+		return trimmed == "0" || trimmed == "0.0" || trimmed == "0.00"
+	default:
+		return false
+	}
 }
 
 func checkoutURLFromRawResponse(value string) string {

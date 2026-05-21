@@ -1008,7 +1008,7 @@ func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
 	accessToken := checkoutCredential(account, "access_token", "token", "accessToken", "legacy_token", "session_token")
 	cookies := checkoutCredential(account, "cookies", "cookie")
 	proxyURL := h.openaiOAuthService.ResolveAccountProxyURL(ctx, account)
-	checkoutURL, err := h.openaiOAuthService.CreateCheckoutLink(ctx, service.CreateCheckoutLinkRequest{
+	checkoutResult, err := h.openaiOAuthService.CreateCheckoutLinkResult(ctx, service.CreateCheckoutLinkRequest{
 		AccessToken: accessToken,
 		ProxyURL:    proxyURL,
 		Cookies:     cookies,
@@ -1018,7 +1018,7 @@ func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
 		return
 	}
 
-	c.String(http.StatusOK, checkoutURL)
+	c.String(http.StatusOK, checkoutResult.Text())
 }
 
 func checkoutCredential(account *service.Account, keys ...string) string {

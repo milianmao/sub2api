@@ -193,6 +193,73 @@ func TestAccountHandlerCreateCheckoutLink_UsesCompatibleCredentialAliases(t *tes
 	require.Equal(t, "https://chatgpt.com/payments/checkout/session-1", rec.Body.String())
 }
 
+func TestAccountHandlerCreateCheckoutLink_ReturnsTrialEligibilityMessage(t *testing.T) {
+	checkoutServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"amount_total":0,"currency":"usd"}`))
+	}))
+	defer checkoutServer.Close()
+
+	oldURL := service.SetChatGPTCheckoutURLForTest(checkoutServer.URL)
+	defer service.SetChatGPTCheckoutURLForTest(oldURL)
+
+	adminSvc := &checkoutLinkAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       43,
+			Platform: service.PlatformOpenAI,
+			Type:     service.AccountTypeOAuth,
+			Status:   service.StatusActive,
+			Credentials: map[string]any{"access_token": "access-token-1"},
+		},
+	}
+	oauthSvc := service.NewOpenAIOAuthService(nil, &checkoutLinkOAuthClient{})
+	oauthSvc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) { return req.C(), nil })
+	router := setupCheckoutLinkRouter(adminSvc, oauthSvc)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/43/checkout-link", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Header().Get("Content-Type"), "text/plain")
+	require.Equal(t, "账号具备 0 元试用资格", rec.Body.String())
+}
+
+func TestAccountHandlerCreateCheckoutLink_ReturnsAlreadySubscribedMessage(t *testing.T) {
+	checkoutServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"detail":"already subscribed"}`))
+	}))
+	defer checkoutServer.Close()
+
+	oldURL := service.SetChatGPTCheckoutURLForTest(checkoutServer.URL)
+	defer service.SetChatGPTCheckoutURLForTest(oldURL)
+
+	adminSvc := &checkoutLinkAdminService{
+		stubAdminService: newStubAdminService(),
+		account: service.Account{
+			ID:       43,
+			Platform: service.PlatformOpenAI,
+			Type:     service.AccountTypeOAuth,
+			Status:   service.StatusActive,
+			Credentials: map[string]any{"access_token": "access-token-1"},
+		},
+	}
+	oauthSvc := service.NewOpenAIOAuthService(nil, &checkoutLinkOAuthClient{})
+	oauthSvc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) { return req.C(), nil })
+	router := setupCheckoutLinkRouter(adminSvc, oauthSvc)
+
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/43/checkout-link", nil)
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Header().Get("Content-Type"), "text/plain")
+	require.Equal(t, "账号已订阅，无需生成支付链接", rec.Body.String())
+}
+
 type checkoutLinkOAuthClient struct{}
 
 func (c *checkoutLinkOAuthClient) ExchangeCode(context.Context, string, string, string, string, string) (*openai.TokenResponse, error) {
