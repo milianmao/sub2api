@@ -14,6 +14,8 @@ import (
 
 var chatGPTCheckoutURL = "https://chatgpt.com/backend-api/payments/checkout"
 
+var chatGPTTeamCheckoutBaseURL = "https://chatgpt.com/checkout/openai_llc/"
+
 var chatGPTCountryCurrency = map[string]string{
 	"SG": "SGD",
 	"US": "USD",
@@ -36,17 +38,18 @@ func SetChatGPTCheckoutURLForTest(url string) string {
 }
 
 type chatGPTCheckoutPayload struct {
-	PlanName       string                 `json:"plan_name"`
-	BillingDetails map[string]string      `json:"billing_details"`
-	CancelURL      string                 `json:"cancel_url"`
-	PromoCampaign  map[string]any         `json:"promo_campaign"`
-	CheckoutUIMode string                 `json:"checkout_ui_mode"`
+	PlanName       string            `json:"plan_name"`
+	BillingDetails map[string]string `json:"billing_details"`
+	CancelURL      string            `json:"cancel_url"`
+	PromoCampaign  map[string]any    `json:"promo_campaign"`
+	CheckoutUIMode string            `json:"checkout_ui_mode"`
 }
 
 type chatGPTCheckoutResponse struct {
-	URL             string `json:"url"`
-	StripeHostedURL string `json:"stripe_hosted_url"`
-	CheckoutURL     string `json:"checkout_url"`
+	URL               string `json:"url"`
+	StripeHostedURL   string `json:"stripe_hosted_url"`
+	CheckoutURL       string `json:"checkout_url"`
+	CheckoutSessionID string `json:"checkout_session_id"`
 }
 
 type CreateCheckoutLinkRequest struct {
@@ -75,7 +78,6 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 		return "", infraerrors.InternalServer("OPENAI_CHECKOUT_CLIENT_FAILED", "failed to create checkout client").WithCause(err)
 	}
 
-	var result chatGPTCheckoutResponse
 	billingDetails := resolveCheckoutBillingDetails(checkoutReq.Country, checkoutReq.Currency)
 	payloadBytes, err := json.Marshal(chatGPTCheckoutPayload{
 		PlanName:       "chatgptplusplan",
@@ -108,7 +110,6 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 		SetHeader("Sec-Fetch-Site", "same-origin").
 		SetHeader("Sec-Fetch-Mode", "cors").
 		SetHeader("Sec-Fetch-Dest", "empty").
-		SetSuccessResult(&result).
 		SetBody(payloadBytes)
 	if cookies != "" {
 		request.SetHeader("Cookie", cookies)
@@ -119,6 +120,12 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 
 	resp, err := request.Post(chatGPTCheckoutURL)
 	if err != nil {
+		if resp != nil && resp.IsSuccessState() {
+			checkoutURL := checkoutURLFromRawResponse(resp.String())
+			if isTrustedCheckoutURL(checkoutURL) {
+				return checkoutURL, nil
+			}
+		}
 		slog.Warn("openai_checkout_request_failed",
 			"proxy_configured", strings.TrimSpace(checkoutReq.ProxyURL) != "",
 			"cookies_configured", cookies != "",
@@ -142,8 +149,31 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 		return "", infraerrors.Newf(http.StatusBadGateway, "OPENAI_CHECKOUT_UPSTREAM_FAILED", "checkout request failed with upstream status %d", resp.StatusCode)
 	}
 
-	checkoutURL := firstCheckoutURL(result)
+	checkoutURL := checkoutURLFromRawResponse(resp.String())
 	if !isTrustedCheckoutURL(checkoutURL) {
+		rawCheckoutSessionID := extractCheckoutSessionID(resp.String())
+		parsedCheckoutURL, parseErr := url.Parse(checkoutURL)
+		checkoutURLHost := ""
+		checkoutURLScheme := ""
+		if parseErr == nil {
+			checkoutURLHost = parsedCheckoutURL.Hostname()
+			checkoutURLScheme = parsedCheckoutURL.Scheme
+		}
+		slog.Warn("openai_checkout_invalid_response",
+			"body", truncateCheckoutDiagnostic(resp.String(), 300),
+			"checkout_url_configured", strings.TrimSpace(checkoutURL) != "",
+			"checkout_url_len", len(checkoutURL),
+			"checkout_url_parse_error", parseErr != nil,
+			"checkout_url_scheme", checkoutURLScheme,
+			"checkout_url_host", checkoutURLHost,
+			"raw_session_id_configured", rawCheckoutSessionID != "",
+			"raw_session_id_len", len(rawCheckoutSessionID),
+			"proxy_configured", strings.TrimSpace(checkoutReq.ProxyURL) != "",
+			"cookies_configured", cookies != "",
+			"device_id_configured", deviceID != "",
+			"country", billingDetails["country"],
+			"currency", billingDetails["currency"],
+		)
 		return "", infraerrors.BadRequest("OPENAI_CHECKOUT_INVALID_URL", "checkout response did not include a valid url")
 	}
 	return checkoutURL, nil
@@ -198,7 +228,58 @@ func firstCheckoutURL(result chatGPTCheckoutResponse) string {
 			return trimmed
 		}
 	}
+	if checkoutSessionID := strings.TrimSpace(result.CheckoutSessionID); checkoutSessionID != "" {
+		return checkoutURLFromSessionID(checkoutSessionID)
+	}
 	return ""
+}
+
+func decodeCheckoutResponse(value string, result *chatGPTCheckoutResponse) error {
+	return json.Unmarshal([]byte(value), result)
+}
+
+func checkoutURLFromRawResponse(value string) string {
+	var result chatGPTCheckoutResponse
+	if decodeCheckoutResponse(value, &result) == nil {
+		if checkoutURL := firstCheckoutURL(result); checkoutURL != "" {
+			return checkoutURL
+		}
+	}
+	return checkoutURLFromSessionID(extractCheckoutSessionID(value))
+}
+
+func extractCheckoutSessionID(value string) string {
+	_, after, ok := strings.Cut(value, `"checkout_session_id"`)
+	if !ok {
+		return ""
+	}
+	_, after, ok = strings.Cut(after, `:`)
+	if !ok {
+		return ""
+	}
+	after = strings.TrimLeft(after, " \t\r\n")
+	if !strings.HasPrefix(after, `"`) {
+		return ""
+	}
+	after = strings.TrimPrefix(after, `"`)
+	end := strings.Index(after, `"`)
+	if end < 0 {
+		return ""
+	}
+	candidate := after[:end]
+	for _, r := range candidate {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '_') {
+			return ""
+		}
+	}
+	return candidate
+}
+
+func checkoutURLFromSessionID(checkoutSessionID string) string {
+	if checkoutSessionID == "" {
+		return ""
+	}
+	return chatGPTTeamCheckoutBaseURL + checkoutSessionID
 }
 
 func truncateCheckoutDiagnostic(value string, maxLen int) string {
@@ -220,6 +301,7 @@ func isTrustedCheckoutURL(value string) bool {
 	host := strings.ToLower(parsed.Hostname())
 	return host == "chatgpt.com" ||
 		host == "openai.com" ||
+		strings.HasSuffix(host, ".openai.com") ||
 		host == "stripe.com" ||
 		strings.HasSuffix(host, ".stripe.com")
 }

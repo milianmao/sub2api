@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/imroc/req/v3"
@@ -130,6 +132,106 @@ func TestOpenAIOAuthService_CreateCheckoutLink_AcceptsAlternateURLFields(t *test
 	}
 }
 
+func TestOpenAIOAuthService_CreateCheckoutLink_AcceptsCheckoutSessionID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"checkout_session_id":"cs_live_test_123"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_test_123", checkoutURL)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLink_DecodesCheckoutSessionIDWithoutJSONContentType(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte(`{"checkout_session_id":"cs_live_test_123"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_test_123", checkoutURL)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLink_ExtractsCheckoutSessionIDFromRawBody(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte(`ignored-prefix {"checkout_session_id":"cs_live_test_123"} ignored-suffix`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_test_123", checkoutURL)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLink_ExtractsCheckoutSessionIDWithHyphenatedFields(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"tag":"hosted_checkout_session","checkout_session_id":"cs_live_a1B9R3EKOeXemh53gqT83ndKd8586G31qUzYSnLFshBkIxSYs93N6co25Q","publishable_key":"pk_live_test","processor_entity":"openai_llc","checkout_ui_mode":"hosted"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://chatgpt.com/checkout/openai_llc/cs_live_a1B9R3EKOeXemh53gqT83ndKd8586G31qUzYSnLFshBkIxSYs93N6co25Q", checkoutURL)
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLink_AcceptsOpenAISubdomainURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"url":"https://pay.openai.com/pay/cs_live_test_123#fidkdWxOYHwnPyd1blppbHNgWjA0T3d8"}`))
+	}))
+	defer server.Close()
+
+	oldURL := SetChatGPTCheckoutURLForTest(server.URL)
+	defer SetChatGPTCheckoutURLForTest(oldURL)
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{AccessToken: "access-token-1"})
+	require.NoError(t, err)
+	require.Equal(t, "https://pay.openai.com/pay/cs_live_test_123#fidkdWxOYHwnPyd1blppbHNgWjA0T3d8", checkoutURL)
+}
+
 func TestOpenAIOAuthService_CreateCheckoutLink_RejectsNonHTTPURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -171,4 +273,27 @@ func TestOpenAIOAuthService_CreateCheckoutLink_MapsUpstreamUnauthorizedToBadGate
 	require.Error(t, err)
 	require.Empty(t, url)
 	require.Equal(t, http.StatusBadGateway, infraerrors.Code(err))
+}
+
+func TestOpenAIOAuthService_CreateCheckoutLink_ManualUpstream(t *testing.T) {
+	accessToken := os.Getenv("CHECKOUT_TOKEN")
+	if accessToken == "" {
+		t.Skip("CHECKOUT_TOKEN is not set")
+	}
+
+	svc := NewOpenAIOAuthService(nil, nil)
+	svc.SetPrivacyClientFactory(func(proxyURL string) (*req.Client, error) {
+		return req.C().SetTimeout(30 * time.Second).ImpersonateChrome(), nil
+	})
+
+	checkoutURL, err := svc.CreateCheckoutLink(context.Background(), CreateCheckoutLinkRequest{
+		AccessToken: accessToken,
+		Cookies:     os.Getenv("CHECKOUT_COOKIES"),
+		Country:     os.Getenv("CHECKOUT_COUNTRY"),
+		Currency:    os.Getenv("CHECKOUT_CURRENCY"),
+	})
+	if err != nil {
+		t.Fatalf("checkout failed: code=%d error=%v", infraerrors.Code(err), err)
+	}
+	t.Logf("checkout succeeded: url_host_trusted=%t url_len=%d", isTrustedCheckoutURL(checkoutURL), len(checkoutURL))
 }
