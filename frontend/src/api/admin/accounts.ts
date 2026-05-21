@@ -18,6 +18,8 @@ import type {
   AdminDataImportResult,
   CodexSessionImportRequest,
   CodexSessionImportResult,
+  ChatGPTSessionImportRequest,
+  ChatGPTSessionImportResult,
   CheckMixedChannelRequest,
   CheckMixedChannelResponse
 } from '@/types'
@@ -571,6 +573,11 @@ export async function importCodexSession(payload: CodexSessionImportRequest): Pr
   return data
 }
 
+export async function importChatGPTSession(payload: ChatGPTSessionImportRequest): Promise<ChatGPTSessionImportResult> {
+  const { data } = await apiClient.post<ChatGPTSessionImportResult>('/admin/accounts/import/chatgpt-session', payload)
+  return data
+}
+
 /**
  * Get Antigravity default model mapping from backend
  * @returns Default model mapping (from -> to)
@@ -694,6 +701,7 @@ export const accountsAPI = {
   exportData,
   importData,
   importCodexSession,
+  importChatGPTSession,
   getAntigravityDefaultModelMapping,
   batchClearError,
   batchRefresh,

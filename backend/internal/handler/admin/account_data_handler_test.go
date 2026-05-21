@@ -2,10 +2,12 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -274,4 +276,69 @@ func TestImportDataReusesProxyAndSkipsDefaultGroup(t *testing.T) {
 	require.Len(t, adminSvc.createdProxies, 0)
 	require.Len(t, adminSvc.createdAccounts, 1)
 	require.True(t, adminSvc.createdAccounts[0].SkipDefaultGroupBind)
+}
+
+func TestImportDataPayloadAppliesImportOptions(t *testing.T) {
+	adminSvc := newStubAdminService()
+	handler := NewAccountHandler(
+		adminSvc,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	notes := "imported-notes"
+	proxyID := int64(55)
+	loadFactor := 19
+	rateMultiplier := 1.5
+	expiresAt := time.Now().Add(2 * time.Hour).Unix()
+	autoPause := true
+
+	result, err := handler.importDataPayload(context.Background(), DataPayload{
+		Accounts: []DataAccount{
+			{
+				Name:               "imported-account",
+				Notes:              &notes,
+				Platform:           service.PlatformOpenAI,
+				Type:               service.AccountTypeOAuth,
+				Credentials:        map[string]any{"access_token": "token"},
+				Concurrency:        4,
+				Priority:           66,
+				RateMultiplier:     &rateMultiplier,
+				ExpiresAt:          &expiresAt,
+				AutoPauseOnExpired: &autoPause,
+			},
+		},
+		Proxies: []DataProxy{},
+	}, dataImportOptions{
+		GroupIDs:             []int64{7, 8},
+		ProxyID:              &proxyID,
+		LoadFactor:           &loadFactor,
+		SkipDefaultGroupBind: true,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, 1, result.AccountCreated)
+	require.Len(t, adminSvc.createdAccounts, 1)
+
+	created := adminSvc.createdAccounts[0]
+	require.Equal(t, &proxyID, created.ProxyID)
+	require.Equal(t, []int64{7, 8}, created.GroupIDs)
+	require.Equal(t, &loadFactor, created.LoadFactor)
+	require.True(t, created.SkipDefaultGroupBind)
+	require.Equal(t, notes, *created.Notes)
+	require.Equal(t, 4, created.Concurrency)
+	require.Equal(t, 66, created.Priority)
+	require.Equal(t, &rateMultiplier, created.RateMultiplier)
+	require.Equal(t, expiresAt, *created.ExpiresAt)
+	require.True(t, *created.AutoPauseOnExpired)
 }

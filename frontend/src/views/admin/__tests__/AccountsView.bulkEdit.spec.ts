@@ -94,6 +94,11 @@ const BulkEditAccountModalStub = {
   template: '<div data-test="bulk-edit-modal" :data-show="String(show)" :data-target-mode="target?.mode ?? \'\'"></div>'
 }
 
+const ImportChatGPTSessionModalStub = {
+  props: ['show'],
+  template: '<div data-test="chatgpt-session-modal" :data-show="String(show)"></div>'
+}
+
 const AccountActionMenuStub = {
   emits: ['generate-checkout-link', 'copy-access-token'],
   template: `
@@ -154,6 +159,7 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountTableFilters: { template: '<div></div>' },
           AccountBulkActionsBar: AccountBulkActionsBarStub,
           AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
           ImportDataModal: true,
           ReAuthAccountModal: true,
           AccountTestModal: true,
@@ -185,6 +191,60 @@ describe('admin AccountsView bulk edit scope', () => {
     expect(wrapper.get('[data-test="bulk-edit-modal"]').attributes('data-target-mode')).toBe('filtered')
   })
 
+  it('shows the ChatGPT Session import entry in more actions and opens its modal', async () => {
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.get('button[title="admin.accounts.moreActions"]').trigger('click')
+
+    const openImportButton = wrapper
+      .findAll('button')
+      .find((node) => node.text().includes('admin.accounts.chatgptSessionImportEntry'))
+
+    expect(openImportButton).toBeTruthy()
+
+    await openImportButton!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="chatgpt-session-modal"]').attributes('data-show')).toBe('true')
+  })
+
   it('generates and opens an OpenAI checkout link from the account action menu', async () => {
     const wrapper = mount(AccountsView, {
       global: {
@@ -200,6 +260,7 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountTableFilters: { template: '<div></div>' },
           AccountBulkActionsBar: AccountBulkActionsBarStub,
           AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
           ImportDataModal: true,
           ReAuthAccountModal: true,
           AccountTestModal: true,
@@ -260,6 +321,7 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountTableFilters: { template: '<div></div>' },
           AccountBulkActionsBar: AccountBulkActionsBarStub,
           AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
           ImportDataModal: true,
           ReAuthAccountModal: true,
           AccountTestModal: true,
@@ -306,6 +368,7 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountTableFilters: { template: '<div></div>' },
           AccountBulkActionsBar: AccountBulkActionsBarStub,
           AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
           ImportDataModal: true,
           ReAuthAccountModal: true,
           AccountTestModal: true,
@@ -357,6 +420,7 @@ describe('admin AccountsView bulk edit scope', () => {
           AccountTableFilters: { template: '<div></div>' },
           AccountBulkActionsBar: AccountBulkActionsBarStub,
           AccountActionMenu: AccountActionMenuWithoutTokenStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
           ImportDataModal: true,
           ReAuthAccountModal: true,
           AccountTestModal: true,

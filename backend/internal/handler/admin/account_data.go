@@ -66,6 +66,13 @@ type DataImportRequest struct {
 	SkipDefaultGroupBind *bool       `json:"skip_default_group_bind"`
 }
 
+type dataImportOptions struct {
+	GroupIDs             []int64
+	ProxyID              *int64
+	LoadFactor           *int
+	SkipDefaultGroupBind bool
+}
+
 type DataImportResult struct {
 	ProxyCreated   int               `json:"proxy_created"`
 	ProxyReused    int               `json:"proxy_reused"`
@@ -198,7 +205,12 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 		skipDefaultGroupBind = *req.SkipDefaultGroupBind
 	}
 
-	dataPayload := req.Data
+	return h.importDataPayload(ctx, req.Data, dataImportOptions{
+		SkipDefaultGroupBind: skipDefaultGroupBind,
+	})
+}
+
+func (h *AccountHandler) importDataPayload(ctx context.Context, dataPayload DataPayload, options dataImportOptions) (DataImportResult, error) {
 	result := DataImportResult{}
 
 	existingProxies, err := h.listAllProxies(ctx)
@@ -287,7 +299,9 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 		}
 
 		var proxyID *int64
-		if item.ProxyKey != nil && *item.ProxyKey != "" {
+		if options.ProxyID != nil {
+			proxyID = options.ProxyID
+		} else if item.ProxyKey != nil && *item.ProxyKey != "" {
 			if id, ok := proxyKeyToID[*item.ProxyKey]; ok {
 				proxyID = &id
 			} else {
@@ -315,10 +329,11 @@ func (h *AccountHandler) importData(ctx context.Context, req DataImportRequest) 
 			Concurrency:          item.Concurrency,
 			Priority:             item.Priority,
 			RateMultiplier:       item.RateMultiplier,
-			GroupIDs:             nil,
+			LoadFactor:           options.LoadFactor,
+			GroupIDs:             append([]int64(nil), options.GroupIDs...),
 			ExpiresAt:            item.ExpiresAt,
 			AutoPauseOnExpired:   item.AutoPauseOnExpired,
-			SkipDefaultGroupBind: skipDefaultGroupBind,
+			SkipDefaultGroupBind: options.SkipDefaultGroupBind,
 		}
 
 		created, err := h.adminService.CreateAccount(ctx, accountInput)

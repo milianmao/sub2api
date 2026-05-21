@@ -1179,6 +1179,42 @@ export interface CodexSessionImportResult {
   errors?: CodexSessionImportMessage[]
 }
 
+export interface ChatGPTSessionImportRequest {
+  content?: string
+  contents?: string[]
+  notes?: string | null
+  group_ids?: number[]
+  proxy_id?: number | null
+  concurrency?: number
+  priority?: number
+  rate_multiplier?: number
+  load_factor?: number | null
+  expires_at?: number | null
+  auto_pause_on_expired?: boolean
+}
+
+export interface ChatGPTSessionImportMessage {
+  index: number
+  name?: string
+  message: string
+}
+
+export interface ChatGPTSessionImportItem {
+  index: number
+  name?: string
+  action: 'created' | 'failed'
+  account_id?: number
+  message?: string
+}
+
+export interface ChatGPTSessionImportResult {
+  total: number
+  created: number
+  failed: number
+  items?: ChatGPTSessionImportItem[]
+  errors?: ChatGPTSessionImportMessage[]
+}
+
 // ==================== Usage & Redeem Types ====================
 
 export type RedeemCodeType = 'balance' | 'concurrency' | 'subscription' | 'invitation'
