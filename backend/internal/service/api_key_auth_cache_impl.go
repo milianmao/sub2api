@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 11 // v11: group visible-user authorization fields
+const apiKeyAuthSnapshotVersion = 12 // v12: group authorization fields and availability checks
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
