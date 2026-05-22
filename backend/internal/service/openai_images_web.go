@@ -306,8 +306,10 @@ func (c *openAIChatGPTWebImageClient) do(req *http.Request) (*http.Response, err
 
 func openAIChatGPTWebImageModelSlug(model string) string {
 	switch strings.ToLower(strings.TrimSpace(model)) {
-	case "gpt-image-2", openAICodexGPTImage2Model:
+	case "gpt-image-2":
 		return "gpt-5-3"
+	case openAICodexGPTImage2Model:
+		return openAICodexGPTImage2Model
 	default:
 		return "auto"
 	}

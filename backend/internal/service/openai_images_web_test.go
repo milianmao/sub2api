@@ -40,6 +40,24 @@ func TestParseOpenAIChatGPTWebImageSSEBlockedOnly(t *testing.T) {
 	require.True(t, got.Blocked)
 }
 
+func TestOpenAIChatGPTWebImageModelSlug(t *testing.T) {
+	tests := []struct {
+		name  string
+		model string
+		want  string
+	}{
+		{name: "gpt image 2 uses web slug", model: "gpt-image-2", want: "gpt-5-3"},
+		{name: "codex image 2 aliases itself", model: openAICodexGPTImage2Model, want: openAICodexGPTImage2Model},
+		{name: "unknown defaults to auto", model: "unknown-model", want: "auto"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.want, openAIChatGPTWebImageModelSlug(tt.model))
+		})
+	}
+}
+
 func TestForwardOpenAIImagesChatGPTWebNonStreamingReturnsBase64(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	imageBytes := []byte("fake-png-bytes")
