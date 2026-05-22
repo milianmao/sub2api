@@ -74,6 +74,8 @@ func (h *OpenAIGatewayHandler) Images(c *gin.Context) {
 		return
 	}
 
+	parsed.GroupID = apiKey.GroupID
+
 	reqLog = reqLog.With(
 		zap.String("model", parsed.Model),
 		zap.Bool("stream", parsed.Stream),

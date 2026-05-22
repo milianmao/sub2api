@@ -61,6 +61,7 @@ type OpenAIImagesUpload struct {
 
 type OpenAIImagesRequest struct {
 	Endpoint           string
+	GroupID            *int64
 	ContentType        string
 	Multipart          bool
 	Model              string
@@ -552,10 +553,33 @@ func (s *OpenAIGatewayService) ForwardImages(
 	case AccountTypeAPIKey:
 		return s.forwardOpenAIImagesAPIKey(ctx, c, account, body, parsed, channelMappedModel)
 	case AccountTypeOAuth:
-		return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
+		strategy, err := s.resolveOpenAIImageUpstreamStrategy(ctx, account, parsed)
+		if err != nil {
+			return nil, err
+		}
+		switch strategy {
+		case OpenAIImageUpstreamCodexResponses:
+			return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
+		case OpenAIImageUpstreamChatGPTWebImage:
+			return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)
+		case OpenAIImageUpstreamOfficialImages:
+			return nil, fmt.Errorf("openai_image_upstream=%s is not valid for OAuth accounts", strategy)
+		default:
+			return nil, fmt.Errorf("unsupported openai image upstream strategy: %s", strategy)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported account type: %s", account.Type)
 	}
+}
+
+func (s *OpenAIGatewayService) forwardOpenAIImagesChatGPTWeb(
+	ctx context.Context,
+	c *gin.Context,
+	account *Account,
+	parsed *OpenAIImagesRequest,
+	channelMappedModel string,
+) (*OpenAIForwardResult, error) {
+	return nil, fmt.Errorf("chatgpt_web_image upstream is not implemented")
 }
 
 func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(

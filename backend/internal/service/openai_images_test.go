@@ -32,6 +32,84 @@ func (w *failingOpenAIImageWriter) Write(p []byte) (int, error) {
 	return w.ResponseWriter.Write(p)
 }
 
+func TestResolveOpenAIImageUpstreamStrategy(t *testing.T) {
+	groupID := int64(4242)
+
+	tests := []struct {
+		name    string
+		account *Account
+		channel *Channel
+		parsed  *OpenAIImagesRequest
+		want    OpenAIImageUpstreamStrategy
+		wantErr string
+	}{
+		{
+			name:    "api key defaults official",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeAPIKey},
+			parsed:  &OpenAIImagesRequest{Model: "gpt-image-2"},
+			want:    OpenAIImageUpstreamOfficialImages,
+		},
+		{
+			name:    "oauth defaults codex responses",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+			parsed:  &OpenAIImagesRequest{Model: "gpt-image-2"},
+			want:    OpenAIImageUpstreamCodexResponses,
+		},
+		{
+			name: "account override chatgpt web",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: map[string]any{
+				"openai_image_upstream": "chatgpt_web_image",
+			}},
+			parsed: &OpenAIImagesRequest{Model: "gpt-image-2"},
+			want:   OpenAIImageUpstreamChatGPTWebImage,
+		},
+		{
+			name:    "channel nested override chatgpt web",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+			channel: &Channel{ID: 1, Status: StatusActive, FeaturesConfig: map[string]any{
+				"openai_image_upstream": map[string]any{PlatformOpenAI: "chatgpt_web_image"},
+			}},
+			parsed: &OpenAIImagesRequest{Model: "gpt-image-2", GroupID: &groupID},
+			want:   OpenAIImageUpstreamChatGPTWebImage,
+		},
+		{
+			name: "codex image alias forces codex responses",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: map[string]any{
+				"openai_image_upstream": "chatgpt_web_image",
+			}},
+			parsed: &OpenAIImagesRequest{Model: "codex-gpt-image-2", GroupID: &groupID},
+			want:   OpenAIImageUpstreamCodexResponses,
+		},
+		{
+			name: "invalid account override fails closed",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: map[string]any{
+				"openai_image_upstream": "bad_strategy",
+			}},
+			parsed:  &OpenAIImagesRequest{Model: "gpt-image-2"},
+			wantErr: "invalid openai image upstream strategy",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := &OpenAIGatewayService{}
+			if tt.channel != nil {
+				svc.channelService = newOpenAIImageGenerationControlChannelService(groupID, tt.channel)
+			}
+
+			got, err := svc.resolveOpenAIImageUpstreamStrategy(context.Background(), tt.account, tt.parsed)
+
+			if tt.wantErr != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_JSON(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"gpt-image-2","prompt":"draw a cat","size":"1024x1024","quality":"high","stream":true}`)
