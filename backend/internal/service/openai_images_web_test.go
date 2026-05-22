@@ -20,3 +20,12 @@ func TestParseOpenAIChatGPTWebImageSSE(t *testing.T) {
 	require.Equal(t, "done", got.AssistantText)
 	require.False(t, got.Blocked)
 }
+
+func TestParseOpenAIChatGPTWebImageSSEBlockedOnly(t *testing.T) {
+	body := []byte("data: {\"type\":\"moderation_blocked\"}\n\n")
+
+	got, err := parseOpenAIChatGPTWebImageSSE(body)
+
+	require.NoError(t, err)
+	require.True(t, got.Blocked)
+}

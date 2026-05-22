@@ -52,7 +52,7 @@ func parseOpenAIChatGPTWebImageSSE(body []byte) (openAIChatGPTWebImageSSEState, 
 		}
 		extractOpenAIChatGPTWebImagePointers(payload, &state)
 	})
-	if len(bytes.TrimSpace(body)) > 0 && state.ConversationID == "" && len(state.FileIDs) == 0 && len(state.SedimentIDs) == 0 && state.AssistantText == "" {
+	if len(bytes.TrimSpace(body)) > 0 && !state.Blocked && state.ConversationID == "" && len(state.FileIDs) == 0 && len(state.SedimentIDs) == 0 && state.AssistantText == "" {
 		return state, fmt.Errorf("malformed chatgpt web image SSE")
 	}
 	return state, nil
