@@ -110,6 +110,28 @@ func TestResolveOpenAIImageUpstreamStrategy(t *testing.T) {
 	}
 }
 
+func TestForwardImagesOAuthDefaultsCodexResponses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := &httpUpstreamRecorder{resp: &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader("data: {\"type\":\"response.completed\",\"response\":{\"created_at\":1,\"output\":[{\"id\":\"ig_1\",\"type\":\"image_generation_call\",\"result\":\"b64\"}]}}\n\n")),
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	account := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1, Credentials: map[string]any{"access_token": "oauth-token"}}
+	parsed := &OpenAIImagesRequest{Endpoint: openAIImagesGenerationsEndpoint, Model: "gpt-image-2", Prompt: "draw", N: 1}
+
+	result, err := svc.ForwardImages(context.Background(), c, account, []byte(`{"model":"gpt-image-2","prompt":"draw"}`), parsed, "")
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Contains(t, upstream.lastReq.URL.Path, "/backend-api/codex/responses")
+	require.Equal(t, "b64", gjson.GetBytes(rec.Body.Bytes(), "data.0.b64_json").String())
+}
+
 func TestOpenAIGatewayServiceParseOpenAIImagesRequest_JSON(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	body := []byte(`{"model":"gpt-image-2","prompt":"draw a cat","size":"1024x1024","quality":"high","stream":true}`)

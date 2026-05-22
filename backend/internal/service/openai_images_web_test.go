@@ -58,6 +58,29 @@ func TestOpenAIChatGPTWebImageModelSlug(t *testing.T) {
 	}
 }
 
+func TestForwardImagesAccountOverrideSelectsChatGPTWeb(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"conduit_token":"conduit_1"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: {\"conversation_id\":\"conv_1\"}\n\ndata: {\"message\":{\"author\":{\"role\":\"tool\"},\"metadata\":{\"async_task_type\":\"image_gen\"},\"content\":{\"content_type\":\"multimodal_text\",\"parts\":[{\"asset_pointer\":\"file-service://file_1\"}]}}}\n\n"))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"download_url":"https://download.local/image.png"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("out"))},
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	account := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1, Credentials: map[string]any{"access_token": "oauth-token"}, Extra: map[string]any{"openai_image_upstream": "chatgpt_web_image"}}
+	parsed := &OpenAIImagesRequest{Endpoint: openAIImagesGenerationsEndpoint, Model: "gpt-image-2", Prompt: "draw", N: 1}
+
+	result, err := svc.ForwardImages(context.Background(), c, account, []byte(`{"model":"gpt-image-2","prompt":"draw"}`), parsed, "")
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, "/backend-api/f/conversation/prepare", upstream.requests[0].URL.Path)
+	require.Equal(t, string(OpenAIImageUpstreamChatGPTWebImage), result.UpstreamModel)
+}
+
 func TestForwardOpenAIImagesChatGPTWebChallengeAllowsFailover(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	upstream := &httpUpstreamRecorder{responses: []*http.Response{
