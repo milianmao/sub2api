@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/microsoftemailaccount"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -793,6 +794,32 @@ func init() {
 	groupDescIsExclusive := groupFields[3].Descriptor()
 	// group.DefaultIsExclusive holds the default value on creation for the is_exclusive field.
 	group.DefaultIsExclusive = groupDescIsExclusive.Default.(bool)
+	// groupDescAccessMode is the schema descriptor for access_mode field.
+	groupDescAccessMode := groupFields[4].Descriptor()
+	// group.DefaultAccessMode holds the default value on creation for the access_mode field.
+	group.DefaultAccessMode = groupDescAccessMode.Default.(string)
+	// group.AccessModeValidator is a validator for the "access_mode" field. It is called by the builders before save.
+	group.AccessModeValidator = func() func(string) error {
+		validators := groupDescAccessMode.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(access_mode string) error {
+			for _, fn := range fns {
+				if err := fn(access_mode); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// groupDescMinUserLevel is the schema descriptor for min_user_level field.
+	groupDescMinUserLevel := groupFields[5].Descriptor()
+	// group.DefaultMinUserLevel holds the default value on creation for the min_user_level field.
+	group.DefaultMinUserLevel = groupDescMinUserLevel.Default.(int)
+	// group.MinUserLevelValidator is a validator for the "min_user_level" field. It is called by the builders before save.
+	group.MinUserLevelValidator = groupDescMinUserLevel.Validators[0].(func(int) error)
 	// groupDescStatus is the schema descriptor for status field.
 	groupDescStatus := groupFields[6].Descriptor()
 	// group.DefaultStatus holds the default value on creation for the status field.
@@ -851,10 +878,10 @@ func init() {
 	groupDescAllowMessagesDispatch := groupFields[27].Descriptor()
 	// group.DefaultAllowMessagesDispatch holds the default value on creation for the allow_messages_dispatch field.
 	group.DefaultAllowMessagesDispatch = groupDescAllowMessagesDispatch.Default.(bool)
-	// groupDescAllowOpenAICompat is the schema descriptor for allow_openai_compat field.
-	groupDescAllowOpenAICompat := groupFields[28].Descriptor()
-	// group.DefaultAllowOpenAICompat holds the default value on creation for the allow_openai_compat field.
-	group.DefaultAllowOpenAICompat = groupDescAllowOpenAICompat.Default.(bool)
+	// groupDescAllowOpenaiCompat is the schema descriptor for allow_openai_compat field.
+	groupDescAllowOpenaiCompat := groupFields[28].Descriptor()
+	// group.DefaultAllowOpenaiCompat holds the default value on creation for the allow_openai_compat field.
+	group.DefaultAllowOpenaiCompat = groupDescAllowOpenaiCompat.Default.(bool)
 	// groupDescRequireOauthOnly is the schema descriptor for require_oauth_only field.
 	groupDescRequireOauthOnly := groupFields[29].Descriptor()
 	// group.DefaultRequireOauthOnly holds the default value on creation for the require_oauth_only field.
@@ -939,6 +966,71 @@ func init() {
 	identityadoptiondecisionDescDecidedAt := identityadoptiondecisionFields[4].Descriptor()
 	// identityadoptiondecision.DefaultDecidedAt holds the default value on creation for the decided_at field.
 	identityadoptiondecision.DefaultDecidedAt = identityadoptiondecisionDescDecidedAt.Default.(func() time.Time)
+	microsoftemailaccountMixin := schema.MicrosoftEmailAccount{}.Mixin()
+	microsoftemailaccountMixinFields0 := microsoftemailaccountMixin[0].Fields()
+	_ = microsoftemailaccountMixinFields0
+	microsoftemailaccountFields := schema.MicrosoftEmailAccount{}.Fields()
+	_ = microsoftemailaccountFields
+	// microsoftemailaccountDescCreatedAt is the schema descriptor for created_at field.
+	microsoftemailaccountDescCreatedAt := microsoftemailaccountMixinFields0[0].Descriptor()
+	// microsoftemailaccount.DefaultCreatedAt holds the default value on creation for the created_at field.
+	microsoftemailaccount.DefaultCreatedAt = microsoftemailaccountDescCreatedAt.Default.(func() time.Time)
+	// microsoftemailaccountDescUpdatedAt is the schema descriptor for updated_at field.
+	microsoftemailaccountDescUpdatedAt := microsoftemailaccountMixinFields0[1].Descriptor()
+	// microsoftemailaccount.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	microsoftemailaccount.DefaultUpdatedAt = microsoftemailaccountDescUpdatedAt.Default.(func() time.Time)
+	// microsoftemailaccount.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	microsoftemailaccount.UpdateDefaultUpdatedAt = microsoftemailaccountDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// microsoftemailaccountDescEmail is the schema descriptor for email field.
+	microsoftemailaccountDescEmail := microsoftemailaccountFields[0].Descriptor()
+	// microsoftemailaccount.EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	microsoftemailaccount.EmailValidator = func() func(string) error {
+		validators := microsoftemailaccountDescEmail.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(email string) error {
+			for _, fn := range fns {
+				if err := fn(email); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// microsoftemailaccountDescPassword is the schema descriptor for password field.
+	microsoftemailaccountDescPassword := microsoftemailaccountFields[1].Descriptor()
+	// microsoftemailaccount.PasswordValidator is a validator for the "password" field. It is called by the builders before save.
+	microsoftemailaccount.PasswordValidator = microsoftemailaccountDescPassword.Validators[0].(func(string) error)
+	// microsoftemailaccountDescClientID is the schema descriptor for client_id field.
+	microsoftemailaccountDescClientID := microsoftemailaccountFields[2].Descriptor()
+	// microsoftemailaccount.ClientIDValidator is a validator for the "client_id" field. It is called by the builders before save.
+	microsoftemailaccount.ClientIDValidator = func() func(string) error {
+		validators := microsoftemailaccountDescClientID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(client_id string) error {
+			for _, fn := range fns {
+				if err := fn(client_id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// microsoftemailaccountDescRefreshToken is the schema descriptor for refresh_token field.
+	microsoftemailaccountDescRefreshToken := microsoftemailaccountFields[3].Descriptor()
+	// microsoftemailaccount.RefreshTokenValidator is a validator for the "refresh_token" field. It is called by the builders before save.
+	microsoftemailaccount.RefreshTokenValidator = microsoftemailaccountDescRefreshToken.Validators[0].(func(string) error)
+	// microsoftemailaccountDescStatus is the schema descriptor for status field.
+	microsoftemailaccountDescStatus := microsoftemailaccountFields[4].Descriptor()
+	// microsoftemailaccount.DefaultStatus holds the default value on creation for the status field.
+	microsoftemailaccount.DefaultStatus = microsoftemailaccountDescStatus.Default.(string)
+	// microsoftemailaccount.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	microsoftemailaccount.StatusValidator = microsoftemailaccountDescStatus.Validators[0].(func(string) error)
 	paymentauditlogFields := schema.PaymentAuditLog{}.Fields()
 	_ = paymentauditlogFields
 	// paymentauditlogDescOrderID is the schema descriptor for order_id field.
@@ -1819,6 +1911,12 @@ func init() {
 	user.DefaultRole = userDescRole.Default.(string)
 	// user.RoleValidator is a validator for the "role" field. It is called by the builders before save.
 	user.RoleValidator = userDescRole.Validators[0].(func(string) error)
+	// userDescLevel is the schema descriptor for level field.
+	userDescLevel := userFields[3].Descriptor()
+	// user.DefaultLevel holds the default value on creation for the level field.
+	user.DefaultLevel = userDescLevel.Default.(int)
+	// user.LevelValidator is a validator for the "level" field. It is called by the builders before save.
+	user.LevelValidator = userDescLevel.Validators[0].(func(int) error)
 	// userDescBalance is the schema descriptor for balance field.
 	userDescBalance := userFields[4].Descriptor()
 	// user.DefaultBalance holds the default value on creation for the balance field.

@@ -81,8 +81,8 @@ type Group struct {
 	SortOrder int `json:"sort_order,omitempty"`
 	// 是否允许 /v1/messages 调度到此 OpenAI 分组
 	AllowMessagesDispatch bool `json:"allow_messages_dispatch,omitempty"`
-	// Whether Anthropic/Antigravity groups allow OpenAI-compatible endpoints.
-	AllowOpenAICompat bool `json:"allow_openai_compat,omitempty"`
+	// Whether Anthropic/Antigravity groups allow OpenAI-compatible endpoint conversion
+	AllowOpenaiCompat bool `json:"allow_openai_compat,omitempty"`
 	// 仅允许非 apikey 类型账号关联到此分组
 	RequireOauthOnly bool `json:"require_oauth_only,omitempty"`
 	// 调度时仅允许 privacy 已成功设置的账号
@@ -201,7 +201,7 @@ func (*Group) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case group.FieldModelRouting, group.FieldSupportedModelScopes, group.FieldMessagesDispatchModelConfig:
 			values[i] = new([]byte)
-		case group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldImageRateIndependent, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowOpenAICompat, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet:
+		case group.FieldIsExclusive, group.FieldAllowImageGeneration, group.FieldImageRateIndependent, group.FieldClaudeCodeOnly, group.FieldModelRoutingEnabled, group.FieldMcpXMLInject, group.FieldAllowMessagesDispatch, group.FieldAllowOpenaiCompat, group.FieldRequireOauthOnly, group.FieldRequirePrivacySet:
 			values[i] = new(sql.NullBool)
 		case group.FieldRateMultiplier, group.FieldDailyLimitUsd, group.FieldWeeklyLimitUsd, group.FieldMonthlyLimitUsd, group.FieldImageRateMultiplier, group.FieldImagePrice1k, group.FieldImagePrice2k, group.FieldImagePrice4k:
 			values[i] = new(sql.NullFloat64)
@@ -432,11 +432,11 @@ func (_m *Group) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.AllowMessagesDispatch = value.Bool
 			}
-		case group.FieldAllowOpenAICompat:
+		case group.FieldAllowOpenaiCompat:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field allow_openai_compat", values[i])
 			} else if value.Valid {
-				_m.AllowOpenAICompat = value.Bool
+				_m.AllowOpenaiCompat = value.Bool
 			}
 		case group.FieldRequireOauthOnly:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -571,6 +571,12 @@ func (_m *Group) String() string {
 	builder.WriteString("is_exclusive=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsExclusive))
 	builder.WriteString(", ")
+	builder.WriteString("access_mode=")
+	builder.WriteString(_m.AccessMode)
+	builder.WriteString(", ")
+	builder.WriteString("min_user_level=")
+	builder.WriteString(fmt.Sprintf("%v", _m.MinUserLevel))
+	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
 	builder.WriteString(", ")
@@ -654,7 +660,7 @@ func (_m *Group) String() string {
 	builder.WriteString(fmt.Sprintf("%v", _m.AllowMessagesDispatch))
 	builder.WriteString(", ")
 	builder.WriteString("allow_openai_compat=")
-	builder.WriteString(fmt.Sprintf("%v", _m.AllowOpenAICompat))
+	builder.WriteString(fmt.Sprintf("%v", _m.AllowOpenaiCompat))
 	builder.WriteString(", ")
 	builder.WriteString("require_oauth_only=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RequireOauthOnly))

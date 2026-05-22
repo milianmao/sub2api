@@ -119,6 +119,34 @@ func (_c *GroupCreate) SetNillableIsExclusive(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetAccessMode sets the "access_mode" field.
+func (_c *GroupCreate) SetAccessMode(v string) *GroupCreate {
+	_c.mutation.SetAccessMode(v)
+	return _c
+}
+
+// SetNillableAccessMode sets the "access_mode" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableAccessMode(v *string) *GroupCreate {
+	if v != nil {
+		_c.SetAccessMode(*v)
+	}
+	return _c
+}
+
+// SetMinUserLevel sets the "min_user_level" field.
+func (_c *GroupCreate) SetMinUserLevel(v int) *GroupCreate {
+	_c.mutation.SetMinUserLevel(v)
+	return _c
+}
+
+// SetNillableMinUserLevel sets the "min_user_level" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableMinUserLevel(v *int) *GroupCreate {
+	if v != nil {
+		_c.SetMinUserLevel(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *GroupCreate) SetStatus(v string) *GroupCreate {
 	_c.mutation.SetStatus(v)
@@ -411,16 +439,16 @@ func (_c *GroupCreate) SetNillableAllowMessagesDispatch(v *bool) *GroupCreate {
 	return _c
 }
 
-// SetAllowOpenAICompat sets the "allow_openai_compat" field.
-func (_c *GroupCreate) SetAllowOpenAICompat(v bool) *GroupCreate {
-	_c.mutation.SetAllowOpenAICompat(v)
+// SetAllowOpenaiCompat sets the "allow_openai_compat" field.
+func (_c *GroupCreate) SetAllowOpenaiCompat(v bool) *GroupCreate {
+	_c.mutation.SetAllowOpenaiCompat(v)
 	return _c
 }
 
-// SetNillableAllowOpenAICompat sets the "allow_openai_compat" field if the given value is not nil.
-func (_c *GroupCreate) SetNillableAllowOpenAICompat(v *bool) *GroupCreate {
+// SetNillableAllowOpenaiCompat sets the "allow_openai_compat" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableAllowOpenaiCompat(v *bool) *GroupCreate {
 	if v != nil {
-		_c.SetAllowOpenAICompat(*v)
+		_c.SetAllowOpenaiCompat(*v)
 	}
 	return _c
 }
@@ -644,6 +672,14 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultIsExclusive
 		_c.mutation.SetIsExclusive(v)
 	}
+	if _, ok := _c.mutation.AccessMode(); !ok {
+		v := group.DefaultAccessMode
+		_c.mutation.SetAccessMode(v)
+	}
+	if _, ok := _c.mutation.MinUserLevel(); !ok {
+		v := group.DefaultMinUserLevel
+		_c.mutation.SetMinUserLevel(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := group.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -696,9 +732,9 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultAllowMessagesDispatch
 		_c.mutation.SetAllowMessagesDispatch(v)
 	}
-	if _, ok := _c.mutation.AllowOpenAICompat(); !ok {
-		v := group.DefaultAllowOpenAICompat
-		_c.mutation.SetAllowOpenAICompat(v)
+	if _, ok := _c.mutation.AllowOpenaiCompat(); !ok {
+		v := group.DefaultAllowOpenaiCompat
+		_c.mutation.SetAllowOpenaiCompat(v)
 	}
 	if _, ok := _c.mutation.RequireOauthOnly(); !ok {
 		v := group.DefaultRequireOauthOnly
@@ -744,6 +780,22 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.IsExclusive(); !ok {
 		return &ValidationError{Name: "is_exclusive", err: errors.New(`ent: missing required field "Group.is_exclusive"`)}
+	}
+	if _, ok := _c.mutation.AccessMode(); !ok {
+		return &ValidationError{Name: "access_mode", err: errors.New(`ent: missing required field "Group.access_mode"`)}
+	}
+	if v, ok := _c.mutation.AccessMode(); ok {
+		if err := group.AccessModeValidator(v); err != nil {
+			return &ValidationError{Name: "access_mode", err: fmt.Errorf(`ent: validator failed for field "Group.access_mode": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.MinUserLevel(); !ok {
+		return &ValidationError{Name: "min_user_level", err: errors.New(`ent: missing required field "Group.min_user_level"`)}
+	}
+	if v, ok := _c.mutation.MinUserLevel(); ok {
+		if err := group.MinUserLevelValidator(v); err != nil {
+			return &ValidationError{Name: "min_user_level", err: fmt.Errorf(`ent: validator failed for field "Group.min_user_level": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Group.status"`)}
@@ -799,7 +851,7 @@ func (_c *GroupCreate) check() error {
 	if _, ok := _c.mutation.AllowMessagesDispatch(); !ok {
 		return &ValidationError{Name: "allow_messages_dispatch", err: errors.New(`ent: missing required field "Group.allow_messages_dispatch"`)}
 	}
-	if _, ok := _c.mutation.AllowOpenAICompat(); !ok {
+	if _, ok := _c.mutation.AllowOpenaiCompat(); !ok {
 		return &ValidationError{Name: "allow_openai_compat", err: errors.New(`ent: missing required field "Group.allow_openai_compat"`)}
 	}
 	if _, ok := _c.mutation.RequireOauthOnly(); !ok {
@@ -876,6 +928,14 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
 		_node.IsExclusive = value
+	}
+	if value, ok := _c.mutation.AccessMode(); ok {
+		_spec.SetField(group.FieldAccessMode, field.TypeString, value)
+		_node.AccessMode = value
+	}
+	if value, ok := _c.mutation.MinUserLevel(); ok {
+		_spec.SetField(group.FieldMinUserLevel, field.TypeInt, value)
+		_node.MinUserLevel = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(group.FieldStatus, field.TypeString, value)
@@ -965,9 +1025,9 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 		_spec.SetField(group.FieldAllowMessagesDispatch, field.TypeBool, value)
 		_node.AllowMessagesDispatch = value
 	}
-	if value, ok := _c.mutation.AllowOpenAICompat(); ok {
-		_spec.SetField(group.FieldAllowOpenAICompat, field.TypeBool, value)
-		_node.AllowOpenAICompat = value
+	if value, ok := _c.mutation.AllowOpenaiCompat(); ok {
+		_spec.SetField(group.FieldAllowOpenaiCompat, field.TypeBool, value)
+		_node.AllowOpenaiCompat = value
 	}
 	if value, ok := _c.mutation.RequireOauthOnly(); ok {
 		_spec.SetField(group.FieldRequireOauthOnly, field.TypeBool, value)
@@ -1232,6 +1292,36 @@ func (u *GroupUpsert) SetIsExclusive(v bool) *GroupUpsert {
 // UpdateIsExclusive sets the "is_exclusive" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateIsExclusive() *GroupUpsert {
 	u.SetExcluded(group.FieldIsExclusive)
+	return u
+}
+
+// SetAccessMode sets the "access_mode" field.
+func (u *GroupUpsert) SetAccessMode(v string) *GroupUpsert {
+	u.Set(group.FieldAccessMode, v)
+	return u
+}
+
+// UpdateAccessMode sets the "access_mode" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateAccessMode() *GroupUpsert {
+	u.SetExcluded(group.FieldAccessMode)
+	return u
+}
+
+// SetMinUserLevel sets the "min_user_level" field.
+func (u *GroupUpsert) SetMinUserLevel(v int) *GroupUpsert {
+	u.Set(group.FieldMinUserLevel, v)
+	return u
+}
+
+// UpdateMinUserLevel sets the "min_user_level" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateMinUserLevel() *GroupUpsert {
+	u.SetExcluded(group.FieldMinUserLevel)
+	return u
+}
+
+// AddMinUserLevel adds v to the "min_user_level" field.
+func (u *GroupUpsert) AddMinUserLevel(v int) *GroupUpsert {
+	u.Add(group.FieldMinUserLevel, v)
 	return u
 }
 
@@ -1619,6 +1709,18 @@ func (u *GroupUpsert) UpdateAllowMessagesDispatch() *GroupUpsert {
 	return u
 }
 
+// SetAllowOpenaiCompat sets the "allow_openai_compat" field.
+func (u *GroupUpsert) SetAllowOpenaiCompat(v bool) *GroupUpsert {
+	u.Set(group.FieldAllowOpenaiCompat, v)
+	return u
+}
+
+// UpdateAllowOpenaiCompat sets the "allow_openai_compat" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateAllowOpenaiCompat() *GroupUpsert {
+	u.SetExcluded(group.FieldAllowOpenaiCompat)
+	return u
+}
+
 // SetRequireOauthOnly sets the "require_oauth_only" field.
 func (u *GroupUpsert) SetRequireOauthOnly(v bool) *GroupUpsert {
 	u.Set(group.FieldRequireOauthOnly, v)
@@ -1832,6 +1934,41 @@ func (u *GroupUpsertOne) SetIsExclusive(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateIsExclusive() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateIsExclusive()
+	})
+}
+
+// SetAccessMode sets the "access_mode" field.
+func (u *GroupUpsertOne) SetAccessMode(v string) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAccessMode(v)
+	})
+}
+
+// UpdateAccessMode sets the "access_mode" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateAccessMode() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAccessMode()
+	})
+}
+
+// SetMinUserLevel sets the "min_user_level" field.
+func (u *GroupUpsertOne) SetMinUserLevel(v int) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetMinUserLevel(v)
+	})
+}
+
+// AddMinUserLevel adds v to the "min_user_level" field.
+func (u *GroupUpsertOne) AddMinUserLevel(v int) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddMinUserLevel(v)
+	})
+}
+
+// UpdateMinUserLevel sets the "min_user_level" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateMinUserLevel() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateMinUserLevel()
 	})
 }
 
@@ -2283,6 +2420,20 @@ func (u *GroupUpsertOne) UpdateAllowMessagesDispatch() *GroupUpsertOne {
 	})
 }
 
+// SetAllowOpenaiCompat sets the "allow_openai_compat" field.
+func (u *GroupUpsertOne) SetAllowOpenaiCompat(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAllowOpenaiCompat(v)
+	})
+}
+
+// UpdateAllowOpenaiCompat sets the "allow_openai_compat" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateAllowOpenaiCompat() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAllowOpenaiCompat()
+	})
+}
+
 // SetRequireOauthOnly sets the "require_oauth_only" field.
 func (u *GroupUpsertOne) SetRequireOauthOnly(v bool) *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
@@ -2673,6 +2824,41 @@ func (u *GroupUpsertBulk) SetIsExclusive(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateIsExclusive() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateIsExclusive()
+	})
+}
+
+// SetAccessMode sets the "access_mode" field.
+func (u *GroupUpsertBulk) SetAccessMode(v string) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAccessMode(v)
+	})
+}
+
+// UpdateAccessMode sets the "access_mode" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateAccessMode() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAccessMode()
+	})
+}
+
+// SetMinUserLevel sets the "min_user_level" field.
+func (u *GroupUpsertBulk) SetMinUserLevel(v int) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetMinUserLevel(v)
+	})
+}
+
+// AddMinUserLevel adds v to the "min_user_level" field.
+func (u *GroupUpsertBulk) AddMinUserLevel(v int) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.AddMinUserLevel(v)
+	})
+}
+
+// UpdateMinUserLevel sets the "min_user_level" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateMinUserLevel() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateMinUserLevel()
 	})
 }
 
@@ -3121,6 +3307,20 @@ func (u *GroupUpsertBulk) SetAllowMessagesDispatch(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateAllowMessagesDispatch() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateAllowMessagesDispatch()
+	})
+}
+
+// SetAllowOpenaiCompat sets the "allow_openai_compat" field.
+func (u *GroupUpsertBulk) SetAllowOpenaiCompat(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetAllowOpenaiCompat(v)
+	})
+}
+
+// UpdateAllowOpenaiCompat sets the "allow_openai_compat" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateAllowOpenaiCompat() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateAllowOpenaiCompat()
 	})
 }
 

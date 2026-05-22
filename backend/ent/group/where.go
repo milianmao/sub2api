@@ -90,6 +90,16 @@ func IsExclusive(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldIsExclusive, v))
 }
 
+// AccessMode applies equality check predicate on the "access_mode" field. It's identical to AccessModeEQ.
+func AccessMode(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAccessMode, v))
+}
+
+// MinUserLevel applies equality check predicate on the "min_user_level" field. It's identical to MinUserLevelEQ.
+func MinUserLevel(v int) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldMinUserLevel, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldStatus, v))
@@ -190,9 +200,9 @@ func AllowMessagesDispatch(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldAllowMessagesDispatch, v))
 }
 
-// AllowOpenAICompat applies equality check predicate on the "allow_openai_compat" field. It's identical to AllowOpenAICompatEQ.
-func AllowOpenAICompat(v bool) predicate.Group {
-	return predicate.Group(sql.FieldEQ(FieldAllowOpenAICompat, v))
+// AllowOpenaiCompat applies equality check predicate on the "allow_openai_compat" field. It's identical to AllowOpenaiCompatEQ.
+func AllowOpenaiCompat(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAllowOpenaiCompat, v))
 }
 
 // RequireOauthOnly applies equality check predicate on the "require_oauth_only" field. It's identical to RequireOauthOnlyEQ.
@@ -533,6 +543,111 @@ func IsExclusiveEQ(v bool) predicate.Group {
 // IsExclusiveNEQ applies the NEQ predicate on the "is_exclusive" field.
 func IsExclusiveNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldIsExclusive, v))
+}
+
+// AccessModeEQ applies the EQ predicate on the "access_mode" field.
+func AccessModeEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAccessMode, v))
+}
+
+// AccessModeNEQ applies the NEQ predicate on the "access_mode" field.
+func AccessModeNEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldAccessMode, v))
+}
+
+// AccessModeIn applies the In predicate on the "access_mode" field.
+func AccessModeIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldAccessMode, vs...))
+}
+
+// AccessModeNotIn applies the NotIn predicate on the "access_mode" field.
+func AccessModeNotIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldAccessMode, vs...))
+}
+
+// AccessModeGT applies the GT predicate on the "access_mode" field.
+func AccessModeGT(v string) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldAccessMode, v))
+}
+
+// AccessModeGTE applies the GTE predicate on the "access_mode" field.
+func AccessModeGTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldAccessMode, v))
+}
+
+// AccessModeLT applies the LT predicate on the "access_mode" field.
+func AccessModeLT(v string) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldAccessMode, v))
+}
+
+// AccessModeLTE applies the LTE predicate on the "access_mode" field.
+func AccessModeLTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldAccessMode, v))
+}
+
+// AccessModeContains applies the Contains predicate on the "access_mode" field.
+func AccessModeContains(v string) predicate.Group {
+	return predicate.Group(sql.FieldContains(FieldAccessMode, v))
+}
+
+// AccessModeHasPrefix applies the HasPrefix predicate on the "access_mode" field.
+func AccessModeHasPrefix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasPrefix(FieldAccessMode, v))
+}
+
+// AccessModeHasSuffix applies the HasSuffix predicate on the "access_mode" field.
+func AccessModeHasSuffix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasSuffix(FieldAccessMode, v))
+}
+
+// AccessModeEqualFold applies the EqualFold predicate on the "access_mode" field.
+func AccessModeEqualFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldEqualFold(FieldAccessMode, v))
+}
+
+// AccessModeContainsFold applies the ContainsFold predicate on the "access_mode" field.
+func AccessModeContainsFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldContainsFold(FieldAccessMode, v))
+}
+
+// MinUserLevelEQ applies the EQ predicate on the "min_user_level" field.
+func MinUserLevelEQ(v int) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldMinUserLevel, v))
+}
+
+// MinUserLevelNEQ applies the NEQ predicate on the "min_user_level" field.
+func MinUserLevelNEQ(v int) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldMinUserLevel, v))
+}
+
+// MinUserLevelIn applies the In predicate on the "min_user_level" field.
+func MinUserLevelIn(vs ...int) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldMinUserLevel, vs...))
+}
+
+// MinUserLevelNotIn applies the NotIn predicate on the "min_user_level" field.
+func MinUserLevelNotIn(vs ...int) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldMinUserLevel, vs...))
+}
+
+// MinUserLevelGT applies the GT predicate on the "min_user_level" field.
+func MinUserLevelGT(v int) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldMinUserLevel, v))
+}
+
+// MinUserLevelGTE applies the GTE predicate on the "min_user_level" field.
+func MinUserLevelGTE(v int) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldMinUserLevel, v))
+}
+
+// MinUserLevelLT applies the LT predicate on the "min_user_level" field.
+func MinUserLevelLT(v int) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldMinUserLevel, v))
+}
+
+// MinUserLevelLTE applies the LTE predicate on the "min_user_level" field.
+func MinUserLevelLTE(v int) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldMinUserLevel, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.
@@ -1320,14 +1435,14 @@ func AllowMessagesDispatchNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldAllowMessagesDispatch, v))
 }
 
-// AllowOpenAICompatEQ applies the EQ predicate on the "allow_openai_compat" field.
-func AllowOpenAICompatEQ(v bool) predicate.Group {
-	return predicate.Group(sql.FieldEQ(FieldAllowOpenAICompat, v))
+// AllowOpenaiCompatEQ applies the EQ predicate on the "allow_openai_compat" field.
+func AllowOpenaiCompatEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldAllowOpenaiCompat, v))
 }
 
-// AllowOpenAICompatNEQ applies the NEQ predicate on the "allow_openai_compat" field.
-func AllowOpenAICompatNEQ(v bool) predicate.Group {
-	return predicate.Group(sql.FieldNEQ(FieldAllowOpenAICompat, v))
+// AllowOpenaiCompatNEQ applies the NEQ predicate on the "allow_openai_compat" field.
+func AllowOpenaiCompatNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldAllowOpenaiCompat, v))
 }
 
 // RequireOauthOnlyEQ applies the EQ predicate on the "require_oauth_only" field.

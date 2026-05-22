@@ -78,8 +78,8 @@ const (
 	FieldSortOrder = "sort_order"
 	// FieldAllowMessagesDispatch holds the string denoting the allow_messages_dispatch field in the database.
 	FieldAllowMessagesDispatch = "allow_messages_dispatch"
-	// FieldAllowOpenAICompat holds the string denoting the allow_openai_compat field in the database.
-	FieldAllowOpenAICompat = "allow_openai_compat"
+	// FieldAllowOpenaiCompat holds the string denoting the allow_openai_compat field in the database.
+	FieldAllowOpenaiCompat = "allow_openai_compat"
 	// FieldRequireOauthOnly holds the string denoting the require_oauth_only field in the database.
 	FieldRequireOauthOnly = "require_oauth_only"
 	// FieldRequirePrivacySet holds the string denoting the require_privacy_set field in the database.
@@ -196,7 +196,7 @@ var Columns = []string{
 	FieldSupportedModelScopes,
 	FieldSortOrder,
 	FieldAllowMessagesDispatch,
-	FieldAllowOpenAICompat,
+	FieldAllowOpenaiCompat,
 	FieldRequireOauthOnly,
 	FieldRequirePrivacySet,
 	FieldDefaultMappedModel,
@@ -243,6 +243,14 @@ var (
 	DefaultRateMultiplier float64
 	// DefaultIsExclusive holds the default value on creation for the "is_exclusive" field.
 	DefaultIsExclusive bool
+	// DefaultAccessMode holds the default value on creation for the "access_mode" field.
+	DefaultAccessMode string
+	// AccessModeValidator is a validator for the "access_mode" field. It is called by the builders before save.
+	AccessModeValidator func(string) error
+	// DefaultMinUserLevel holds the default value on creation for the "min_user_level" field.
+	DefaultMinUserLevel int
+	// MinUserLevelValidator is a validator for the "min_user_level" field. It is called by the builders before save.
+	MinUserLevelValidator func(int) error
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -275,8 +283,8 @@ var (
 	DefaultSortOrder int
 	// DefaultAllowMessagesDispatch holds the default value on creation for the "allow_messages_dispatch" field.
 	DefaultAllowMessagesDispatch bool
-	// DefaultAllowOpenAICompat holds the default value on creation for the "allow_openai_compat" field.
-	DefaultAllowOpenAICompat bool
+	// DefaultAllowOpenaiCompat holds the default value on creation for the "allow_openai_compat" field.
+	DefaultAllowOpenaiCompat bool
 	// DefaultRequireOauthOnly holds the default value on creation for the "require_oauth_only" field.
 	DefaultRequireOauthOnly bool
 	// DefaultRequirePrivacySet holds the default value on creation for the "require_privacy_set" field.
@@ -332,6 +340,16 @@ func ByRateMultiplier(opts ...sql.OrderTermOption) OrderOption {
 // ByIsExclusive orders the results by the is_exclusive field.
 func ByIsExclusive(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsExclusive, opts...).ToFunc()
+}
+
+// ByAccessMode orders the results by the access_mode field.
+func ByAccessMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAccessMode, opts...).ToFunc()
+}
+
+// ByMinUserLevel orders the results by the min_user_level field.
+func ByMinUserLevel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMinUserLevel, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.
@@ -434,9 +452,9 @@ func ByAllowMessagesDispatch(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAllowMessagesDispatch, opts...).ToFunc()
 }
 
-// ByAllowOpenAICompat orders the results by the allow_openai_compat field.
-func ByAllowOpenAICompat(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldAllowOpenAICompat, opts...).ToFunc()
+// ByAllowOpenaiCompat orders the results by the allow_openai_compat field.
+func ByAllowOpenaiCompat(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAllowOpenaiCompat, opts...).ToFunc()
 }
 
 // ByRequireOauthOnly orders the results by the require_oauth_only field.

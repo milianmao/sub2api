@@ -85,6 +85,11 @@ func Role(v string) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldRole, v))
 }
 
+// Level applies equality check predicate on the "level" field. It's identical to LevelEQ.
+func Level(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldLevel, v))
+}
+
 // Balance applies equality check predicate on the "balance" field. It's identical to BalanceEQ.
 func Balance(v float64) predicate.User {
 	return predicate.User(sql.FieldEQ(FieldBalance, v))
@@ -493,6 +498,46 @@ func RoleEqualFold(v string) predicate.User {
 // RoleContainsFold applies the ContainsFold predicate on the "role" field.
 func RoleContainsFold(v string) predicate.User {
 	return predicate.User(sql.FieldContainsFold(FieldRole, v))
+}
+
+// LevelEQ applies the EQ predicate on the "level" field.
+func LevelEQ(v int) predicate.User {
+	return predicate.User(sql.FieldEQ(FieldLevel, v))
+}
+
+// LevelNEQ applies the NEQ predicate on the "level" field.
+func LevelNEQ(v int) predicate.User {
+	return predicate.User(sql.FieldNEQ(FieldLevel, v))
+}
+
+// LevelIn applies the In predicate on the "level" field.
+func LevelIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldIn(FieldLevel, vs...))
+}
+
+// LevelNotIn applies the NotIn predicate on the "level" field.
+func LevelNotIn(vs ...int) predicate.User {
+	return predicate.User(sql.FieldNotIn(FieldLevel, vs...))
+}
+
+// LevelGT applies the GT predicate on the "level" field.
+func LevelGT(v int) predicate.User {
+	return predicate.User(sql.FieldGT(FieldLevel, v))
+}
+
+// LevelGTE applies the GTE predicate on the "level" field.
+func LevelGTE(v int) predicate.User {
+	return predicate.User(sql.FieldGTE(FieldLevel, v))
+}
+
+// LevelLT applies the LT predicate on the "level" field.
+func LevelLT(v int) predicate.User {
+	return predicate.User(sql.FieldLT(FieldLevel, v))
+}
+
+// LevelLTE applies the LTE predicate on the "level" field.
+func LevelLTE(v int) predicate.User {
+	return predicate.User(sql.FieldLTE(FieldLevel, v))
 }
 
 // BalanceEQ applies the EQ predicate on the "balance" field.
