@@ -41,6 +41,7 @@
               <select v-model="filters.status" class="form-select min-w-[150px]" @change="reloadFirstPage">
                 <option value="">全部状态</option>
                 <option value="active">正常</option>
+                <option value="invalid">失效</option>
                 <option value="error">异常</option>
                 <option value="unchecked">待检查</option>
                 <option value="inactive">停用</option>
@@ -559,6 +560,7 @@ function maskClientId(value?: string) {
 function normalizeStatus(status: MicrosoftEmailStatus) {
   if (status === 'active') return 'active'
   if (status === 'error') return 'error'
+  if (status === 'invalid') return 'error'
   if (status === 'inactive') return 'inactive'
   return 'warning'
 }
@@ -566,6 +568,7 @@ function normalizeStatus(status: MicrosoftEmailStatus) {
 function statusLabel(status: MicrosoftEmailStatus) {
   const labels: Record<string, string> = {
     active: '正常',
+    invalid: '失效',
     error: '异常',
     unchecked: '待检查',
     inactive: '停用'
