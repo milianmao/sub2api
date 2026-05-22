@@ -88,7 +88,7 @@ func (s *MicrosoftEmailService) Check(ctx context.Context, id int64) (*Microsoft
 	_, err = s.graph.RefreshAccessToken(ctx, account.ClientID, account.RefreshToken)
 	if err != nil {
 		status = MicrosoftEmailStatusInvalid
-		msg := sanitizeMicrosoftSecretError(err)
+		msg := sanitizeMicrosoftSecretError(err, account.Password, account.RefreshToken, account.ClientID)
 		lastErr = &msg
 	}
 
@@ -170,11 +170,18 @@ func maskSecret(secret string) string {
 	return secret[:4] + "****" + secret[len(secret)-4:]
 }
 
-func sanitizeMicrosoftSecretError(err error) string {
+func sanitizeMicrosoftSecretError(err error, secrets ...string) string {
 	if err == nil {
 		return ""
 	}
 	msg := err.Error()
+	for _, secret := range secrets {
+		secret = strings.TrimSpace(secret)
+		if secret == "" {
+			continue
+		}
+		msg = strings.ReplaceAll(msg, secret, "[redacted]")
+	}
 	for _, token := range []string{"refresh_token", "access_token", "client_secret", "password"} {
 		msg = strings.ReplaceAll(msg, token, "[redacted]")
 	}

@@ -157,3 +157,36 @@ func TestMicrosoftEmailService_Check_UpdatesInvalidOnRefreshFailure(t *testing.T
 	require.NoError(t, err)
 	require.Equal(t, MicrosoftEmailStatusInvalid, stored.Status)
 }
+
+func TestMicrosoftEmailService_Check_RedactsAccountSecretsFromRefreshFailure(t *testing.T) {
+	repo := newFakeMicrosoftEmailRepo()
+	password := "actual-password-secret"
+	refreshToken := "actual-refresh-token-secret"
+	clientID := "actual-client-id-secret"
+	created, err := repo.Create(context.Background(), &MicrosoftEmailAccount{
+		Email:        "u@example.com",
+		Password:     password,
+		ClientID:     clientID,
+		RefreshToken: refreshToken,
+	})
+	require.NoError(t, err)
+	svc := NewMicrosoftEmailService(repo, fakeMicrosoftGraphClient{tokenErr: errors.New("invalid refresh token " + refreshToken + " for password " + password + " and client " + clientID)})
+
+	res, err := svc.Check(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.NotNil(t, res.LastError)
+	require.NotContains(t, *res.LastError, password)
+	require.NotContains(t, *res.LastError, refreshToken)
+	require.NotContains(t, *res.LastError, clientID)
+	require.Contains(t, *res.LastError, "[redacted]")
+	require.Contains(t, *res.LastError, "invalid refresh token")
+
+	stored, err := repo.GetByID(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.NotNil(t, stored.LastError)
+	require.NotContains(t, *stored.LastError, password)
+	require.NotContains(t, *stored.LastError, refreshToken)
+	require.NotContains(t, *stored.LastError, clientID)
+	require.Contains(t, *stored.LastError, "[redacted]")
+	require.Contains(t, *stored.LastError, "invalid refresh token")
+}
