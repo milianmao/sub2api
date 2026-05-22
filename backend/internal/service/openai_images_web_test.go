@@ -102,6 +102,53 @@ func TestForwardOpenAIImagesChatGPTWebChallengeAllowsFailover(t *testing.T) {
 	require.NotContains(t, err.Error(), "oauth-token")
 }
 
+func TestForwardOpenAIImagesChatGPTWebUpstreamErrorWritesOpenAIError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{StatusCode: http.StatusBadRequest, Header: http.Header{"Content-Type": []string{"application/json"}, "x-request-id": []string{"rid_web_bad"}}, Body: io.NopCloser(strings.NewReader(`{"error":{"message":"bad image prompt"}}`))},
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	account := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1, Credentials: map[string]any{"access_token": "oauth-token"}}
+	parsed := &OpenAIImagesRequest{Endpoint: openAIImagesGenerationsEndpoint, Model: "gpt-image-2", Prompt: "draw", N: 1}
+
+	result, err := svc.forwardOpenAIImagesChatGPTWeb(context.Background(), c, account, parsed, "")
+
+	require.Nil(t, result)
+	var upstreamErr *OpenAIImagesUpstreamError
+	require.ErrorAs(t, err, &upstreamErr)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Equal(t, "bad image prompt", gjson.Get(rec.Body.String(), "error.message").String())
+	require.Equal(t, "upstream_error", gjson.Get(rec.Body.String(), "error.type").String())
+	require.Equal(t, "upstream_error", gjson.Get(rec.Body.String(), "error.code").String())
+}
+
+func TestForwardOpenAIImagesChatGPTWebModerationBlockedWritesOpenAIError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"conduit_token":"conduit_1"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}, "x-request-id": []string{"rid_block"}}, Body: io.NopCloser(strings.NewReader("data: {\"type\":\"moderation_blocked\"}\n\n"))},
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/generations", nil)
+	account := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1, Credentials: map[string]any{"access_token": "oauth-token"}}
+	parsed := &OpenAIImagesRequest{Endpoint: openAIImagesGenerationsEndpoint, Model: "gpt-image-2", Prompt: "draw", N: 1}
+
+	result, err := svc.forwardOpenAIImagesChatGPTWeb(context.Background(), c, account, parsed, "")
+
+	require.Nil(t, result)
+	var upstreamErr *OpenAIImagesUpstreamError
+	require.ErrorAs(t, err, &upstreamErr)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	require.Equal(t, "Image generation was blocked by upstream moderation", gjson.Get(rec.Body.String(), "error.message").String())
+	require.Equal(t, "content_policy_violation", gjson.Get(rec.Body.String(), "error.type").String())
+	require.Equal(t, "content_policy_violation", gjson.Get(rec.Body.String(), "error.code").String())
+}
+
 func TestForwardOpenAIImagesChatGPTWebURLFormatReturnsDataURL(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	imageBytes := []byte("fake-png-bytes")

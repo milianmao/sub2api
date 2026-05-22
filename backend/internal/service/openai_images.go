@@ -561,7 +561,7 @@ func (s *OpenAIGatewayService) ForwardImages(
 		case OpenAIImageUpstreamCodexResponses:
 			return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
 		case OpenAIImageUpstreamChatGPTWebImage:
-			if parsed.HasMask {
+			if parsed.HasMask || (parsed.IsEdits() && len(parsed.InputImageURLs) > 0) {
 				return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
 			}
 			return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)

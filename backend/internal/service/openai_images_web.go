@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -78,6 +79,11 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesChatGPTWeb(
 	client := &openAIChatGPTWebImageClient{upstream: s.httpUpstream, account: account, token: token}
 	outputs, headers, err := client.generate(ctx, parsed, requestModel)
 	if err != nil {
+		var upstreamErr *OpenAIImagesUpstreamError
+		if errors.As(err, &upstreamErr) {
+			setOpsUpstreamError(c, upstreamErr.clientStatusCode(), upstreamErr.clientMessage(), "")
+			writeOpenAIImagesUpstreamErrorResponse(c, upstreamErr)
+		}
 		return nil, err
 	}
 	results := make([]openAIResponsesImageResult, 0, len(outputs))
