@@ -227,6 +227,9 @@
           <dd class="whitespace-pre-wrap">{{ fetchCodeResult.snippet || '-' }}</dd>
         </div>
       </div>
+      <div v-else class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-800/50 dark:bg-blue-900/20 dark:text-blue-200">
+        正在获取验证码，请稍候...
+      </div>
       <template #footer>
         <button type="button" class="btn btn-primary" @click="closeFetchCodeDialog">知道了</button>
       </template>
@@ -407,7 +410,7 @@ function toggleSelectAllVisible(event: Event) {
 }
 
 function isRowBusy(id: number) {
-  return checkingIds.value.has(id) || fetchingCodeId.value === id || deleting.value
+  return checkingIds.value.has(id) || fetchingCodeId.value !== null || deleting.value
 }
 
 async function handleCheck(row: MicrosoftEmailListItem) {
@@ -448,6 +451,8 @@ async function handleBatchCheck() {
 }
 
 async function handleFetchCode(row: MicrosoftEmailListItem) {
+  if (fetchingCodeId.value !== null) return
+
   fetchingCodeId.value = row.id
   fetchCodeResult.value = null
   showFetchCode.value = true
