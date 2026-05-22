@@ -276,12 +276,18 @@ const handleImport = async () => {
     const res = await adminAPI.accounts.importChatGPTSession(payload)
     result.value = res
 
+    const messageParams = {
+      total: res.total,
+      created: res.created,
+      failed: res.failed
+    }
+
     if (res.failed > 0) {
-      appStore.showError(t('admin.accounts.chatgptSessionImportPartial', res))
+      appStore.showError(t('admin.accounts.chatgptSessionImportPartial', messageParams))
       return
     }
 
-    appStore.showSuccess(t('admin.accounts.chatgptSessionImportSuccess', res))
+    appStore.showSuccess(t('admin.accounts.chatgptSessionImportSuccess', messageParams))
     emit('imported')
   } catch (error: any) {
     appStore.showError(error?.message || t('admin.accounts.chatgptSessionImportFailed'))
