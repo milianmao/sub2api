@@ -84,8 +84,9 @@ func (r *fakeMicrosoftEmailRepo) Delete(ctx context.Context, id int64) error {
 }
 
 type fakeMicrosoftGraphClient struct {
-	tokenErr error
-	messages []MicrosoftGraphMessage
+	tokenErr   error
+	messageErr error
+	messages   []MicrosoftGraphMessage
 }
 
 func (c fakeMicrosoftGraphClient) RefreshAccessToken(ctx context.Context, clientID, refreshToken string) (string, error) {
@@ -95,6 +96,9 @@ func (c fakeMicrosoftGraphClient) RefreshAccessToken(ctx context.Context, client
 	return "access-token", nil
 }
 func (c fakeMicrosoftGraphClient) ListRecentMessages(ctx context.Context, accessToken string, limit int) ([]MicrosoftGraphMessage, error) {
+	if c.messageErr != nil {
+		return nil, c.messageErr
+	}
 	return c.messages, nil
 }
 
@@ -189,4 +193,117 @@ func TestMicrosoftEmailService_Check_RedactsAccountSecretsFromRefreshFailure(t *
 	require.NotContains(t, *stored.LastError, clientID)
 	require.Contains(t, *stored.LastError, "[redacted]")
 	require.Contains(t, *stored.LastError, "invalid refresh token")
+}
+
+func TestMicrosoftEmailService_FetchCode_ReturnsCodeMetadataAndDoesNotStoreBody(t *testing.T) {
+	repo := newFakeMicrosoftEmailRepo()
+	created, err := repo.Create(context.Background(), &MicrosoftEmailAccount{Email: "u@example.com", ClientID: "client", RefreshToken: "refresh", Status: MicrosoftEmailStatusError, LastError: stringPtr("old error")})
+	require.NoError(t, err)
+	receivedAt := time.Date(2026, 5, 22, 10, 30, 0, 0, time.UTC)
+	svc := NewMicrosoftEmailService(repo, fakeMicrosoftGraphClient{messages: []MicrosoftGraphMessage{{
+		Subject:     "Microsoft verification code 654321",
+		From:        "account-security-noreply@accountprotection.microsoft.com",
+		ReceivedAt:  receivedAt,
+		BodyPreview: "Use 654321 to sign in",
+		BodyText:    "Full body contains 654321 and must not be persisted",
+	}}})
+
+	res, err := svc.FetchCode(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, "u@example.com", res.Email)
+	require.Equal(t, "654321", res.Code)
+	require.Equal(t, "subject", res.Source)
+	require.Equal(t, "Microsoft verification code 654321", res.Subject)
+	require.Equal(t, "account-security-noreply@accountprotection.microsoft.com", res.From)
+	require.Equal(t, receivedAt, res.ReceivedAt)
+	require.Equal(t, "Use 654321 to sign in", res.Snippet)
+	require.Empty(t, res.Error)
+	require.NotZero(t, res.FetchedAt)
+
+	stored, err := repo.GetByID(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, MicrosoftEmailStatusActive, stored.Status)
+	require.NotNil(t, stored.LastFetchAt)
+	require.Nil(t, stored.LastError)
+	require.NotContains(t, stored.Password, "Full body")
+	require.NotContains(t, stored.RefreshToken, "Full body")
+}
+
+func TestMicrosoftEmailService_FetchCode_CodeNotFoundDoesNotInvalidateActiveAccount(t *testing.T) {
+	repo := newFakeMicrosoftEmailRepo()
+	created, err := repo.Create(context.Background(), &MicrosoftEmailAccount{Email: "u@example.com", ClientID: "client", RefreshToken: "refresh", Status: MicrosoftEmailStatusActive})
+	require.NoError(t, err)
+	svc := NewMicrosoftEmailService(repo, fakeMicrosoftGraphClient{messages: []MicrosoftGraphMessage{{Subject: "Welcome", BodyPreview: "No verification code here", ReceivedAt: time.Now()}}})
+
+	res, err := svc.FetchCode(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, "u@example.com", res.Email)
+	require.Empty(t, res.Code)
+	require.Equal(t, "code_not_found", res.Error)
+
+	stored, err := repo.GetByID(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, MicrosoftEmailStatusActive, stored.Status)
+	require.NotNil(t, stored.LastFetchAt)
+	require.NotNil(t, stored.LastError)
+	require.Equal(t, "code_not_found", *stored.LastError)
+}
+
+func TestMicrosoftEmailService_FetchCode_RedactsRefreshFailureSecrets(t *testing.T) {
+	repo := newFakeMicrosoftEmailRepo()
+	password := "actual-password-secret"
+	refreshToken := "actual-refresh-token-secret"
+	clientID := "actual-client-id-secret"
+	created, err := repo.Create(context.Background(), &MicrosoftEmailAccount{Email: "u@example.com", Password: password, ClientID: clientID, RefreshToken: refreshToken, Status: MicrosoftEmailStatusActive})
+	require.NoError(t, err)
+	svc := NewMicrosoftEmailService(repo, fakeMicrosoftGraphClient{tokenErr: errors.New("invalid refresh token " + refreshToken + " for password " + password + " and client " + clientID)})
+
+	res, err := svc.FetchCode(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, "u@example.com", res.Email)
+	require.Empty(t, res.Code)
+	require.NotEmpty(t, res.Error)
+	require.NotContains(t, res.Error, password)
+	require.NotContains(t, res.Error, refreshToken)
+	require.NotContains(t, res.Error, clientID)
+	require.Contains(t, res.Error, "[redacted]")
+
+	stored, err := repo.GetByID(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, MicrosoftEmailStatusInvalid, stored.Status)
+	require.NotNil(t, stored.LastFetchAt)
+	require.NotNil(t, stored.LastError)
+	require.Equal(t, res.Error, *stored.LastError)
+}
+
+func TestMicrosoftEmailService_FetchCode_RedactsMessageFetchFailureSecrets(t *testing.T) {
+	repo := newFakeMicrosoftEmailRepo()
+	password := "actual-password-secret"
+	refreshToken := "actual-refresh-token-secret"
+	clientID := "actual-client-id-secret"
+	created, err := repo.Create(context.Background(), &MicrosoftEmailAccount{Email: "u@example.com", Password: password, ClientID: clientID, RefreshToken: refreshToken, Status: MicrosoftEmailStatusActive})
+	require.NoError(t, err)
+	svc := NewMicrosoftEmailService(repo, fakeMicrosoftGraphClient{messageErr: errors.New("graph failed for access_token using " + refreshToken + " " + clientID + " " + password)})
+
+	res, err := svc.FetchCode(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, "u@example.com", res.Email)
+	require.Empty(t, res.Code)
+	require.NotEmpty(t, res.Error)
+	require.NotContains(t, res.Error, password)
+	require.NotContains(t, res.Error, refreshToken)
+	require.NotContains(t, res.Error, clientID)
+	require.NotContains(t, res.Error, "access_token")
+	require.Contains(t, res.Error, "[redacted]")
+
+	stored, err := repo.GetByID(context.Background(), created.ID)
+	require.NoError(t, err)
+	require.Equal(t, MicrosoftEmailStatusError, stored.Status)
+	require.NotNil(t, stored.LastFetchAt)
+	require.NotNil(t, stored.LastError)
+	require.Equal(t, res.Error, *stored.LastError)
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

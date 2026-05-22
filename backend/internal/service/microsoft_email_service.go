@@ -99,6 +99,65 @@ func (s *MicrosoftEmailService) Check(ctx context.Context, id int64) (*Microsoft
 	return &MicrosoftEmailCheckResult{ID: account.ID, Email: account.Email, Status: status, CheckedAt: checkedAt, LastError: lastErr}, nil
 }
 
+func (s *MicrosoftEmailService) FetchCode(ctx context.Context, id int64) (*MicrosoftEmailFetchCodeResult, error) {
+	account, err := s.repo.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	fetchedAt := time.Now()
+	result := &MicrosoftEmailFetchCodeResult{Email: account.Email, FetchedAt: fetchedAt}
+	accessToken, err := s.graph.RefreshAccessToken(ctx, account.ClientID, account.RefreshToken)
+	if err != nil {
+		msg := sanitizeMicrosoftSecretError(err, account.Password, account.RefreshToken, account.ClientID)
+		result.Error = msg
+		result.LastError = &msg
+		status := MicrosoftEmailStatusInvalid
+		if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, &status, &msg); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	messages, err := s.graph.ListRecentMessages(ctx, accessToken, microsoftVerificationMessageLimit)
+	if err != nil {
+		msg := sanitizeMicrosoftSecretError(err, account.Password, account.RefreshToken, account.ClientID, accessToken)
+		result.Error = msg
+		result.LastError = &msg
+		status := MicrosoftEmailStatusError
+		if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, &status, &msg); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	extracted := ExtractMicrosoftVerificationCode(messages)
+	if extracted.Code == "" {
+		msg := "code_not_found"
+		result.Error = msg
+		result.LastError = &msg
+		if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, nil, &msg); err != nil {
+			return nil, err
+		}
+		return result, nil
+	}
+
+	result.Code = extracted.Code
+	result.Source = extracted.Source
+	result.Message = extracted.Message
+	if extracted.Message != nil {
+		result.Subject = extracted.Message.Subject
+		result.From = extracted.Message.From
+		result.ReceivedAt = extracted.Message.ReceivedAt
+		result.Snippet = extracted.Message.BodyPreview
+	}
+	status := MicrosoftEmailStatusActive
+	if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, &status, nil); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 func ExtractMicrosoftVerificationCode(messages []MicrosoftGraphMessage) MicrosoftEmailFetchCodeResult {
 	if len(messages) == 0 {
 		return MicrosoftEmailFetchCodeResult{}
@@ -117,14 +176,14 @@ func ExtractMicrosoftVerificationCode(messages []MicrosoftGraphMessage) Microsof
 			text   string
 		}{
 			{source: "subject", text: msg.Subject},
-			{source: "body", text: msg.BodyPreview},
+			{source: "body", text: strings.TrimSpace(msg.BodyPreview + " " + msg.BodyText)},
 		} {
 			code := microsoftVerificationCodePattern.FindString(part.text)
 			if code == "" {
 				continue
 			}
 			candidate := MicrosoftEmailFetchCodeResult{Code: code, Source: part.source, Message: &msg}
-			if isMicrosoftVerificationKeywordText(msg.Subject + " " + msg.BodyPreview) {
+			if isMicrosoftVerificationKeywordText(msg.Subject + " " + msg.BodyPreview + " " + msg.BodyText) {
 				return candidate
 			}
 			if fallback == nil {

@@ -59,8 +59,10 @@ type MicrosoftGraphClient interface {
 
 type MicrosoftGraphMessage struct {
 	Subject     string
-	BodyPreview string
+	From        string
 	ReceivedAt  time.Time
+	BodyPreview string
+	BodyText    string
 }
 
 type MicrosoftEmailImportResult struct {
@@ -94,9 +96,15 @@ type MicrosoftEmailCheckResult struct {
 }
 
 type MicrosoftEmailFetchCodeResult struct {
-	Code      string
-	Source    string
-	Message   *MicrosoftGraphMessage
-	FetchedAt time.Time
-	LastError *string
+	Email      string
+	Code       string
+	Source     string
+	Subject    string
+	From       string
+	ReceivedAt time.Time
+	Snippet    string
+	Error      string
+	Message    *MicrosoftGraphMessage
+	FetchedAt  time.Time
+	LastError  *string
 }
