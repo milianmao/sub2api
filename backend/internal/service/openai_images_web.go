@@ -81,6 +81,32 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesChatGPTWeb(
 			Model:         requestModel,
 		})
 	}
+	if parsed.Stream {
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+		c.Status(http.StatusOK)
+		flusher, _ := c.Writer.(http.Flusher)
+		for _, img := range results {
+			eventName := openAIImagesStreamPrefix(parsed) + ".completed"
+			payload := buildOpenAIImagesStreamCompletedPayload(eventName, img, parsed.ResponseFormat, time.Now().Unix(), nil)
+			if err := s.writeOpenAIImagesStreamEvent(c, flusher, eventName, payload); err != nil {
+				return nil, err
+			}
+		}
+		return &OpenAIForwardResult{
+			RequestID:        headers.Get("x-request-id"),
+			Model:            requestModel,
+			UpstreamModel:    "chatgpt_web_image",
+			Stream:           parsed.Stream,
+			ResponseHeaders:  headers.Clone(),
+			Duration:         time.Since(startTime),
+			ImageCount:       len(results),
+			ImageSize:        parsed.SizeTier,
+			ImageInputSize:   parsed.Size,
+			ImageOutputSizes: openAIResponsesImageResultSizes(results),
+		}, nil
+	}
 	body, err := buildOpenAIImagesAPIResponse(results, time.Now().Unix(), nil, openAIResponsesImageResult{Model: requestModel}, parsed.ResponseFormat)
 	if err != nil {
 		return nil, err
