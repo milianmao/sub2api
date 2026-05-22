@@ -30,3 +30,12 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar admin microsoft email menu', () => {
+  it('shows a dedicated admin menu item without batch fetch-code entry points', () => {
+    expect(componentSource).toContain("{ path: '/admin/microsoft-emails', label: '微软邮箱', icon: GlobeIcon")
+    expect(componentSource).not.toContain('batchFetchCode')
+    expect(componentSource).not.toContain('batch-fetch-code')
+  })
+})
+
