@@ -50,6 +50,7 @@ type MicrosoftEmailRepository interface {
 	UpdateCheckResult(ctx context.Context, id int64, status string, checkedAt time.Time, lastErr *string) error
 	UpdateFetchResult(ctx context.Context, id int64, fetchedAt time.Time, status *string, lastErr *string) error
 	Delete(ctx context.Context, id int64) error
+	BatchDelete(ctx context.Context, ids []int64) (int, error)
 }
 
 type MicrosoftGraphClient interface {

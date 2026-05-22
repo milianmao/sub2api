@@ -83,6 +83,16 @@ func (r *fakeMicrosoftEmailRepo) Delete(ctx context.Context, id int64) error {
 	delete(r.byID, id)
 	return nil
 }
+func (r *fakeMicrosoftEmailRepo) BatchDelete(ctx context.Context, ids []int64) (int, error) {
+	count := 0
+	for _, id := range ids {
+		if _, ok := r.byID[id]; ok {
+			delete(r.byID, id)
+			count++
+		}
+	}
+	return count, nil
+}
 
 type fakeMicrosoftGraphClient struct {
 	tokenErr   error

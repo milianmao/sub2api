@@ -22,6 +22,18 @@ func NewMicrosoftEmailService(repo MicrosoftEmailRepository, graph MicrosoftGrap
 	return &MicrosoftEmailService{repo: repo, graph: graph}
 }
 
+func (s *MicrosoftEmailService) List(ctx context.Context, filter MicrosoftEmailListFilter) ([]*MicrosoftEmailAccount, int, error) {
+	items, total, err := s.repo.List(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	masked := make([]*MicrosoftEmailAccount, 0, len(items))
+	for _, item := range items {
+		masked = append(masked, MaskMicrosoftEmailAccount(item))
+	}
+	return masked, total, nil
+}
+
 func (s *MicrosoftEmailService) ImportTXT(ctx context.Context, content string) (*MicrosoftEmailImportResult, error) {
 	result := &MicrosoftEmailImportResult{}
 	lines := strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n")
@@ -150,6 +162,14 @@ func (s *MicrosoftEmailService) FetchCode(ctx context.Context, id int64) (*Micro
 		return nil, err
 	}
 	return result, nil
+}
+
+func (s *MicrosoftEmailService) Delete(ctx context.Context, id int64) error {
+	return s.repo.Delete(ctx, id)
+}
+
+func (s *MicrosoftEmailService) BatchDelete(ctx context.Context, ids []int64) (int, error) {
+	return s.repo.BatchDelete(ctx, ids)
 }
 
 func ExtractMicrosoftVerificationCode(messages []MicrosoftGraphMessage) MicrosoftEmailFetchCodeResult {

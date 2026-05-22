@@ -24,10 +24,8 @@ type MicrosoftGraphHTTPClient struct {
 	messagesURL string
 }
 
-func NewMicrosoftGraphHTTPClient(httpClient *http.Client) *MicrosoftGraphHTTPClient {
-	if httpClient == nil {
-		httpClient = &http.Client{Timeout: microsoftGraphHTTPTimeout}
-	}
+func NewMicrosoftGraphHTTPClient() *MicrosoftGraphHTTPClient {
+	httpClient := &http.Client{Timeout: microsoftGraphHTTPTimeout}
 	return &MicrosoftGraphHTTPClient{httpClient: httpClient, tokenURL: microsoftOAuthTokenEndpoint, messagesURL: microsoftGraphMessagesURL}
 }
 
