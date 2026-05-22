@@ -219,12 +219,12 @@ func TestMicrosoftEmailService_FetchCode_ReturnsCodeMetadataAndDoesNotStoreBody(
 	require.Equal(t, receivedAt, res.ReceivedAt)
 	require.Equal(t, "Use 654321 to sign in", res.Snippet)
 	require.Empty(t, res.Error)
-	require.NotZero(t, res.FetchedAt)
 
 	payload, err := json.Marshal(res)
 	require.NoError(t, err)
 	var responseFields map[string]any
 	require.NoError(t, json.Unmarshal(payload, &responseFields))
+	require.ElementsMatch(t, []string{"email", "code", "source", "subject", "from", "received_at", "snippet", "error"}, mapKeys(responseFields))
 	require.NotContains(t, responseFields, "Message")
 	require.NotContains(t, responseFields, "message")
 	require.NotContains(t, responseFields, "BodyText")
@@ -251,6 +251,14 @@ func TestMicrosoftEmailService_FetchCode_CodeNotFoundDoesNotInvalidateActiveAcco
 	require.Equal(t, "u@example.com", res.Email)
 	require.Empty(t, res.Code)
 	require.Equal(t, "code_not_found", res.Error)
+	payload, err := json.Marshal(res)
+	require.NoError(t, err)
+	var responseFields map[string]any
+	require.NoError(t, json.Unmarshal(payload, &responseFields))
+	require.NotContains(t, responseFields, "FetchedAt")
+	require.NotContains(t, responseFields, "LastError")
+	require.NotContains(t, responseFields, "fetched_at")
+	require.NotContains(t, responseFields, "last_error")
 
 	stored, err := repo.GetByID(context.Background(), created.ID)
 	require.NoError(t, err)
@@ -313,6 +321,14 @@ func TestMicrosoftEmailService_FetchCode_RedactsMessageFetchFailureSecrets(t *te
 	require.NotNil(t, stored.LastFetchAt)
 	require.NotNil(t, stored.LastError)
 	require.Equal(t, res.Error, *stored.LastError)
+}
+
+func mapKeys(values map[string]any) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 func stringPtr(value string) *string {

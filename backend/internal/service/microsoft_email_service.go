@@ -106,12 +106,11 @@ func (s *MicrosoftEmailService) FetchCode(ctx context.Context, id int64) (*Micro
 	}
 
 	fetchedAt := time.Now()
-	result := &MicrosoftEmailFetchCodeResult{Email: account.Email, FetchedAt: fetchedAt}
+	result := &MicrosoftEmailFetchCodeResult{Email: account.Email}
 	accessToken, err := s.graph.RefreshAccessToken(ctx, account.ClientID, account.RefreshToken)
 	if err != nil {
 		msg := sanitizeMicrosoftSecretError(err, account.Password, account.RefreshToken, account.ClientID)
 		result.Error = msg
-		result.LastError = &msg
 		status := MicrosoftEmailStatusInvalid
 		if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, &status, &msg); err != nil {
 			return nil, err
@@ -123,7 +122,6 @@ func (s *MicrosoftEmailService) FetchCode(ctx context.Context, id int64) (*Micro
 	if err != nil {
 		msg := sanitizeMicrosoftSecretError(err, account.Password, account.RefreshToken, account.ClientID, accessToken)
 		result.Error = msg
-		result.LastError = &msg
 		status := MicrosoftEmailStatusError
 		if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, &status, &msg); err != nil {
 			return nil, err
@@ -135,7 +133,6 @@ func (s *MicrosoftEmailService) FetchCode(ctx context.Context, id int64) (*Micro
 	if extracted.Code == "" {
 		msg := "code_not_found"
 		result.Error = msg
-		result.LastError = &msg
 		if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, nil, &msg); err != nil {
 			return nil, err
 		}

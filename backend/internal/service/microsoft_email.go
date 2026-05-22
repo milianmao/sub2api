@@ -96,14 +96,12 @@ type MicrosoftEmailCheckResult struct {
 }
 
 type MicrosoftEmailFetchCodeResult struct {
-	Email      string
-	Code       string
-	Source     string
-	Subject    string
-	From       string
-	ReceivedAt time.Time
-	Snippet    string
-	Error      string
-	FetchedAt  time.Time
-	LastError  *string
+	Email      string    `json:"email"`
+	Code       string    `json:"code"`
+	Source     string    `json:"source"`
+	Subject    string    `json:"subject"`
+	From       string    `json:"from"`
+	ReceivedAt time.Time `json:"received_at"`
+	Snippet    string    `json:"snippet"`
+	Error      string    `json:"error"`
 }
