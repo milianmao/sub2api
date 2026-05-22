@@ -104,7 +104,6 @@ type MicrosoftEmailFetchCodeResult struct {
 	ReceivedAt time.Time
 	Snippet    string
 	Error      string
-	Message    *MicrosoftGraphMessage
 	FetchedAt  time.Time
 	LastError  *string
 }

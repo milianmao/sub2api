@@ -144,13 +144,10 @@ func (s *MicrosoftEmailService) FetchCode(ctx context.Context, id int64) (*Micro
 
 	result.Code = extracted.Code
 	result.Source = extracted.Source
-	result.Message = extracted.Message
-	if extracted.Message != nil {
-		result.Subject = extracted.Message.Subject
-		result.From = extracted.Message.From
-		result.ReceivedAt = extracted.Message.ReceivedAt
-		result.Snippet = extracted.Message.BodyPreview
-	}
+	result.Subject = extracted.Subject
+	result.From = extracted.From
+	result.ReceivedAt = extracted.ReceivedAt
+	result.Snippet = extracted.Snippet
 	status := MicrosoftEmailStatusActive
 	if err := s.repo.UpdateFetchResult(ctx, id, fetchedAt, &status, nil); err != nil {
 		return nil, err
@@ -182,7 +179,14 @@ func ExtractMicrosoftVerificationCode(messages []MicrosoftGraphMessage) Microsof
 			if code == "" {
 				continue
 			}
-			candidate := MicrosoftEmailFetchCodeResult{Code: code, Source: part.source, Message: &msg}
+			candidate := MicrosoftEmailFetchCodeResult{
+				Code:       code,
+				Source:     part.source,
+				Subject:    msg.Subject,
+				From:       msg.From,
+				ReceivedAt: msg.ReceivedAt,
+				Snippet:    msg.BodyPreview,
+			}
 			if isMicrosoftVerificationKeywordText(msg.Subject + " " + msg.BodyPreview + " " + msg.BodyText) {
 				return candidate
 			}

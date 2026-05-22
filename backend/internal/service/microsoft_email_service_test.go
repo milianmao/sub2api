@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -219,6 +220,16 @@ func TestMicrosoftEmailService_FetchCode_ReturnsCodeMetadataAndDoesNotStoreBody(
 	require.Equal(t, "Use 654321 to sign in", res.Snippet)
 	require.Empty(t, res.Error)
 	require.NotZero(t, res.FetchedAt)
+
+	payload, err := json.Marshal(res)
+	require.NoError(t, err)
+	var responseFields map[string]any
+	require.NoError(t, json.Unmarshal(payload, &responseFields))
+	require.NotContains(t, responseFields, "Message")
+	require.NotContains(t, responseFields, "message")
+	require.NotContains(t, responseFields, "BodyText")
+	require.NotContains(t, responseFields, "body_text")
+	require.NotContains(t, string(payload), "Full body")
 
 	stored, err := repo.GetByID(context.Background(), created.ID)
 	require.NoError(t, err)
