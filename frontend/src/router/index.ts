@@ -489,6 +489,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/microsoft-emails',
+    name: 'AdminMicrosoftEmails',
+    component: () => import('@/views/admin/MicrosoftEmailsView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Microsoft Email Management',
+      titleKey: 'admin.microsoftEmails.title',
+      descriptionKey: 'admin.microsoftEmails.description'
+    }
+  },
+  {
     path: '/admin/announcements',
     name: 'AdminAnnouncements',
     component: () => import('@/views/admin/AnnouncementsView.vue'),

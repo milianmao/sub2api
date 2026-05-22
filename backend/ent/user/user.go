@@ -249,6 +249,10 @@ var (
 	DefaultRole string
 	// RoleValidator is a validator for the "role" field. It is called by the builders before save.
 	RoleValidator func(string) error
+	// DefaultLevel holds the default value on creation for the "level" field.
+	DefaultLevel int
+	// LevelValidator is a validator for the "level" field. It is called by the builders before save.
+	LevelValidator func(int) error
 	// DefaultBalance holds the default value on creation for the "balance" field.
 	DefaultBalance float64
 	// DefaultConcurrency holds the default value on creation for the "concurrency" field.
@@ -317,6 +321,11 @@ func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 // ByRole orders the results by the role field.
 func ByRole(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldRole, opts...).ToFunc()
+}
+
+// ByLevel orders the results by the level field.
+func ByLevel(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLevel, opts...).ToFunc()
 }
 
 // ByBalance orders the results by the balance field.

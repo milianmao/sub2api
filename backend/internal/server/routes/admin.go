@@ -97,6 +97,22 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+
+		// Microsoft 邮箱管理
+		registerMicrosoftEmailRoutes(admin, h)
+	}
+}
+
+func registerMicrosoftEmailRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	microsoftEmails := admin.Group("/microsoft-emails")
+	{
+		microsoftEmails.GET("", h.Admin.MicrosoftEmail.List)
+		microsoftEmails.POST("/import", h.Admin.MicrosoftEmail.Import)
+		microsoftEmails.POST("/:id/check", h.Admin.MicrosoftEmail.Check)
+		microsoftEmails.POST("/batch-check", h.Admin.MicrosoftEmail.BatchCheck)
+		microsoftEmails.POST("/:id/fetch-code", h.Admin.MicrosoftEmail.FetchCode)
+		microsoftEmails.DELETE("/:id", h.Admin.MicrosoftEmail.Delete)
+		microsoftEmails.POST("/batch-delete", h.Admin.MicrosoftEmail.BatchDelete)
 	}
 }
 

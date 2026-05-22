@@ -101,6 +101,20 @@ func (_c *UserCreate) SetNillableRole(v *string) *UserCreate {
 	return _c
 }
 
+// SetLevel sets the "level" field.
+func (_c *UserCreate) SetLevel(v int) *UserCreate {
+	_c.mutation.SetLevel(v)
+	return _c
+}
+
+// SetNillableLevel sets the "level" field if the given value is not nil.
+func (_c *UserCreate) SetNillableLevel(v *int) *UserCreate {
+	if v != nil {
+		_c.SetLevel(*v)
+	}
+	return _c
+}
+
 // SetBalance sets the "balance" field.
 func (_c *UserCreate) SetBalance(v float64) *UserCreate {
 	_c.mutation.SetBalance(v)
@@ -574,6 +588,10 @@ func (_c *UserCreate) defaults() error {
 		v := user.DefaultRole
 		_c.mutation.SetRole(v)
 	}
+	if _, ok := _c.mutation.Level(); !ok {
+		v := user.DefaultLevel
+		_c.mutation.SetLevel(v)
+	}
 	if _, ok := _c.mutation.Balance(); !ok {
 		v := user.DefaultBalance
 		_c.mutation.SetBalance(v)
@@ -655,6 +673,14 @@ func (_c *UserCreate) check() error {
 	if v, ok := _c.mutation.Role(); ok {
 		if err := user.RoleValidator(v); err != nil {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Level(); !ok {
+		return &ValidationError{Name: "level", err: errors.New(`ent: missing required field "User.level"`)}
+	}
+	if v, ok := _c.mutation.Level(); ok {
+		if err := user.LevelValidator(v); err != nil {
+			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "User.level": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.Balance(); !ok {
@@ -758,6 +784,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Role(); ok {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
 		_node.Role = value
+	}
+	if value, ok := _c.mutation.Level(); ok {
+		_spec.SetField(user.FieldLevel, field.TypeInt, value)
+		_node.Level = value
 	}
 	if value, ok := _c.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)
@@ -1138,6 +1168,24 @@ func (u *UserUpsert) SetRole(v string) *UserUpsert {
 // UpdateRole sets the "role" field to the value that was provided on create.
 func (u *UserUpsert) UpdateRole() *UserUpsert {
 	u.SetExcluded(user.FieldRole)
+	return u
+}
+
+// SetLevel sets the "level" field.
+func (u *UserUpsert) SetLevel(v int) *UserUpsert {
+	u.Set(user.FieldLevel, v)
+	return u
+}
+
+// UpdateLevel sets the "level" field to the value that was provided on create.
+func (u *UserUpsert) UpdateLevel() *UserUpsert {
+	u.SetExcluded(user.FieldLevel)
+	return u
+}
+
+// AddLevel adds v to the "level" field.
+func (u *UserUpsert) AddLevel(v int) *UserUpsert {
+	u.Add(user.FieldLevel, v)
 	return u
 }
 
@@ -1524,6 +1572,27 @@ func (u *UserUpsertOne) SetRole(v string) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateRole() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateRole()
+	})
+}
+
+// SetLevel sets the "level" field.
+func (u *UserUpsertOne) SetLevel(v int) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetLevel(v)
+	})
+}
+
+// AddLevel adds v to the "level" field.
+func (u *UserUpsertOne) AddLevel(v int) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.AddLevel(v)
+	})
+}
+
+// UpdateLevel sets the "level" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateLevel() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateLevel()
 	})
 }
 
@@ -2120,6 +2189,27 @@ func (u *UserUpsertBulk) SetRole(v string) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateRole() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateRole()
+	})
+}
+
+// SetLevel sets the "level" field.
+func (u *UserUpsertBulk) SetLevel(v int) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetLevel(v)
+	})
+}
+
+// AddLevel adds v to the "level" field.
+func (u *UserUpsertBulk) AddLevel(v int) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.AddLevel(v)
+	})
+}
+
+// UpdateLevel sets the "level" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateLevel() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateLevel()
 	})
 }
 

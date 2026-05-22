@@ -27,6 +27,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/idempotencyrecord"
 	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
+	"github.com/Wei-Shaw/sub2api/ent/microsoftemailaccount"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/paymentproviderinstance"
@@ -74,6 +75,7 @@ const (
 	TypeGroup                         = "Group"
 	TypeIdempotencyRecord             = "IdempotencyRecord"
 	TypeIdentityAdoptionDecision      = "IdentityAdoptionDecision"
+	TypeMicrosoftEmailAccount         = "MicrosoftEmailAccount"
 	TypePaymentAuditLog               = "PaymentAuditLog"
 	TypePaymentOrder                  = "PaymentOrder"
 	TypePaymentProviderInstance       = "PaymentProviderInstance"
@@ -14861,6 +14863,9 @@ type GroupMutation struct {
 	rate_multiplier                         *float64
 	addrate_multiplier                      *float64
 	is_exclusive                            *bool
+	access_mode                             *string
+	min_user_level                          *int
+	addmin_user_level                       *int
 	status                                  *string
 	platform                                *string
 	subscription_type                       *string
@@ -15320,6 +15325,98 @@ func (m *GroupMutation) OldIsExclusive(ctx context.Context) (v bool, err error) 
 // ResetIsExclusive resets all changes to the "is_exclusive" field.
 func (m *GroupMutation) ResetIsExclusive() {
 	m.is_exclusive = nil
+}
+
+// SetAccessMode sets the "access_mode" field.
+func (m *GroupMutation) SetAccessMode(s string) {
+	m.access_mode = &s
+}
+
+// AccessMode returns the value of the "access_mode" field in the mutation.
+func (m *GroupMutation) AccessMode() (r string, exists bool) {
+	v := m.access_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAccessMode returns the old "access_mode" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldAccessMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAccessMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAccessMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAccessMode: %w", err)
+	}
+	return oldValue.AccessMode, nil
+}
+
+// ResetAccessMode resets all changes to the "access_mode" field.
+func (m *GroupMutation) ResetAccessMode() {
+	m.access_mode = nil
+}
+
+// SetMinUserLevel sets the "min_user_level" field.
+func (m *GroupMutation) SetMinUserLevel(i int) {
+	m.min_user_level = &i
+	m.addmin_user_level = nil
+}
+
+// MinUserLevel returns the value of the "min_user_level" field in the mutation.
+func (m *GroupMutation) MinUserLevel() (r int, exists bool) {
+	v := m.min_user_level
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMinUserLevel returns the old "min_user_level" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldMinUserLevel(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMinUserLevel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMinUserLevel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMinUserLevel: %w", err)
+	}
+	return oldValue.MinUserLevel, nil
+}
+
+// AddMinUserLevel adds i to the "min_user_level" field.
+func (m *GroupMutation) AddMinUserLevel(i int) {
+	if m.addmin_user_level != nil {
+		*m.addmin_user_level += i
+	} else {
+		m.addmin_user_level = &i
+	}
+}
+
+// AddedMinUserLevel returns the value that was added to the "min_user_level" field in this mutation.
+func (m *GroupMutation) AddedMinUserLevel() (r int, exists bool) {
+	v := m.addmin_user_level
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetMinUserLevel resets all changes to the "min_user_level" field.
+func (m *GroupMutation) ResetMinUserLevel() {
+	m.min_user_level = nil
+	m.addmin_user_level = nil
 }
 
 // SetStatus sets the "status" field.
@@ -16474,13 +16571,13 @@ func (m *GroupMutation) ResetAllowMessagesDispatch() {
 	m.allow_messages_dispatch = nil
 }
 
-// SetAllowOpenAICompat sets the "allow_openai_compat" field.
-func (m *GroupMutation) SetAllowOpenAICompat(b bool) {
+// SetAllowOpenaiCompat sets the "allow_openai_compat" field.
+func (m *GroupMutation) SetAllowOpenaiCompat(b bool) {
 	m.allow_openai_compat = &b
 }
 
-// AllowOpenAICompat returns the value of the "allow_openai_compat" field in the mutation.
-func (m *GroupMutation) AllowOpenAICompat() (r bool, exists bool) {
+// AllowOpenaiCompat returns the value of the "allow_openai_compat" field in the mutation.
+func (m *GroupMutation) AllowOpenaiCompat() (r bool, exists bool) {
 	v := m.allow_openai_compat
 	if v == nil {
 		return
@@ -16488,23 +16585,25 @@ func (m *GroupMutation) AllowOpenAICompat() (r bool, exists bool) {
 	return *v, true
 }
 
-// OldAllowOpenAICompat returns the old "allow_openai_compat" field's value of the Group entity.
-func (m *GroupMutation) OldAllowOpenAICompat(ctx context.Context) (v bool, err error) {
+// OldAllowOpenaiCompat returns the old "allow_openai_compat" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldAllowOpenaiCompat(ctx context.Context) (v bool, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldAllowOpenAICompat is only allowed on UpdateOne operations")
+		return v, errors.New("OldAllowOpenaiCompat is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldAllowOpenAICompat requires an ID field in the mutation")
+		return v, errors.New("OldAllowOpenaiCompat requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldAllowOpenAICompat: %w", err)
+		return v, fmt.Errorf("querying old value for OldAllowOpenaiCompat: %w", err)
 	}
-	return oldValue.AllowOpenAICompat, nil
+	return oldValue.AllowOpenaiCompat, nil
 }
 
-// ResetAllowOpenAICompat resets all changes to the "allow_openai_compat" field.
-func (m *GroupMutation) ResetAllowOpenAICompat() {
+// ResetAllowOpenaiCompat resets all changes to the "allow_openai_compat" field.
+func (m *GroupMutation) ResetAllowOpenaiCompat() {
 	m.allow_openai_compat = nil
 }
 
@@ -17066,7 +17165,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 34)
+	fields := make([]string, 0, 37)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -17087,6 +17186,12 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.is_exclusive != nil {
 		fields = append(fields, group.FieldIsExclusive)
+	}
+	if m.access_mode != nil {
+		fields = append(fields, group.FieldAccessMode)
+	}
+	if m.min_user_level != nil {
+		fields = append(fields, group.FieldMinUserLevel)
 	}
 	if m.status != nil {
 		fields = append(fields, group.FieldStatus)
@@ -17155,7 +17260,7 @@ func (m *GroupMutation) Fields() []string {
 		fields = append(fields, group.FieldAllowMessagesDispatch)
 	}
 	if m.allow_openai_compat != nil {
-		fields = append(fields, group.FieldAllowOpenAICompat)
+		fields = append(fields, group.FieldAllowOpenaiCompat)
 	}
 	if m.require_oauth_only != nil {
 		fields = append(fields, group.FieldRequireOauthOnly)
@@ -17194,6 +17299,10 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.RateMultiplier()
 	case group.FieldIsExclusive:
 		return m.IsExclusive()
+	case group.FieldAccessMode:
+		return m.AccessMode()
+	case group.FieldMinUserLevel:
+		return m.MinUserLevel()
 	case group.FieldStatus:
 		return m.Status()
 	case group.FieldPlatform:
@@ -17238,8 +17347,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.SortOrder()
 	case group.FieldAllowMessagesDispatch:
 		return m.AllowMessagesDispatch()
-	case group.FieldAllowOpenAICompat:
-		return m.AllowOpenAICompat()
+	case group.FieldAllowOpenaiCompat:
+		return m.AllowOpenaiCompat()
 	case group.FieldRequireOauthOnly:
 		return m.RequireOauthOnly()
 	case group.FieldRequirePrivacySet:
@@ -17273,6 +17382,10 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldRateMultiplier(ctx)
 	case group.FieldIsExclusive:
 		return m.OldIsExclusive(ctx)
+	case group.FieldAccessMode:
+		return m.OldAccessMode(ctx)
+	case group.FieldMinUserLevel:
+		return m.OldMinUserLevel(ctx)
 	case group.FieldStatus:
 		return m.OldStatus(ctx)
 	case group.FieldPlatform:
@@ -17317,8 +17430,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldSortOrder(ctx)
 	case group.FieldAllowMessagesDispatch:
 		return m.OldAllowMessagesDispatch(ctx)
-	case group.FieldAllowOpenAICompat:
-		return m.OldAllowOpenAICompat(ctx)
+	case group.FieldAllowOpenaiCompat:
+		return m.OldAllowOpenaiCompat(ctx)
 	case group.FieldRequireOauthOnly:
 		return m.OldRequireOauthOnly(ctx)
 	case group.FieldRequirePrivacySet:
@@ -17386,6 +17499,20 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetIsExclusive(v)
+		return nil
+	case group.FieldAccessMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAccessMode(v)
+		return nil
+	case group.FieldMinUserLevel:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMinUserLevel(v)
 		return nil
 	case group.FieldStatus:
 		v, ok := value.(string)
@@ -17541,12 +17668,12 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAllowMessagesDispatch(v)
 		return nil
-	case group.FieldAllowOpenAICompat:
+	case group.FieldAllowOpenaiCompat:
 		v, ok := value.(bool)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetAllowOpenAICompat(v)
+		m.SetAllowOpenaiCompat(v)
 		return nil
 	case group.FieldRequireOauthOnly:
 		v, ok := value.(bool)
@@ -17594,6 +17721,9 @@ func (m *GroupMutation) AddedFields() []string {
 	if m.addrate_multiplier != nil {
 		fields = append(fields, group.FieldRateMultiplier)
 	}
+	if m.addmin_user_level != nil {
+		fields = append(fields, group.FieldMinUserLevel)
+	}
 	if m.adddaily_limit_usd != nil {
 		fields = append(fields, group.FieldDailyLimitUsd)
 	}
@@ -17640,6 +17770,8 @@ func (m *GroupMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case group.FieldRateMultiplier:
 		return m.AddedRateMultiplier()
+	case group.FieldMinUserLevel:
+		return m.AddedMinUserLevel()
 	case group.FieldDailyLimitUsd:
 		return m.AddedDailyLimitUsd()
 	case group.FieldWeeklyLimitUsd:
@@ -17679,6 +17811,13 @@ func (m *GroupMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddRateMultiplier(v)
+		return nil
+	case group.FieldMinUserLevel:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddMinUserLevel(v)
 		return nil
 	case group.FieldDailyLimitUsd:
 		v, ok := value.(float64)
@@ -17881,6 +18020,12 @@ func (m *GroupMutation) ResetField(name string) error {
 	case group.FieldIsExclusive:
 		m.ResetIsExclusive()
 		return nil
+	case group.FieldAccessMode:
+		m.ResetAccessMode()
+		return nil
+	case group.FieldMinUserLevel:
+		m.ResetMinUserLevel()
+		return nil
 	case group.FieldStatus:
 		m.ResetStatus()
 		return nil
@@ -17947,8 +18092,8 @@ func (m *GroupMutation) ResetField(name string) error {
 	case group.FieldAllowMessagesDispatch:
 		m.ResetAllowMessagesDispatch()
 		return nil
-	case group.FieldAllowOpenAICompat:
-		m.ResetAllowOpenAICompat()
+	case group.FieldAllowOpenaiCompat:
+		m.ResetAllowOpenaiCompat()
 		return nil
 	case group.FieldRequireOauthOnly:
 		m.ResetRequireOauthOnly()
@@ -19938,6 +20083,951 @@ func (m *IdentityAdoptionDecisionMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown IdentityAdoptionDecision edge %s", name)
+}
+
+// MicrosoftEmailAccountMutation represents an operation that mutates the MicrosoftEmailAccount nodes in the graph.
+type MicrosoftEmailAccountMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int64
+	created_at    *time.Time
+	updated_at    *time.Time
+	email         *string
+	password      *string
+	client_id     *string
+	refresh_token *string
+	status        *string
+	last_check_at *time.Time
+	last_fetch_at *time.Time
+	last_error    *string
+	notes         *string
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*MicrosoftEmailAccount, error)
+	predicates    []predicate.MicrosoftEmailAccount
+}
+
+var _ ent.Mutation = (*MicrosoftEmailAccountMutation)(nil)
+
+// microsoftemailaccountOption allows management of the mutation configuration using functional options.
+type microsoftemailaccountOption func(*MicrosoftEmailAccountMutation)
+
+// newMicrosoftEmailAccountMutation creates new mutation for the MicrosoftEmailAccount entity.
+func newMicrosoftEmailAccountMutation(c config, op Op, opts ...microsoftemailaccountOption) *MicrosoftEmailAccountMutation {
+	m := &MicrosoftEmailAccountMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeMicrosoftEmailAccount,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withMicrosoftEmailAccountID sets the ID field of the mutation.
+func withMicrosoftEmailAccountID(id int64) microsoftemailaccountOption {
+	return func(m *MicrosoftEmailAccountMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *MicrosoftEmailAccount
+		)
+		m.oldValue = func(ctx context.Context) (*MicrosoftEmailAccount, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().MicrosoftEmailAccount.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withMicrosoftEmailAccount sets the old MicrosoftEmailAccount of the mutation.
+func withMicrosoftEmailAccount(node *MicrosoftEmailAccount) microsoftemailaccountOption {
+	return func(m *MicrosoftEmailAccountMutation) {
+		m.oldValue = func(context.Context) (*MicrosoftEmailAccount, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m MicrosoftEmailAccountMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m MicrosoftEmailAccountMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *MicrosoftEmailAccountMutation) ID() (id int64, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *MicrosoftEmailAccountMutation) IDs(ctx context.Context) ([]int64, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int64{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().MicrosoftEmailAccount.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *MicrosoftEmailAccountMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *MicrosoftEmailAccountMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *MicrosoftEmailAccountMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *MicrosoftEmailAccountMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetEmail sets the "email" field.
+func (m *MicrosoftEmailAccountMutation) SetEmail(s string) {
+	m.email = &s
+}
+
+// Email returns the value of the "email" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) Email() (r string, exists bool) {
+	v := m.email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEmail returns the old "email" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldEmail(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEmail: %w", err)
+	}
+	return oldValue.Email, nil
+}
+
+// ResetEmail resets all changes to the "email" field.
+func (m *MicrosoftEmailAccountMutation) ResetEmail() {
+	m.email = nil
+}
+
+// SetPassword sets the "password" field.
+func (m *MicrosoftEmailAccountMutation) SetPassword(s string) {
+	m.password = &s
+}
+
+// Password returns the value of the "password" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) Password() (r string, exists bool) {
+	v := m.password
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPassword returns the old "password" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldPassword(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPassword is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPassword requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPassword: %w", err)
+	}
+	return oldValue.Password, nil
+}
+
+// ResetPassword resets all changes to the "password" field.
+func (m *MicrosoftEmailAccountMutation) ResetPassword() {
+	m.password = nil
+}
+
+// SetClientID sets the "client_id" field.
+func (m *MicrosoftEmailAccountMutation) SetClientID(s string) {
+	m.client_id = &s
+}
+
+// ClientID returns the value of the "client_id" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) ClientID() (r string, exists bool) {
+	v := m.client_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClientID returns the old "client_id" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldClientID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClientID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClientID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClientID: %w", err)
+	}
+	return oldValue.ClientID, nil
+}
+
+// ResetClientID resets all changes to the "client_id" field.
+func (m *MicrosoftEmailAccountMutation) ResetClientID() {
+	m.client_id = nil
+}
+
+// SetRefreshToken sets the "refresh_token" field.
+func (m *MicrosoftEmailAccountMutation) SetRefreshToken(s string) {
+	m.refresh_token = &s
+}
+
+// RefreshToken returns the value of the "refresh_token" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) RefreshToken() (r string, exists bool) {
+	v := m.refresh_token
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefreshToken returns the old "refresh_token" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldRefreshToken(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefreshToken is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefreshToken requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefreshToken: %w", err)
+	}
+	return oldValue.RefreshToken, nil
+}
+
+// ResetRefreshToken resets all changes to the "refresh_token" field.
+func (m *MicrosoftEmailAccountMutation) ResetRefreshToken() {
+	m.refresh_token = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *MicrosoftEmailAccountMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *MicrosoftEmailAccountMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetLastCheckAt sets the "last_check_at" field.
+func (m *MicrosoftEmailAccountMutation) SetLastCheckAt(t time.Time) {
+	m.last_check_at = &t
+}
+
+// LastCheckAt returns the value of the "last_check_at" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) LastCheckAt() (r time.Time, exists bool) {
+	v := m.last_check_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastCheckAt returns the old "last_check_at" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldLastCheckAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastCheckAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastCheckAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastCheckAt: %w", err)
+	}
+	return oldValue.LastCheckAt, nil
+}
+
+// ClearLastCheckAt clears the value of the "last_check_at" field.
+func (m *MicrosoftEmailAccountMutation) ClearLastCheckAt() {
+	m.last_check_at = nil
+	m.clearedFields[microsoftemailaccount.FieldLastCheckAt] = struct{}{}
+}
+
+// LastCheckAtCleared returns if the "last_check_at" field was cleared in this mutation.
+func (m *MicrosoftEmailAccountMutation) LastCheckAtCleared() bool {
+	_, ok := m.clearedFields[microsoftemailaccount.FieldLastCheckAt]
+	return ok
+}
+
+// ResetLastCheckAt resets all changes to the "last_check_at" field.
+func (m *MicrosoftEmailAccountMutation) ResetLastCheckAt() {
+	m.last_check_at = nil
+	delete(m.clearedFields, microsoftemailaccount.FieldLastCheckAt)
+}
+
+// SetLastFetchAt sets the "last_fetch_at" field.
+func (m *MicrosoftEmailAccountMutation) SetLastFetchAt(t time.Time) {
+	m.last_fetch_at = &t
+}
+
+// LastFetchAt returns the value of the "last_fetch_at" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) LastFetchAt() (r time.Time, exists bool) {
+	v := m.last_fetch_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastFetchAt returns the old "last_fetch_at" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldLastFetchAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastFetchAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastFetchAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastFetchAt: %w", err)
+	}
+	return oldValue.LastFetchAt, nil
+}
+
+// ClearLastFetchAt clears the value of the "last_fetch_at" field.
+func (m *MicrosoftEmailAccountMutation) ClearLastFetchAt() {
+	m.last_fetch_at = nil
+	m.clearedFields[microsoftemailaccount.FieldLastFetchAt] = struct{}{}
+}
+
+// LastFetchAtCleared returns if the "last_fetch_at" field was cleared in this mutation.
+func (m *MicrosoftEmailAccountMutation) LastFetchAtCleared() bool {
+	_, ok := m.clearedFields[microsoftemailaccount.FieldLastFetchAt]
+	return ok
+}
+
+// ResetLastFetchAt resets all changes to the "last_fetch_at" field.
+func (m *MicrosoftEmailAccountMutation) ResetLastFetchAt() {
+	m.last_fetch_at = nil
+	delete(m.clearedFields, microsoftemailaccount.FieldLastFetchAt)
+}
+
+// SetLastError sets the "last_error" field.
+func (m *MicrosoftEmailAccountMutation) SetLastError(s string) {
+	m.last_error = &s
+}
+
+// LastError returns the value of the "last_error" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) LastError() (r string, exists bool) {
+	v := m.last_error
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastError returns the old "last_error" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldLastError(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastError is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastError requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastError: %w", err)
+	}
+	return oldValue.LastError, nil
+}
+
+// ClearLastError clears the value of the "last_error" field.
+func (m *MicrosoftEmailAccountMutation) ClearLastError() {
+	m.last_error = nil
+	m.clearedFields[microsoftemailaccount.FieldLastError] = struct{}{}
+}
+
+// LastErrorCleared returns if the "last_error" field was cleared in this mutation.
+func (m *MicrosoftEmailAccountMutation) LastErrorCleared() bool {
+	_, ok := m.clearedFields[microsoftemailaccount.FieldLastError]
+	return ok
+}
+
+// ResetLastError resets all changes to the "last_error" field.
+func (m *MicrosoftEmailAccountMutation) ResetLastError() {
+	m.last_error = nil
+	delete(m.clearedFields, microsoftemailaccount.FieldLastError)
+}
+
+// SetNotes sets the "notes" field.
+func (m *MicrosoftEmailAccountMutation) SetNotes(s string) {
+	m.notes = &s
+}
+
+// Notes returns the value of the "notes" field in the mutation.
+func (m *MicrosoftEmailAccountMutation) Notes() (r string, exists bool) {
+	v := m.notes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotes returns the old "notes" field's value of the MicrosoftEmailAccount entity.
+// If the MicrosoftEmailAccount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MicrosoftEmailAccountMutation) OldNotes(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotes: %w", err)
+	}
+	return oldValue.Notes, nil
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (m *MicrosoftEmailAccountMutation) ClearNotes() {
+	m.notes = nil
+	m.clearedFields[microsoftemailaccount.FieldNotes] = struct{}{}
+}
+
+// NotesCleared returns if the "notes" field was cleared in this mutation.
+func (m *MicrosoftEmailAccountMutation) NotesCleared() bool {
+	_, ok := m.clearedFields[microsoftemailaccount.FieldNotes]
+	return ok
+}
+
+// ResetNotes resets all changes to the "notes" field.
+func (m *MicrosoftEmailAccountMutation) ResetNotes() {
+	m.notes = nil
+	delete(m.clearedFields, microsoftemailaccount.FieldNotes)
+}
+
+// Where appends a list predicates to the MicrosoftEmailAccountMutation builder.
+func (m *MicrosoftEmailAccountMutation) Where(ps ...predicate.MicrosoftEmailAccount) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the MicrosoftEmailAccountMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *MicrosoftEmailAccountMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.MicrosoftEmailAccount, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *MicrosoftEmailAccountMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *MicrosoftEmailAccountMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (MicrosoftEmailAccount).
+func (m *MicrosoftEmailAccountMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *MicrosoftEmailAccountMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.created_at != nil {
+		fields = append(fields, microsoftemailaccount.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, microsoftemailaccount.FieldUpdatedAt)
+	}
+	if m.email != nil {
+		fields = append(fields, microsoftemailaccount.FieldEmail)
+	}
+	if m.password != nil {
+		fields = append(fields, microsoftemailaccount.FieldPassword)
+	}
+	if m.client_id != nil {
+		fields = append(fields, microsoftemailaccount.FieldClientID)
+	}
+	if m.refresh_token != nil {
+		fields = append(fields, microsoftemailaccount.FieldRefreshToken)
+	}
+	if m.status != nil {
+		fields = append(fields, microsoftemailaccount.FieldStatus)
+	}
+	if m.last_check_at != nil {
+		fields = append(fields, microsoftemailaccount.FieldLastCheckAt)
+	}
+	if m.last_fetch_at != nil {
+		fields = append(fields, microsoftemailaccount.FieldLastFetchAt)
+	}
+	if m.last_error != nil {
+		fields = append(fields, microsoftemailaccount.FieldLastError)
+	}
+	if m.notes != nil {
+		fields = append(fields, microsoftemailaccount.FieldNotes)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *MicrosoftEmailAccountMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case microsoftemailaccount.FieldCreatedAt:
+		return m.CreatedAt()
+	case microsoftemailaccount.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case microsoftemailaccount.FieldEmail:
+		return m.Email()
+	case microsoftemailaccount.FieldPassword:
+		return m.Password()
+	case microsoftemailaccount.FieldClientID:
+		return m.ClientID()
+	case microsoftemailaccount.FieldRefreshToken:
+		return m.RefreshToken()
+	case microsoftemailaccount.FieldStatus:
+		return m.Status()
+	case microsoftemailaccount.FieldLastCheckAt:
+		return m.LastCheckAt()
+	case microsoftemailaccount.FieldLastFetchAt:
+		return m.LastFetchAt()
+	case microsoftemailaccount.FieldLastError:
+		return m.LastError()
+	case microsoftemailaccount.FieldNotes:
+		return m.Notes()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *MicrosoftEmailAccountMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case microsoftemailaccount.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case microsoftemailaccount.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case microsoftemailaccount.FieldEmail:
+		return m.OldEmail(ctx)
+	case microsoftemailaccount.FieldPassword:
+		return m.OldPassword(ctx)
+	case microsoftemailaccount.FieldClientID:
+		return m.OldClientID(ctx)
+	case microsoftemailaccount.FieldRefreshToken:
+		return m.OldRefreshToken(ctx)
+	case microsoftemailaccount.FieldStatus:
+		return m.OldStatus(ctx)
+	case microsoftemailaccount.FieldLastCheckAt:
+		return m.OldLastCheckAt(ctx)
+	case microsoftemailaccount.FieldLastFetchAt:
+		return m.OldLastFetchAt(ctx)
+	case microsoftemailaccount.FieldLastError:
+		return m.OldLastError(ctx)
+	case microsoftemailaccount.FieldNotes:
+		return m.OldNotes(ctx)
+	}
+	return nil, fmt.Errorf("unknown MicrosoftEmailAccount field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MicrosoftEmailAccountMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case microsoftemailaccount.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case microsoftemailaccount.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case microsoftemailaccount.FieldEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEmail(v)
+		return nil
+	case microsoftemailaccount.FieldPassword:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPassword(v)
+		return nil
+	case microsoftemailaccount.FieldClientID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClientID(v)
+		return nil
+	case microsoftemailaccount.FieldRefreshToken:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefreshToken(v)
+		return nil
+	case microsoftemailaccount.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case microsoftemailaccount.FieldLastCheckAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastCheckAt(v)
+		return nil
+	case microsoftemailaccount.FieldLastFetchAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastFetchAt(v)
+		return nil
+	case microsoftemailaccount.FieldLastError:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastError(v)
+		return nil
+	case microsoftemailaccount.FieldNotes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown MicrosoftEmailAccount field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *MicrosoftEmailAccountMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *MicrosoftEmailAccountMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *MicrosoftEmailAccountMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown MicrosoftEmailAccount numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *MicrosoftEmailAccountMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(microsoftemailaccount.FieldLastCheckAt) {
+		fields = append(fields, microsoftemailaccount.FieldLastCheckAt)
+	}
+	if m.FieldCleared(microsoftemailaccount.FieldLastFetchAt) {
+		fields = append(fields, microsoftemailaccount.FieldLastFetchAt)
+	}
+	if m.FieldCleared(microsoftemailaccount.FieldLastError) {
+		fields = append(fields, microsoftemailaccount.FieldLastError)
+	}
+	if m.FieldCleared(microsoftemailaccount.FieldNotes) {
+		fields = append(fields, microsoftemailaccount.FieldNotes)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *MicrosoftEmailAccountMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *MicrosoftEmailAccountMutation) ClearField(name string) error {
+	switch name {
+	case microsoftemailaccount.FieldLastCheckAt:
+		m.ClearLastCheckAt()
+		return nil
+	case microsoftemailaccount.FieldLastFetchAt:
+		m.ClearLastFetchAt()
+		return nil
+	case microsoftemailaccount.FieldLastError:
+		m.ClearLastError()
+		return nil
+	case microsoftemailaccount.FieldNotes:
+		m.ClearNotes()
+		return nil
+	}
+	return fmt.Errorf("unknown MicrosoftEmailAccount nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *MicrosoftEmailAccountMutation) ResetField(name string) error {
+	switch name {
+	case microsoftemailaccount.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case microsoftemailaccount.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case microsoftemailaccount.FieldEmail:
+		m.ResetEmail()
+		return nil
+	case microsoftemailaccount.FieldPassword:
+		m.ResetPassword()
+		return nil
+	case microsoftemailaccount.FieldClientID:
+		m.ResetClientID()
+		return nil
+	case microsoftemailaccount.FieldRefreshToken:
+		m.ResetRefreshToken()
+		return nil
+	case microsoftemailaccount.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case microsoftemailaccount.FieldLastCheckAt:
+		m.ResetLastCheckAt()
+		return nil
+	case microsoftemailaccount.FieldLastFetchAt:
+		m.ResetLastFetchAt()
+		return nil
+	case microsoftemailaccount.FieldLastError:
+		m.ResetLastError()
+		return nil
+	case microsoftemailaccount.FieldNotes:
+		m.ResetNotes()
+		return nil
+	}
+	return fmt.Errorf("unknown MicrosoftEmailAccount field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *MicrosoftEmailAccountMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *MicrosoftEmailAccountMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *MicrosoftEmailAccountMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *MicrosoftEmailAccountMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *MicrosoftEmailAccountMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *MicrosoftEmailAccountMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *MicrosoftEmailAccountMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown MicrosoftEmailAccount unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *MicrosoftEmailAccountMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown MicrosoftEmailAccount edge %s", name)
 }
 
 // PaymentAuditLogMutation represents an operation that mutates the PaymentAuditLog nodes in the graph.
@@ -38153,6 +39243,8 @@ type UserMutation struct {
 	email                         *string
 	password_hash                 *string
 	role                          *string
+	level                         *int
+	addlevel                      *int
 	balance                       *float64
 	addbalance                    *float64
 	concurrency                   *int
@@ -38542,6 +39634,62 @@ func (m *UserMutation) OldRole(ctx context.Context) (v string, err error) {
 // ResetRole resets all changes to the "role" field.
 func (m *UserMutation) ResetRole() {
 	m.role = nil
+}
+
+// SetLevel sets the "level" field.
+func (m *UserMutation) SetLevel(i int) {
+	m.level = &i
+	m.addlevel = nil
+}
+
+// Level returns the value of the "level" field in the mutation.
+func (m *UserMutation) Level() (r int, exists bool) {
+	v := m.level
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLevel returns the old "level" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldLevel(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLevel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLevel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLevel: %w", err)
+	}
+	return oldValue.Level, nil
+}
+
+// AddLevel adds i to the "level" field.
+func (m *UserMutation) AddLevel(i int) {
+	if m.addlevel != nil {
+		*m.addlevel += i
+	} else {
+		m.addlevel = &i
+	}
+}
+
+// AddedLevel returns the value that was added to the "level" field in this mutation.
+func (m *UserMutation) AddedLevel() (r int, exists bool) {
+	v := m.addlevel
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLevel resets all changes to the "level" field.
+func (m *UserMutation) ResetLevel() {
+	m.level = nil
+	m.addlevel = nil
 }
 
 // SetBalance sets the "balance" field.
@@ -40004,7 +41152,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 23)
+	fields := make([]string, 0, 24)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -40022,6 +41170,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.role != nil {
 		fields = append(fields, user.FieldRole)
+	}
+	if m.level != nil {
+		fields = append(fields, user.FieldLevel)
 	}
 	if m.balance != nil {
 		fields = append(fields, user.FieldBalance)
@@ -40094,6 +41245,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.PasswordHash()
 	case user.FieldRole:
 		return m.Role()
+	case user.FieldLevel:
+		return m.Level()
 	case user.FieldBalance:
 		return m.Balance()
 	case user.FieldConcurrency:
@@ -40149,6 +41302,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldPasswordHash(ctx)
 	case user.FieldRole:
 		return m.OldRole(ctx)
+	case user.FieldLevel:
+		return m.OldLevel(ctx)
 	case user.FieldBalance:
 		return m.OldBalance(ctx)
 	case user.FieldConcurrency:
@@ -40233,6 +41388,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetRole(v)
+		return nil
+	case user.FieldLevel:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLevel(v)
 		return nil
 	case user.FieldBalance:
 		v, ok := value.(float64)
@@ -40361,6 +41523,9 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *UserMutation) AddedFields() []string {
 	var fields []string
+	if m.addlevel != nil {
+		fields = append(fields, user.FieldLevel)
+	}
 	if m.addbalance != nil {
 		fields = append(fields, user.FieldBalance)
 	}
@@ -40384,6 +41549,8 @@ func (m *UserMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case user.FieldLevel:
+		return m.AddedLevel()
 	case user.FieldBalance:
 		return m.AddedBalance()
 	case user.FieldConcurrency:
@@ -40403,6 +41570,13 @@ func (m *UserMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *UserMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case user.FieldLevel:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLevel(v)
+		return nil
 	case user.FieldBalance:
 		v, ok := value.(float64)
 		if !ok {
@@ -40521,6 +41695,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldRole:
 		m.ResetRole()
+		return nil
+	case user.FieldLevel:
+		m.ResetLevel()
 		return nil
 	case user.FieldBalance:
 		m.ResetBalance()

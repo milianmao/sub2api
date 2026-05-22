@@ -533,6 +533,9 @@ var ProviderSet = wire.NewSet(
 	ProvideChannelMonitorService,
 	ProvideChannelMonitorRunner,
 	NewChannelMonitorRequestTemplateService,
+	NewMicrosoftGraphHTTPClient,
+	wire.Bind(new(MicrosoftGraphClient), new(*MicrosoftGraphHTTPClient)),
+	NewMicrosoftEmailService,
 )
 
 // ProvidePaymentConfigService wraps NewPaymentConfigService to accept the named

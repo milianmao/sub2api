@@ -131,6 +131,41 @@ func (_u *GroupUpdate) SetNillableIsExclusive(v *bool) *GroupUpdate {
 	return _u
 }
 
+// SetAccessMode sets the "access_mode" field.
+func (_u *GroupUpdate) SetAccessMode(v string) *GroupUpdate {
+	_u.mutation.SetAccessMode(v)
+	return _u
+}
+
+// SetNillableAccessMode sets the "access_mode" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableAccessMode(v *string) *GroupUpdate {
+	if v != nil {
+		_u.SetAccessMode(*v)
+	}
+	return _u
+}
+
+// SetMinUserLevel sets the "min_user_level" field.
+func (_u *GroupUpdate) SetMinUserLevel(v int) *GroupUpdate {
+	_u.mutation.ResetMinUserLevel()
+	_u.mutation.SetMinUserLevel(v)
+	return _u
+}
+
+// SetNillableMinUserLevel sets the "min_user_level" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableMinUserLevel(v *int) *GroupUpdate {
+	if v != nil {
+		_u.SetMinUserLevel(*v)
+	}
+	return _u
+}
+
+// AddMinUserLevel adds value to the "min_user_level" field.
+func (_u *GroupUpdate) AddMinUserLevel(v int) *GroupUpdate {
+	_u.mutation.AddMinUserLevel(v)
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *GroupUpdate) SetStatus(v string) *GroupUpdate {
 	_u.mutation.SetStatus(v)
@@ -560,16 +595,16 @@ func (_u *GroupUpdate) SetNillableAllowMessagesDispatch(v *bool) *GroupUpdate {
 	return _u
 }
 
-// SetAllowOpenAICompat sets the "allow_openai_compat" field.
-func (_u *GroupUpdate) SetAllowOpenAICompat(v bool) *GroupUpdate {
-	_u.mutation.SetAllowOpenAICompat(v)
+// SetAllowOpenaiCompat sets the "allow_openai_compat" field.
+func (_u *GroupUpdate) SetAllowOpenaiCompat(v bool) *GroupUpdate {
+	_u.mutation.SetAllowOpenaiCompat(v)
 	return _u
 }
 
-// SetNillableAllowOpenAICompat sets the "allow_openai_compat" field if the given value is not nil.
-func (_u *GroupUpdate) SetNillableAllowOpenAICompat(v *bool) *GroupUpdate {
+// SetNillableAllowOpenaiCompat sets the "allow_openai_compat" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableAllowOpenaiCompat(v *bool) *GroupUpdate {
 	if v != nil {
-		_u.SetAllowOpenAICompat(*v)
+		_u.SetAllowOpenaiCompat(*v)
 	}
 	return _u
 }
@@ -921,6 +956,16 @@ func (_u *GroupUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Group.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.AccessMode(); ok {
+		if err := group.AccessModeValidator(v); err != nil {
+			return &ValidationError{Name: "access_mode", err: fmt.Errorf(`ent: validator failed for field "Group.access_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MinUserLevel(); ok {
+		if err := group.MinUserLevelValidator(v); err != nil {
+			return &ValidationError{Name: "min_user_level", err: fmt.Errorf(`ent: validator failed for field "Group.min_user_level": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := group.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Group.status": %w`, err)}
@@ -982,6 +1027,15 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AccessMode(); ok {
+		_spec.SetField(group.FieldAccessMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MinUserLevel(); ok {
+		_spec.SetField(group.FieldMinUserLevel, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMinUserLevel(); ok {
+		_spec.AddField(group.FieldMinUserLevel, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(group.FieldStatus, field.TypeString, value)
@@ -1114,8 +1168,8 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.AllowMessagesDispatch(); ok {
 		_spec.SetField(group.FieldAllowMessagesDispatch, field.TypeBool, value)
 	}
-	if value, ok := _u.mutation.AllowOpenAICompat(); ok {
-		_spec.SetField(group.FieldAllowOpenAICompat, field.TypeBool, value)
+	if value, ok := _u.mutation.AllowOpenaiCompat(); ok {
+		_spec.SetField(group.FieldAllowOpenaiCompat, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RequireOauthOnly(); ok {
 		_spec.SetField(group.FieldRequireOauthOnly, field.TypeBool, value)
@@ -1541,6 +1595,41 @@ func (_u *GroupUpdateOne) SetNillableIsExclusive(v *bool) *GroupUpdateOne {
 	if v != nil {
 		_u.SetIsExclusive(*v)
 	}
+	return _u
+}
+
+// SetAccessMode sets the "access_mode" field.
+func (_u *GroupUpdateOne) SetAccessMode(v string) *GroupUpdateOne {
+	_u.mutation.SetAccessMode(v)
+	return _u
+}
+
+// SetNillableAccessMode sets the "access_mode" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableAccessMode(v *string) *GroupUpdateOne {
+	if v != nil {
+		_u.SetAccessMode(*v)
+	}
+	return _u
+}
+
+// SetMinUserLevel sets the "min_user_level" field.
+func (_u *GroupUpdateOne) SetMinUserLevel(v int) *GroupUpdateOne {
+	_u.mutation.ResetMinUserLevel()
+	_u.mutation.SetMinUserLevel(v)
+	return _u
+}
+
+// SetNillableMinUserLevel sets the "min_user_level" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableMinUserLevel(v *int) *GroupUpdateOne {
+	if v != nil {
+		_u.SetMinUserLevel(*v)
+	}
+	return _u
+}
+
+// AddMinUserLevel adds value to the "min_user_level" field.
+func (_u *GroupUpdateOne) AddMinUserLevel(v int) *GroupUpdateOne {
+	_u.mutation.AddMinUserLevel(v)
 	return _u
 }
 
@@ -1973,16 +2062,16 @@ func (_u *GroupUpdateOne) SetNillableAllowMessagesDispatch(v *bool) *GroupUpdate
 	return _u
 }
 
-// SetAllowOpenAICompat sets the "allow_openai_compat" field.
-func (_u *GroupUpdateOne) SetAllowOpenAICompat(v bool) *GroupUpdateOne {
-	_u.mutation.SetAllowOpenAICompat(v)
+// SetAllowOpenaiCompat sets the "allow_openai_compat" field.
+func (_u *GroupUpdateOne) SetAllowOpenaiCompat(v bool) *GroupUpdateOne {
+	_u.mutation.SetAllowOpenaiCompat(v)
 	return _u
 }
 
-// SetNillableAllowOpenAICompat sets the "allow_openai_compat" field if the given value is not nil.
-func (_u *GroupUpdateOne) SetNillableAllowOpenAICompat(v *bool) *GroupUpdateOne {
+// SetNillableAllowOpenaiCompat sets the "allow_openai_compat" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableAllowOpenaiCompat(v *bool) *GroupUpdateOne {
 	if v != nil {
-		_u.SetAllowOpenAICompat(*v)
+		_u.SetAllowOpenaiCompat(*v)
 	}
 	return _u
 }
@@ -2347,6 +2436,16 @@ func (_u *GroupUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Group.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.AccessMode(); ok {
+		if err := group.AccessModeValidator(v); err != nil {
+			return &ValidationError{Name: "access_mode", err: fmt.Errorf(`ent: validator failed for field "Group.access_mode": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.MinUserLevel(); ok {
+		if err := group.MinUserLevelValidator(v); err != nil {
+			return &ValidationError{Name: "min_user_level", err: fmt.Errorf(`ent: validator failed for field "Group.min_user_level": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := group.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Group.status": %w`, err)}
@@ -2425,6 +2524,15 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.IsExclusive(); ok {
 		_spec.SetField(group.FieldIsExclusive, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AccessMode(); ok {
+		_spec.SetField(group.FieldAccessMode, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MinUserLevel(); ok {
+		_spec.SetField(group.FieldMinUserLevel, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMinUserLevel(); ok {
+		_spec.AddField(group.FieldMinUserLevel, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(group.FieldStatus, field.TypeString, value)
@@ -2557,8 +2665,8 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	if value, ok := _u.mutation.AllowMessagesDispatch(); ok {
 		_spec.SetField(group.FieldAllowMessagesDispatch, field.TypeBool, value)
 	}
-	if value, ok := _u.mutation.AllowOpenAICompat(); ok {
-		_spec.SetField(group.FieldAllowOpenAICompat, field.TypeBool, value)
+	if value, ok := _u.mutation.AllowOpenaiCompat(); ok {
+		_spec.SetField(group.FieldAllowOpenaiCompat, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RequireOauthOnly(); ok {
 		_spec.SetField(group.FieldRequireOauthOnly, field.TypeBool, value)

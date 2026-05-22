@@ -701,6 +701,16 @@ var (
 				Columns: []*schema.Column{GroupsColumns[7]},
 			},
 			{
+				Name:    "group_access_mode",
+				Unique:  false,
+				Columns: []*schema.Column{GroupsColumns[8]},
+			},
+			{
+				Name:    "group_min_user_level",
+				Unique:  false,
+				Columns: []*schema.Column{GroupsColumns[9]},
+			},
+			{
 				Name:    "group_deleted_at",
 				Unique:  false,
 				Columns: []*schema.Column{GroupsColumns[3]},
@@ -790,6 +800,49 @@ var (
 				Name:    "identityadoptiondecision_identity_id",
 				Unique:  false,
 				Columns: []*schema.Column{IdentityAdoptionDecisionsColumns[6]},
+			},
+		},
+	}
+	// MicrosoftEmailAccountsColumns holds the columns for the "microsoft_email_accounts" table.
+	MicrosoftEmailAccountsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "email", Type: field.TypeString, Size: 255},
+		{Name: "password", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "client_id", Type: field.TypeString, Size: 255},
+		{Name: "refresh_token", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "last_check_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "last_fetch_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "last_error", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "notes", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+	}
+	// MicrosoftEmailAccountsTable holds the schema information for the "microsoft_email_accounts" table.
+	MicrosoftEmailAccountsTable = &schema.Table{
+		Name:       "microsoft_email_accounts",
+		Columns:    MicrosoftEmailAccountsColumns,
+		PrimaryKey: []*schema.Column{MicrosoftEmailAccountsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "microsoftemailaccount_email",
+				Unique:  true,
+				Columns: []*schema.Column{MicrosoftEmailAccountsColumns[3]},
+			},
+			{
+				Name:    "microsoftemailaccount_status",
+				Unique:  false,
+				Columns: []*schema.Column{MicrosoftEmailAccountsColumns[7]},
+			},
+			{
+				Name:    "microsoftemailaccount_last_check_at",
+				Unique:  false,
+				Columns: []*schema.Column{MicrosoftEmailAccountsColumns[8]},
+			},
+			{
+				Name:    "microsoftemailaccount_last_fetch_at",
+				Unique:  false,
+				Columns: []*schema.Column{MicrosoftEmailAccountsColumns[9]},
 			},
 		},
 	}
@@ -1722,6 +1775,7 @@ var (
 		GroupsTable,
 		IdempotencyRecordsTable,
 		IdentityAdoptionDecisionsTable,
+		MicrosoftEmailAccountsTable,
 		PaymentAuditLogsTable,
 		PaymentOrdersTable,
 		PaymentProviderInstancesTable,
@@ -1803,6 +1857,9 @@ func init() {
 	IdentityAdoptionDecisionsTable.ForeignKeys[1].RefTable = PendingAuthSessionsTable
 	IdentityAdoptionDecisionsTable.Annotation = &entsql.Annotation{
 		Table: "identity_adoption_decisions",
+	}
+	MicrosoftEmailAccountsTable.Annotation = &entsql.Annotation{
+		Table: "microsoft_email_accounts",
 	}
 	PaymentAuditLogsTable.Annotation = &entsql.Annotation{
 		Table: "payment_audit_logs",

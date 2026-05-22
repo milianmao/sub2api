@@ -107,6 +107,27 @@ func (_u *UserUpdate) SetNillableRole(v *string) *UserUpdate {
 	return _u
 }
 
+// SetLevel sets the "level" field.
+func (_u *UserUpdate) SetLevel(v int) *UserUpdate {
+	_u.mutation.ResetLevel()
+	_u.mutation.SetLevel(v)
+	return _u
+}
+
+// SetNillableLevel sets the "level" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableLevel(v *int) *UserUpdate {
+	if v != nil {
+		_u.SetLevel(*v)
+	}
+	return _u
+}
+
+// AddLevel adds value to the "level" field.
+func (_u *UserUpdate) AddLevel(v int) *UserUpdate {
+	_u.mutation.AddLevel(v)
+	return _u
+}
+
 // SetBalance sets the "balance" field.
 func (_u *UserUpdate) SetBalance(v float64) *UserUpdate {
 	_u.mutation.ResetBalance()
@@ -906,6 +927,11 @@ func (_u *UserUpdate) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Level(); ok {
+		if err := user.LevelValidator(v); err != nil {
+			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "User.level": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := user.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "User.status": %w`, err)}
@@ -953,6 +979,12 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Role(); ok {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Level(); ok {
+		_spec.SetField(user.FieldLevel, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLevel(); ok {
+		_spec.AddField(user.FieldLevel, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)
@@ -1672,6 +1704,27 @@ func (_u *UserUpdateOne) SetNillableRole(v *string) *UserUpdateOne {
 	if v != nil {
 		_u.SetRole(*v)
 	}
+	return _u
+}
+
+// SetLevel sets the "level" field.
+func (_u *UserUpdateOne) SetLevel(v int) *UserUpdateOne {
+	_u.mutation.ResetLevel()
+	_u.mutation.SetLevel(v)
+	return _u
+}
+
+// SetNillableLevel sets the "level" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableLevel(v *int) *UserUpdateOne {
+	if v != nil {
+		_u.SetLevel(*v)
+	}
+	return _u
+}
+
+// AddLevel adds value to the "level" field.
+func (_u *UserUpdateOne) AddLevel(v int) *UserUpdateOne {
+	_u.mutation.AddLevel(v)
 	return _u
 }
 
@@ -2487,6 +2540,11 @@ func (_u *UserUpdateOne) check() error {
 			return &ValidationError{Name: "role", err: fmt.Errorf(`ent: validator failed for field "User.role": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Level(); ok {
+		if err := user.LevelValidator(v); err != nil {
+			return &ValidationError{Name: "level", err: fmt.Errorf(`ent: validator failed for field "User.level": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := user.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "User.status": %w`, err)}
@@ -2551,6 +2609,12 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	}
 	if value, ok := _u.mutation.Role(); ok {
 		_spec.SetField(user.FieldRole, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Level(); ok {
+		_spec.SetField(user.FieldLevel, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedLevel(); ok {
+		_spec.AddField(user.FieldLevel, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Balance(); ok {
 		_spec.SetField(user.FieldBalance, field.TypeFloat64, value)
