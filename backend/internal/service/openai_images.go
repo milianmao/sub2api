@@ -572,16 +572,6 @@ func (s *OpenAIGatewayService) ForwardImages(
 	}
 }
 
-func (s *OpenAIGatewayService) forwardOpenAIImagesChatGPTWeb(
-	ctx context.Context,
-	c *gin.Context,
-	account *Account,
-	parsed *OpenAIImagesRequest,
-	channelMappedModel string,
-) (*OpenAIForwardResult, error) {
-	return nil, fmt.Errorf("chatgpt_web_image upstream is not implemented")
-}
-
 func (s *OpenAIGatewayService) forwardOpenAIImagesAPIKey(
 	ctx context.Context,
 	c *gin.Context,
