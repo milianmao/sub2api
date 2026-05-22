@@ -561,6 +561,9 @@ func (s *OpenAIGatewayService) ForwardImages(
 		case OpenAIImageUpstreamCodexResponses:
 			return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
 		case OpenAIImageUpstreamChatGPTWebImage:
+			if parsed.HasMask {
+				return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
+			}
 			return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)
 		case OpenAIImageUpstreamOfficialImages:
 			return nil, fmt.Errorf("openai_image_upstream=%s is not valid for OAuth accounts", strategy)

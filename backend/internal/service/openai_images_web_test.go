@@ -128,6 +128,34 @@ func TestForwardOpenAIImagesChatGPTWebStreamingEmitsCompleted(t *testing.T) {
 	require.Contains(t, rec.Body.String(), base64.StdEncoding.EncodeToString(imageBytes))
 }
 
+func TestForwardOpenAIImagesChatGPTWebEditUploadsInputImage(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	upstream := &httpUpstreamRecorder{responses: []*http.Response{
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"conduit_token":"conduit_1"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"file_id":"file_upload_1","upload_url":"https://upload.local/blob"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{}, Body: io.NopCloser(strings.NewReader(`{}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"text/event-stream"}}, Body: io.NopCloser(strings.NewReader("data: {\"conversation_id\":\"conv_1\"}\n\ndata: {\"message\":{\"author\":{\"role\":\"tool\"},\"metadata\":{\"async_task_type\":\"image_gen\"},\"content\":{\"content_type\":\"multimodal_text\",\"parts\":[{\"asset_pointer\":\"file-service://file_1\"}]}}}\n\n"))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"application/json"}}, Body: io.NopCloser(strings.NewReader(`{"download_url":"https://download.local/image.png"}`))},
+		{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": []string{"image/png"}}, Body: io.NopCloser(strings.NewReader("out"))},
+	}}
+	svc := &OpenAIGatewayService{cfg: &config.Config{}, httpUpstream: upstream}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/edits", nil)
+	account := &Account{ID: 7, Platform: PlatformOpenAI, Type: AccountTypeOAuth, Concurrency: 1, Credentials: map[string]any{"access_token": "oauth-token"}}
+	parsed := &OpenAIImagesRequest{Endpoint: openAIImagesEditsEndpoint, Model: "gpt-image-2", Prompt: "edit", N: 1, Uploads: []OpenAIImagesUpload{{FieldName: "image", FileName: "source.png", ContentType: "image/png", Data: []byte("input-image")}}}
+
+	_, err := svc.forwardOpenAIImagesChatGPTWeb(context.Background(), c, account, parsed, "")
+
+	require.NoError(t, err)
+	require.Len(t, upstream.requests, 7)
+	require.Equal(t, "/backend-api/files", upstream.requests[1].URL.Path)
+	require.Equal(t, "https://upload.local/blob", upstream.requests[2].URL.String())
+	require.Equal(t, "/backend-api/files/file_upload_1/uploaded", upstream.requests[3].URL.Path)
+	require.Contains(t, string(upstream.bodies[4]), "file-service://file_upload_1")
+}
+
 func TestForwardOpenAIImagesChatGPTWebNonStreamingReturnsBase64(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	imageBytes := []byte("fake-png-bytes")

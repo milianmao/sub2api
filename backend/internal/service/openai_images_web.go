@@ -36,6 +36,15 @@ type openAIChatGPTWebImageOutput struct {
 	Size          string
 }
 
+type openAIChatGPTWebImageUploadRef struct {
+	FileID      string
+	FileName    string
+	FileSize    int
+	ContentType string
+	Width       int
+	Height      int
+}
+
 type openAIChatGPTWebImageSSEState struct {
 	ConversationID string
 	FileIDs        []string
@@ -131,7 +140,11 @@ func (c *openAIChatGPTWebImageClient) generate(ctx context.Context, parsed *Open
 	if err != nil {
 		return nil, nil, err
 	}
-	state, headers, err := c.startConversation(ctx, parsed, requestModel, conduitToken)
+	refs, err := c.uploadReferences(ctx, c.account, c.token, parsed)
+	if err != nil {
+		return nil, nil, err
+	}
+	state, headers, err := c.startConversation(ctx, parsed, requestModel, conduitToken, refs)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -191,13 +204,118 @@ func (c *openAIChatGPTWebImageClient) prepare(ctx context.Context, parsed *OpenA
 	return conduitToken, nil
 }
 
-func (c *openAIChatGPTWebImageClient) startConversation(ctx context.Context, parsed *OpenAIImagesRequest, requestModel, conduitToken string) (openAIChatGPTWebImageSSEState, http.Header, error) {
+func (c *openAIChatGPTWebImageClient) uploadReferences(ctx context.Context, account *Account, token string, parsed *OpenAIImagesRequest) ([]openAIChatGPTWebImageUploadRef, error) {
+	if parsed == nil || len(parsed.Uploads) == 0 {
+		return nil, nil
+	}
+	refs := make([]openAIChatGPTWebImageUploadRef, 0, len(parsed.Uploads))
+	for _, upload := range parsed.Uploads {
+		ref, err := c.uploadOne(ctx, account, token, upload)
+		if err != nil {
+			return nil, err
+		}
+		refs = append(refs, ref)
+	}
+	return refs, nil
+}
+
+func (c *openAIChatGPTWebImageClient) uploadOne(ctx context.Context, account *Account, token string, upload OpenAIImagesUpload) (openAIChatGPTWebImageUploadRef, error) {
+	contentType := strings.TrimSpace(upload.ContentType)
+	if contentType == "" {
+		contentType = http.DetectContentType(upload.Data)
+	}
+	fileName := strings.TrimSpace(upload.FileName)
+	if fileName == "" {
+		fileName = "image.png"
+	}
+	metadata := map[string]any{
+		"file_name": fileName,
+		"file_size": len(upload.Data),
+		"use_case":  "multimodal",
+		"width":     upload.Width,
+		"height":    upload.Height,
+	}
+	body, err := json.Marshal(metadata)
+	if err != nil {
+		return openAIChatGPTWebImageUploadRef{}, err
+	}
+	metaReq, err := c.newWebRequest(ctx, http.MethodPost, "/backend-api/files", body)
+	if err != nil {
+		return openAIChatGPTWebImageUploadRef{}, err
+	}
+	metaResp, err := c.do(metaReq)
+	if err != nil {
+		return openAIChatGPTWebImageUploadRef{}, err
+	}
+	metaBody, _ := io.ReadAll(io.LimitReader(metaResp.Body, 2<<20))
+	_ = metaResp.Body.Close()
+	if metaResp.StatusCode < 200 || metaResp.StatusCode >= 300 {
+		return openAIChatGPTWebImageUploadRef{}, openAIChatGPTWebStatusError(metaResp, metaBody, "create chatgpt web image upload failed")
+	}
+	fileID := strings.TrimSpace(gjson.GetBytes(metaBody, "file_id").String())
+	uploadURL := strings.TrimSpace(gjson.GetBytes(metaBody, "upload_url").String())
+	if fileID == "" || uploadURL == "" {
+		return openAIChatGPTWebImageUploadRef{}, fmt.Errorf("chatgpt web image upload response missing file_id or upload_url")
+	}
+
+	putReq, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, bytes.NewReader(upload.Data))
+	if err != nil {
+		return openAIChatGPTWebImageUploadRef{}, err
+	}
+	putReq.Header.Set("Content-Type", contentType)
+	putReq.Header.Set("x-ms-blob-type", "BlockBlob")
+	putReq.Header.Set("x-ms-version", "2020-04-08")
+	putReq.Header.Set("User-Agent", openAIImageBackendUserAgent)
+	putResp, err := c.do(putReq)
+	if err != nil {
+		return openAIChatGPTWebImageUploadRef{}, err
+	}
+	putBody, _ := io.ReadAll(io.LimitReader(putResp.Body, 2<<20))
+	_ = putResp.Body.Close()
+	if putResp.StatusCode < 200 || putResp.StatusCode >= 300 {
+		return openAIChatGPTWebImageUploadRef{}, openAIChatGPTWebStatusError(putResp, putBody, "put chatgpt web image upload bytes failed")
+	}
+
+	uploadedReq, err := c.newWebRequest(ctx, http.MethodPost, fmt.Sprintf("/backend-api/files/%s/uploaded", fileID), []byte(`{}`))
+	if err != nil {
+		return openAIChatGPTWebImageUploadRef{}, err
+	}
+	uploadedResp, err := c.do(uploadedReq)
+	if err != nil {
+		return openAIChatGPTWebImageUploadRef{}, err
+	}
+	uploadedBody, _ := io.ReadAll(io.LimitReader(uploadedResp.Body, 2<<20))
+	_ = uploadedResp.Body.Close()
+	if uploadedResp.StatusCode < 200 || uploadedResp.StatusCode >= 300 {
+		return openAIChatGPTWebImageUploadRef{}, openAIChatGPTWebStatusError(uploadedResp, uploadedBody, "mark chatgpt web image upload complete failed")
+	}
+
+	return openAIChatGPTWebImageUploadRef{FileID: fileID, FileName: fileName, FileSize: len(upload.Data), ContentType: contentType, Width: upload.Width, Height: upload.Height}, nil
+}
+
+func (c *openAIChatGPTWebImageClient) startConversation(ctx context.Context, parsed *OpenAIImagesRequest, requestModel, conduitToken string, refs []openAIChatGPTWebImageUploadRef) (openAIChatGPTWebImageSSEState, http.Header, error) {
+	parts := make([]any, 0, len(refs)+1)
+	attachments := make([]map[string]any, 0, len(refs))
+	for _, ref := range refs {
+		parts = append(parts, map[string]any{"content_type": "image_asset_pointer", "asset_pointer": "file-service://" + ref.FileID, "width": ref.Width, "height": ref.Height, "size_bytes": ref.FileSize})
+		attachments = append(attachments, map[string]any{"id": ref.FileID, "mimeType": ref.ContentType, "name": ref.FileName, "size": ref.FileSize, "width": ref.Width, "height": ref.Height})
+	}
+	parts = append(parts, parsed.Prompt)
+	content := map[string]any{"content_type": "text", "parts": []string{parsed.Prompt}}
+	if len(refs) > 0 {
+		content = map[string]any{"content_type": "multimodal_text", "parts": parts}
+	}
+	metadata := map[string]any{"system_hints": []string{"picture_v2"}, "serialization_metadata": map[string]any{"custom_symbol_offsets": []any{}}}
+	if len(attachments) > 0 {
+		metadata["attachments"] = attachments
+	}
 	payload := map[string]any{
 		"action": "next",
 		"messages": []map[string]any{{
-			"id":      newUUIDString(),
-			"author":  map[string]any{"role": "user"},
-			"content": map[string]any{"content_type": "text", "parts": []string{parsed.Prompt}},
+			"id":       newUUIDString(),
+			"author":   map[string]any{"role": "user"},
+			"content":  content,
+			"metadata": metadata,
 		}},
 		"model":             openAIChatGPTWebImageModelSlug(requestModel),
 		"conversation_id":   nil,
