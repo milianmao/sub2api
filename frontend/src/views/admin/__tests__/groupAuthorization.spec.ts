@@ -295,7 +295,24 @@ const mountGroupsView = async () => {
           props: ['show'],
           template: '<div v-if="show"><slot /><slot name="footer" /></div>',
         },
-        Select: true,
+        Select: {
+          props: ['modelValue', 'options'],
+          emits: ['update:modelValue', 'change'],
+          methods: {
+            emitValue(event: Event) {
+              const value = (event.target as HTMLSelectElement).value
+              this.$emit('update:modelValue', value)
+              this.$emit('change', value)
+            },
+          },
+          template: `
+            <select :value="modelValue ?? ''" @change="emitValue">
+              <option v-for="option in options" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          `,
+        },
         PlatformIcon: true,
         GroupCapacityBadge: true,
         GroupRateMultipliersModal: true,
@@ -566,6 +583,38 @@ describe('group authorization frontend behavior', () => {
 
     expect(createGroupRequest).toHaveBeenCalledWith(
       expect.objectContaining({ visible_user_ids: [7] }),
+    )
+  })
+
+  it('lets admins set OpenAI image upstream when creating a group', async () => {
+    listGroups.mockResolvedValue({
+      items: [createGroup({ platform: 'openai', openai_image_upstream: 'auto' })],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1,
+    })
+    const wrapper = await mountGroupsView()
+
+    await wrapper.find('[data-tour="groups-create-btn"]').trigger('click')
+    await flushPromises()
+    await wrapper.find('input[data-tour="group-form-name"]').setValue('OpenAI Images')
+    const platformSelect = wrapper.findAll('select').find((select) =>
+      select.findAll('option').some((option) => option.attributes('value') === 'openai') &&
+      select.findAll('option').some((option) => option.attributes('value') === 'gemini') &&
+      !select.findAll('option').some((option) => option.attributes('value') === ''),
+    )!
+    await platformSelect.setValue('openai')
+    await flushPromises()
+    await nextTick()
+    await wrapper.vm.$nextTick()
+    const upstreamSelect = wrapper.get('select[data-test="create-openai-image-upstream"]')
+    await upstreamSelect.setValue('chatgpt_web_image')
+    await wrapper.find('form#create-group-form').trigger('submit')
+    await flushPromises()
+
+    expect(createGroupRequest).toHaveBeenCalledWith(
+      expect.objectContaining({ openai_image_upstream: 'chatgpt_web_image' }),
     )
   })
 

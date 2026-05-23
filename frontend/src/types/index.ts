@@ -493,6 +493,12 @@ export type SubscriptionType = 'standard' | 'subscription'
 
 export type GroupAccessMode = 'public' | 'restricted'
 
+export type OpenAIImageUpstreamStrategy =
+  | 'auto'
+  | 'official_images'
+  | 'codex_responses'
+  | 'chatgpt_web_image'
+
 export interface OpenAIMessagesDispatchModelConfig {
   opus_mapped_model?: string
   sonnet_mapped_model?: string
@@ -528,6 +534,7 @@ export interface Group {
   fallback_group_id: number | null
   fallback_group_id_on_invalid_request: number | null
   allow_openai_compat?: boolean
+  openai_image_upstream?: OpenAIImageUpstreamStrategy
   // OpenAI Messages 调度开关（用户侧需要此字段判断是否展示 Claude Code 教程）
   allow_messages_dispatch?: boolean
   default_mapped_model?: string
@@ -643,6 +650,7 @@ export interface CreateGroupRequest {
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null
   allow_openai_compat?: boolean
+  openai_image_upstream?: OpenAIImageUpstreamStrategy
   mcp_xml_inject?: boolean
   supported_model_scopes?: string[]
   require_oauth_only?: boolean
@@ -675,6 +683,7 @@ export interface UpdateGroupRequest {
   fallback_group_id?: number | null
   fallback_group_id_on_invalid_request?: number | null
   allow_openai_compat?: boolean
+  openai_image_upstream?: OpenAIImageUpstreamStrategy
   mcp_xml_inject?: boolean
   supported_model_scopes?: string[]
   require_oauth_only?: boolean

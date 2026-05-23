@@ -1083,6 +1083,23 @@
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            {{ t("admin.groups.openaiImageUpstream.title") }}
+          </h4>
+          <Select
+            v-model="createForm.openai_image_upstream"
+            :options="openAIImageUpstreamOptions"
+            data-test="create-openai-image-upstream"
+          />
+          <p class="input-hint">
+            {{ t("admin.groups.openaiImageUpstream.hint") }}
+          </p>
+        </div>
+
+        <div
+          v-if="createForm.platform === 'openai'"
+          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
+        >
+          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             {{ t("admin.groups.openaiMessages.title") }}
           </h4>
 
@@ -2358,6 +2375,22 @@
           class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
         >
           <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+            {{ t("admin.groups.openaiImageUpstream.title") }}
+          </h4>
+          <Select
+            v-model="editForm.openai_image_upstream"
+            :options="openAIImageUpstreamOptions"
+          />
+          <p class="input-hint">
+            {{ t("admin.groups.openaiImageUpstream.hint") }}
+          </p>
+        </div>
+
+        <div
+          v-if="editForm.platform === 'openai'"
+          class="border-t border-gray-200 dark:border-dark-400 pt-4 mt-4"
+        >
+          <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             {{ t("admin.groups.openaiMessages.title") }}
           </h4>
 
@@ -3051,7 +3084,13 @@ import { useAppStore } from "@/stores/app";
 import { useOnboardingStore } from "@/stores/onboarding";
 import { useAuthStore } from "@/stores/auth";
 import { adminAPI } from "@/api/admin";
-import type { AdminGroup, AdminUser, GroupPlatform, SubscriptionType } from "@/types";
+import type {
+  AdminGroup,
+  AdminUser,
+  GroupPlatform,
+  OpenAIImageUpstreamStrategy,
+  SubscriptionType,
+} from "@/types";
 import type { Column } from "@/components/common/types";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import TablePageLayout from "@/components/layout/TablePageLayout.vue";
@@ -3197,6 +3236,22 @@ const removeVisibleUser = (target: number[], userId: number) => {
     target.splice(index, 1);
   }
 };
+
+const openAIImageUpstreamOptions = computed(() => [
+  { value: "auto", label: t("admin.groups.openaiImageUpstream.options.auto") },
+  {
+    value: "official_images",
+    label: t("admin.groups.openaiImageUpstream.options.officialImages"),
+  },
+  {
+    value: "codex_responses",
+    label: t("admin.groups.openaiImageUpstream.options.codexResponses"),
+  },
+  {
+    value: "chatgpt_web_image",
+    label: t("admin.groups.openaiImageUpstream.options.chatgptWebImage"),
+  },
+]);
 
 // 降级分组选项（创建时）- 仅包含 anthropic 平台且未启用 claude_code_only 的分组
 const fallbackGroupOptions = computed(() => {
@@ -3378,6 +3433,7 @@ const createForm = reactive({
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   allow_openai_compat: false,
+  openai_image_upstream: "auto" as OpenAIImageUpstreamStrategy,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
   allow_messages_dispatch: false,
   opus_mapped_model: createMessagesDispatchDefaults.opus_mapped_model,
@@ -3667,6 +3723,7 @@ const editForm = reactive({
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   allow_openai_compat: false,
+  openai_image_upstream: "auto" as OpenAIImageUpstreamStrategy,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
   allow_messages_dispatch: false,
   default_mapped_model: '',
@@ -3933,6 +3990,7 @@ const closeCreateModal = () => {
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
   createForm.allow_openai_compat = false;
+  createForm.openai_image_upstream = "auto";
   resetMessagesDispatchFormState(createForm);
   createForm.require_oauth_only = false;
   createForm.require_privacy_set = false;
@@ -4070,6 +4128,7 @@ const handleEdit = async (group: AdminGroup) => {
   editForm.fallback_group_id_on_invalid_request =
     group.fallback_group_id_on_invalid_request;
   editForm.allow_openai_compat = group.allow_openai_compat ?? false;
+  editForm.openai_image_upstream = group.openai_image_upstream ?? "auto";
   const messagesDispatchFormState = messagesDispatchConfigToFormState(
     group.messages_dispatch_model_config,
   );
@@ -4108,6 +4167,7 @@ const closeEditModal = () => {
   editingGroup.value = null;
   editModelRoutingRules.value = [];
   editForm.copy_accounts_from_group_ids = [];
+  editForm.openai_image_upstream = "auto";
   editForm.access_mode = "public";
   editForm.min_user_level = 0;
   editForm.visible_user_ids = [];
