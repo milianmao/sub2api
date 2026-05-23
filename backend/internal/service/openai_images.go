@@ -40,6 +40,7 @@ const (
 	openAIImageMaxDownloadBytes    = 20 << 20 // 20MB per image download
 	openAIImageMaxUploadPartSize   = 20 << 20 // 20MB per multipart upload part
 	openAIImagesResponsesMainModel = "gpt-5.4-mini"
+	openAICodexGPTImage2Model      = "codex-gpt-image-2"
 )
 
 type OpenAIImagesCapability string
@@ -60,6 +61,7 @@ type OpenAIImagesUpload struct {
 
 type OpenAIImagesRequest struct {
 	Endpoint           string
+	GroupID            *int64
 	ContentType        string
 	Multipart          bool
 	Model              string
@@ -455,7 +457,8 @@ func applyOpenAIImagesDefaults(req *OpenAIImagesRequest) {
 }
 
 func isOpenAIImageGenerationModel(model string) bool {
-	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(model)), "gpt-image-")
+	model = strings.ToLower(strings.TrimSpace(model))
+	return strings.HasPrefix(model, "gpt-image-") || model == openAICodexGPTImage2Model
 }
 
 func validateOpenAIImagesModel(model string) error {
@@ -550,7 +553,23 @@ func (s *OpenAIGatewayService) ForwardImages(
 	case AccountTypeAPIKey:
 		return s.forwardOpenAIImagesAPIKey(ctx, c, account, body, parsed, channelMappedModel)
 	case AccountTypeOAuth:
-		return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
+		strategy, err := s.resolveOpenAIImageUpstreamStrategy(ctx, account, parsed)
+		if err != nil {
+			return nil, err
+		}
+		switch strategy {
+		case OpenAIImageUpstreamCodexResponses:
+			return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
+		case OpenAIImageUpstreamChatGPTWebImage:
+			if parsed.HasMask || (parsed.IsEdits() && len(parsed.InputImageURLs) > 0) {
+				return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
+			}
+			return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)
+		case OpenAIImageUpstreamOfficialImages:
+			return nil, fmt.Errorf("openai_image_upstream=%s is not valid for OAuth accounts", strategy)
+		default:
+			return nil, fmt.Errorf("unsupported openai image upstream strategy: %s", strategy)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported account type: %s", account.Type)
 	}

@@ -23,6 +23,10 @@ func TestOpenAIGatewayServiceForward_RejectsDisabledImageGenerationIntents(t *te
 		body []byte
 	}{
 		{
+			name: "codex image model",
+			body: []byte(`{"model":"codex-gpt-image-2","input":"draw"}`),
+		},
+		{
 			name: "image model",
 			body: []byte(`{"model":"gpt-image-2","input":"draw"}`),
 		},
