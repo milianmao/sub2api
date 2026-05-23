@@ -516,6 +516,16 @@ type AccountSortState = {
   sort_by: string
   sort_order: AccountSortOrder
 }
+type AccountQueryFilters = {
+  platform?: string
+  type?: string
+  status?: string
+  privacy_mode?: string
+  group?: string
+  search?: string
+  sort_by?: string
+  sort_order?: AccountSortOrder
+}
 const ACCOUNT_SORTABLE_KEYS = new Set([
   'name',
   'status',
@@ -723,6 +733,24 @@ const toggleColumn = (key: string) => {
 
 const isColumnVisible = (key: string) => !hiddenColumns.has(key)
 
+const normalizeAccountStatusFilter = (status: string) => {
+  return status === 'paused' ? 'unschedulable' : status
+}
+
+const normalizeAccountQueryFilters = (filters: AccountQueryFilters): AccountQueryFilters => ({
+  ...filters,
+  status: normalizeAccountStatusFilter(filters.status || '')
+})
+
+const fetchAccounts = (
+  page: number,
+  pageSize: number,
+  filters: AccountQueryFilters,
+  options?: { signal?: AbortSignal }
+) => {
+  return adminAPI.accounts.list(page, pageSize, normalizeAccountQueryFilters(filters), options)
+}
+
 const {
   items: accounts,
   loading,
@@ -734,7 +762,7 @@ const {
   handlePageChange: baseHandlePageChange,
   handlePageSizeChange: baseHandlePageSizeChange
 } = useTableLoader<Account, any>({
-  fetchFn: adminAPI.accounts.list,
+  fetchFn: fetchAccounts,
   initialParams: {
     platform: '',
     type: '',
@@ -940,17 +968,7 @@ const refreshAccountsIncrementally = async () => {
     const result = await adminAPI.accounts.listWithEtag(
       pagination.page,
       pagination.page_size,
-      toRaw(params) as {
-        platform?: string
-        type?: string
-        status?: string
-        privacy_mode?: string
-        group?: string
-        search?: string
-        sort_by?: string
-        sort_order?: AccountSortOrder
-
-      },
+      normalizeAccountQueryFilters(toRaw(params) as AccountQueryFilters),
       { etag: autoRefreshETag.value }
     )
 
@@ -1357,13 +1375,14 @@ const handleBulkToggleSchedulable = async (schedulable: boolean) => {
     appStore.showError(t('common.error'))
   }
 }
+
 const buildBulkEditFilterSnapshot = () => {
   const rawParams = toRaw(params) as Record<string, unknown>
   const sortOrder: AccountSortOrder = rawParams.sort_order === 'desc' ? 'desc' : 'asc'
   return {
     platform: typeof rawParams.platform === 'string' ? rawParams.platform : '',
     type: typeof rawParams.type === 'string' ? rawParams.type : '',
-    status: typeof rawParams.status === 'string' ? rawParams.status : '',
+    status: typeof rawParams.status === 'string' ? normalizeAccountStatusFilter(rawParams.status) : '',
     group: typeof rawParams.group === 'string' ? rawParams.group : '',
     search: typeof rawParams.search === 'string' ? rawParams.search : '',
     privacy_mode: typeof rawParams.privacy_mode === 'string' ? rawParams.privacy_mode : '',
@@ -1415,7 +1434,7 @@ const ACCOUNT_PRIVACY_MODE_UNSET_QUERY_VALUE = '__unset__'
 const buildAccountQueryFilters = () => ({
   platform: params.platform || '',
   type: params.type || '',
-  status: params.status || '',
+  status: normalizeAccountStatusFilter(params.status || ''),
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
   search: params.search || '',

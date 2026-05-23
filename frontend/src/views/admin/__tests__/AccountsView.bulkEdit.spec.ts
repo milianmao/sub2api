@@ -526,4 +526,119 @@ describe('admin AccountsView bulk edit scope', () => {
 
     expect(copyToClipboard).toHaveBeenCalledWith('owner@example.com', 'admin.accounts.emailCopied')
   })
+
+  it('maps paused status filter to unschedulable when loading filtered results', async () => {
+    listAccounts.mockResolvedValueOnce({
+      items: [],
+      total: 0,
+      page: 1,
+      page_size: 20,
+      pages: 0
+    })
+
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    ;(wrapper.vm as any).params.status = 'paused'
+    await (wrapper.vm as any).openBulkEditFiltered()
+
+    expect(listAccounts).toHaveBeenLastCalledWith(
+      1,
+      100,
+      expect.objectContaining({
+        status: 'unschedulable'
+      })
+    )
+  })
+
+  it('maps paused status filter to unschedulable for the main account list request', async () => {
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    ;(wrapper.vm as any).params.status = 'paused'
+    await (wrapper.vm as any).reload()
+
+    expect(listAccounts).toHaveBeenLastCalledWith(
+      1,
+      20,
+      expect.objectContaining({
+        status: 'unschedulable'
+      }),
+      expect.anything()
+    )
+  })
 })
