@@ -14905,6 +14905,7 @@ type GroupMutation struct {
 	require_privacy_set                     *bool
 	default_mapped_model                    *string
 	messages_dispatch_model_config          *domain.OpenAIMessagesDispatchModelConfig
+	openai_image_upstream                   *string
 	rpm_limit                               *int
 	addrpm_limit                            *int
 	clearedFields                           map[string]struct{}
@@ -16751,6 +16752,42 @@ func (m *GroupMutation) ResetMessagesDispatchModelConfig() {
 	m.messages_dispatch_model_config = nil
 }
 
+// SetOpenaiImageUpstream sets the "openai_image_upstream" field.
+func (m *GroupMutation) SetOpenaiImageUpstream(s string) {
+	m.openai_image_upstream = &s
+}
+
+// OpenaiImageUpstream returns the value of the "openai_image_upstream" field in the mutation.
+func (m *GroupMutation) OpenaiImageUpstream() (r string, exists bool) {
+	v := m.openai_image_upstream
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOpenaiImageUpstream returns the old "openai_image_upstream" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldOpenaiImageUpstream(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOpenaiImageUpstream is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOpenaiImageUpstream requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOpenaiImageUpstream: %w", err)
+	}
+	return oldValue.OpenaiImageUpstream, nil
+}
+
+// ResetOpenaiImageUpstream resets all changes to the "openai_image_upstream" field.
+func (m *GroupMutation) ResetOpenaiImageUpstream() {
+	m.openai_image_upstream = nil
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (m *GroupMutation) SetRpmLimit(i int) {
 	m.rpm_limit = &i
@@ -17165,7 +17202,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 37)
+	fields := make([]string, 0, 38)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -17274,6 +17311,9 @@ func (m *GroupMutation) Fields() []string {
 	if m.messages_dispatch_model_config != nil {
 		fields = append(fields, group.FieldMessagesDispatchModelConfig)
 	}
+	if m.openai_image_upstream != nil {
+		fields = append(fields, group.FieldOpenaiImageUpstream)
+	}
 	if m.rpm_limit != nil {
 		fields = append(fields, group.FieldRpmLimit)
 	}
@@ -17357,6 +17397,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.DefaultMappedModel()
 	case group.FieldMessagesDispatchModelConfig:
 		return m.MessagesDispatchModelConfig()
+	case group.FieldOpenaiImageUpstream:
+		return m.OpenaiImageUpstream()
 	case group.FieldRpmLimit:
 		return m.RpmLimit()
 	}
@@ -17440,6 +17482,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldDefaultMappedModel(ctx)
 	case group.FieldMessagesDispatchModelConfig:
 		return m.OldMessagesDispatchModelConfig(ctx)
+	case group.FieldOpenaiImageUpstream:
+		return m.OldOpenaiImageUpstream(ctx)
 	case group.FieldRpmLimit:
 		return m.OldRpmLimit(ctx)
 	}
@@ -17702,6 +17746,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMessagesDispatchModelConfig(v)
+		return nil
+	case group.FieldOpenaiImageUpstream:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOpenaiImageUpstream(v)
 		return nil
 	case group.FieldRpmLimit:
 		v, ok := value.(int)
@@ -18106,6 +18157,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldMessagesDispatchModelConfig:
 		m.ResetMessagesDispatchModelConfig()
+		return nil
+	case group.FieldOpenaiImageUpstream:
+		m.ResetOpenaiImageUpstream()
 		return nil
 	case group.FieldRpmLimit:
 		m.ResetRpmLimit()

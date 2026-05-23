@@ -220,6 +220,11 @@ func DefaultMappedModel(v string) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldDefaultMappedModel, v))
 }
 
+// OpenaiImageUpstream applies equality check predicate on the "openai_image_upstream" field. It's identical to OpenaiImageUpstreamEQ.
+func OpenaiImageUpstream(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldOpenaiImageUpstream, v))
+}
+
 // RpmLimit applies equality check predicate on the "rpm_limit" field. It's identical to RpmLimitEQ.
 func RpmLimit(v int) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldRpmLimit, v))
@@ -1528,6 +1533,71 @@ func DefaultMappedModelEqualFold(v string) predicate.Group {
 // DefaultMappedModelContainsFold applies the ContainsFold predicate on the "default_mapped_model" field.
 func DefaultMappedModelContainsFold(v string) predicate.Group {
 	return predicate.Group(sql.FieldContainsFold(FieldDefaultMappedModel, v))
+}
+
+// OpenaiImageUpstreamEQ applies the EQ predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamNEQ applies the NEQ predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamNEQ(v string) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamIn applies the In predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldIn(FieldOpenaiImageUpstream, vs...))
+}
+
+// OpenaiImageUpstreamNotIn applies the NotIn predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamNotIn(vs ...string) predicate.Group {
+	return predicate.Group(sql.FieldNotIn(FieldOpenaiImageUpstream, vs...))
+}
+
+// OpenaiImageUpstreamGT applies the GT predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamGT(v string) predicate.Group {
+	return predicate.Group(sql.FieldGT(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamGTE applies the GTE predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamGTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldGTE(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamLT applies the LT predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamLT(v string) predicate.Group {
+	return predicate.Group(sql.FieldLT(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamLTE applies the LTE predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamLTE(v string) predicate.Group {
+	return predicate.Group(sql.FieldLTE(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamContains applies the Contains predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamContains(v string) predicate.Group {
+	return predicate.Group(sql.FieldContains(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamHasPrefix applies the HasPrefix predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamHasPrefix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasPrefix(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamHasSuffix applies the HasSuffix predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamHasSuffix(v string) predicate.Group {
+	return predicate.Group(sql.FieldHasSuffix(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamEqualFold applies the EqualFold predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamEqualFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldEqualFold(FieldOpenaiImageUpstream, v))
+}
+
+// OpenaiImageUpstreamContainsFold applies the ContainsFold predicate on the "openai_image_upstream" field.
+func OpenaiImageUpstreamContainsFold(v string) predicate.Group {
+	return predicate.Group(sql.FieldContainsFold(FieldOpenaiImageUpstream, v))
 }
 
 // RpmLimitEQ applies the EQ predicate on the "rpm_limit" field.

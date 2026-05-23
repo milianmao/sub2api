@@ -665,6 +665,20 @@ func (_u *GroupUpdate) SetNillableMessagesDispatchModelConfig(v *domain.OpenAIMe
 	return _u
 }
 
+// SetOpenaiImageUpstream sets the "openai_image_upstream" field.
+func (_u *GroupUpdate) SetOpenaiImageUpstream(v string) *GroupUpdate {
+	_u.mutation.SetOpenaiImageUpstream(v)
+	return _u
+}
+
+// SetNillableOpenaiImageUpstream sets the "openai_image_upstream" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableOpenaiImageUpstream(v *string) *GroupUpdate {
+	if v != nil {
+		_u.SetOpenaiImageUpstream(*v)
+	}
+	return _u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_u *GroupUpdate) SetRpmLimit(v int) *GroupUpdate {
 	_u.mutation.ResetRpmLimit()
@@ -986,6 +1000,11 @@ func (_u *GroupUpdate) check() error {
 			return &ValidationError{Name: "default_mapped_model", err: fmt.Errorf(`ent: validator failed for field "Group.default_mapped_model": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.OpenaiImageUpstream(); ok {
+		if err := group.OpenaiImageUpstreamValidator(v); err != nil {
+			return &ValidationError{Name: "openai_image_upstream", err: fmt.Errorf(`ent: validator failed for field "Group.openai_image_upstream": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1182,6 +1201,9 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.MessagesDispatchModelConfig(); ok {
 		_spec.SetField(group.FieldMessagesDispatchModelConfig, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.OpenaiImageUpstream(); ok {
+		_spec.SetField(group.FieldOpenaiImageUpstream, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.RpmLimit(); ok {
 		_spec.SetField(group.FieldRpmLimit, field.TypeInt, value)
@@ -2132,6 +2154,20 @@ func (_u *GroupUpdateOne) SetNillableMessagesDispatchModelConfig(v *domain.OpenA
 	return _u
 }
 
+// SetOpenaiImageUpstream sets the "openai_image_upstream" field.
+func (_u *GroupUpdateOne) SetOpenaiImageUpstream(v string) *GroupUpdateOne {
+	_u.mutation.SetOpenaiImageUpstream(v)
+	return _u
+}
+
+// SetNillableOpenaiImageUpstream sets the "openai_image_upstream" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableOpenaiImageUpstream(v *string) *GroupUpdateOne {
+	if v != nil {
+		_u.SetOpenaiImageUpstream(*v)
+	}
+	return _u
+}
+
 // SetRpmLimit sets the "rpm_limit" field.
 func (_u *GroupUpdateOne) SetRpmLimit(v int) *GroupUpdateOne {
 	_u.mutation.ResetRpmLimit()
@@ -2466,6 +2502,11 @@ func (_u *GroupUpdateOne) check() error {
 			return &ValidationError{Name: "default_mapped_model", err: fmt.Errorf(`ent: validator failed for field "Group.default_mapped_model": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.OpenaiImageUpstream(); ok {
+		if err := group.OpenaiImageUpstreamValidator(v); err != nil {
+			return &ValidationError{Name: "openai_image_upstream", err: fmt.Errorf(`ent: validator failed for field "Group.openai_image_upstream": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -2679,6 +2720,9 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.MessagesDispatchModelConfig(); ok {
 		_spec.SetField(group.FieldMessagesDispatchModelConfig, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.OpenaiImageUpstream(); ok {
+		_spec.SetField(group.FieldOpenaiImageUpstream, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.RpmLimit(); ok {
 		_spec.SetField(group.FieldRpmLimit, field.TypeInt, value)

@@ -33,6 +33,14 @@ func parseOpenAIImageUpstreamStrategy(value string) (OpenAIImageUpstreamStrategy
 	}
 }
 
+func NormalizeOpenAIImageUpstreamStrategy(value string) (string, error) {
+	strategy, valid := parseOpenAIImageUpstreamStrategy(value)
+	if !valid {
+		return "", fmt.Errorf("invalid openai image upstream strategy %q", value)
+	}
+	return string(strategy), nil
+}
+
 func stringOverrideFromMap(values map[string]any, keys ...string) (string, bool) {
 	if values == nil {
 		return "", false
@@ -113,6 +121,14 @@ func (s *OpenAIGatewayService) resolveOpenAIImageUpstreamStrategy(ctx context.Co
 		}
 		return resolveOpenAIImageUpstreamAuto(account, strategy)
 	}
+	if group := accountOpenAIImageUpstreamGroup(account, parsed); group != nil {
+		if strategy, ok, err := group.OpenAIImageUpstreamOverride(); ok || err != nil {
+			if err != nil {
+				return "", err
+			}
+			return resolveOpenAIImageUpstreamAuto(account, strategy)
+		}
+	}
 	if s != nil && s.channelService != nil && parsed != nil && parsed.GroupID != nil {
 		ch, err := s.channelService.GetChannelForGroup(ctx, *parsed.GroupID)
 		if err != nil {
@@ -125,6 +141,18 @@ func (s *OpenAIGatewayService) resolveOpenAIImageUpstreamStrategy(ctx context.Co
 		}
 	}
 	return resolveOpenAIImageUpstreamAuto(account, OpenAIImageUpstreamAuto)
+}
+
+func accountOpenAIImageUpstreamGroup(account *Account, parsed *OpenAIImagesRequest) *Group {
+	if account == nil || parsed == nil || parsed.GroupID == nil {
+		return nil
+	}
+	for _, group := range account.Groups {
+		if group != nil && group.ID == *parsed.GroupID {
+			return group
+		}
+	}
+	return nil
 }
 
 func resolveOpenAIImageUpstreamAuto(account *Account, strategy OpenAIImageUpstreamStrategy) (OpenAIImageUpstreamStrategy, error) {

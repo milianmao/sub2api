@@ -2269,6 +2269,16 @@ export default {
         targetModelPlaceholder: '例如: gpt-5.4',
         removeExactMapping: '删除精确映射'
       },
+      openaiImageUpstream: {
+        title: 'OpenAI 生图上游',
+        hint: '控制此 OpenAI 分组的图片生成走官方 Images、Codex Responses 或 ChatGPT Web 生图链路。codex-gpt-image-2 固定走 Codex Responses。',
+        options: {
+          auto: '自动（按账号类型）',
+          officialImages: '官方 Images API',
+          codexResponses: 'Codex Responses',
+          chatgptWebImage: 'ChatGPT Web 生图'
+        }
+      },
       openaiCompat: {
         title: 'OpenAI 兼容接口',
         hint: '开启后允许 OpenAI Chat/Responses 接口转 Claude Messages。',

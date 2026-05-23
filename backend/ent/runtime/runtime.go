@@ -900,8 +900,28 @@ func init() {
 	groupDescMessagesDispatchModelConfig := groupFields[32].Descriptor()
 	// group.DefaultMessagesDispatchModelConfig holds the default value on creation for the messages_dispatch_model_config field.
 	group.DefaultMessagesDispatchModelConfig = groupDescMessagesDispatchModelConfig.Default.(domain.OpenAIMessagesDispatchModelConfig)
+	// groupDescOpenaiImageUpstream is the schema descriptor for openai_image_upstream field.
+	groupDescOpenaiImageUpstream := groupFields[33].Descriptor()
+	// group.DefaultOpenaiImageUpstream holds the default value on creation for the openai_image_upstream field.
+	group.DefaultOpenaiImageUpstream = groupDescOpenaiImageUpstream.Default.(string)
+	// group.OpenaiImageUpstreamValidator is a validator for the "openai_image_upstream" field. It is called by the builders before save.
+	group.OpenaiImageUpstreamValidator = func() func(string) error {
+		validators := groupDescOpenaiImageUpstream.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(openai_image_upstream string) error {
+			for _, fn := range fns {
+				if err := fn(openai_image_upstream); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// groupDescRpmLimit is the schema descriptor for rpm_limit field.
-	groupDescRpmLimit := groupFields[33].Descriptor()
+	groupDescRpmLimit := groupFields[34].Descriptor()
 	// group.DefaultRpmLimit holds the default value on creation for the rpm_limit field.
 	group.DefaultRpmLimit = groupDescRpmLimit.Default.(int)
 	idempotencyrecordMixin := schema.IdempotencyRecord{}.Mixin()
