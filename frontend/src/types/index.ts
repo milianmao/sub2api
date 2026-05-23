@@ -1407,8 +1407,10 @@ export interface DashboardStats {
 
   // 账户统计
   total_accounts: number
-  normal_accounts: number // 正常账户数
+  enabled_accounts: number // 启用账户数
+  schedulable_accounts: number // 可调度账户数
   error_accounts: number // 异常账户数
+  disabled_accounts: number // 停用账户数
   ratelimit_accounts: number // 限流账户数
   overload_accounts: number // 过载账户数
 

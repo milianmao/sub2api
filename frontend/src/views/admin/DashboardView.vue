@@ -42,13 +42,19 @@
                 <p class="text-xl font-bold text-gray-900 dark:text-white">
                   {{ stats.total_accounts }}
                 </p>
-                <p class="text-xs">
-                  <span class="text-green-600 dark:text-green-400"
-                    >{{ stats.normal_accounts }} {{ t('common.active') }}</span
-                  >
-                  <span v-if="stats.error_accounts > 0" class="ml-1 text-red-500"
-                    >{{ stats.error_accounts }} {{ t('common.error') }}</span
-                  >
+                <p class="text-xs flex flex-wrap gap-x-2 gap-y-1">
+                  <span class="text-green-600 dark:text-green-400">
+                    {{ stats.enabled_accounts }} {{ t('admin.dashboard.enabled') }}
+                  </span>
+                  <span v-if="stats.error_accounts > 0" class="text-red-500">
+                    {{ stats.error_accounts }} {{ t('common.error') }}
+                  </span>
+                  <span v-if="stats.disabled_accounts > 0" class="text-gray-500 dark:text-gray-400">
+                    {{ stats.disabled_accounts }} {{ t('admin.dashboard.disabled') }}
+                  </span>
+                </p>
+                <p class="text-xs text-blue-600 dark:text-blue-400">
+                  {{ stats.schedulable_accounts }} {{ t('admin.dashboard.schedulable') }}
                 </p>
               </div>
             </div>

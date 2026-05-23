@@ -43,11 +43,13 @@ type DashboardStats struct {
 	ActiveAPIKeys int64 `json:"active_api_keys"` // 状态为 active 的 API Key 数
 
 	// 账户统计
-	TotalAccounts     int64 `json:"total_accounts"`
-	NormalAccounts    int64 `json:"normal_accounts"`    // 正常账户数 (schedulable=true, status=active)
-	ErrorAccounts     int64 `json:"error_accounts"`     // 异常账户数 (status=error)
-	RateLimitAccounts int64 `json:"ratelimit_accounts"` // 限流账户数
-	OverloadAccounts  int64 `json:"overload_accounts"`  // 过载账户数
+	TotalAccounts       int64 `json:"total_accounts"`
+	EnabledAccounts     int64 `json:"enabled_accounts"`     // 启用账户数 (status=active)
+	SchedulableAccounts int64 `json:"schedulable_accounts"` // 可调度账户数 (status=active, schedulable=true)
+	ErrorAccounts       int64 `json:"error_accounts"`       // 异常账户数 (status=error)
+	DisabledAccounts    int64 `json:"disabled_accounts"`    // 停用账户数 (status=disabled)
+	RateLimitAccounts   int64 `json:"ratelimit_accounts"`   // 限流账户数
+	OverloadAccounts    int64 `json:"overload_accounts"`    // 过载账户数
 
 	// 累计 Token 使用统计
 	TotalRequests            int64   `json:"total_requests"`

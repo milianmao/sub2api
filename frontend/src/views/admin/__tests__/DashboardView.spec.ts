@@ -59,8 +59,10 @@ const createDashboardStats = (): DashboardStats => ({
   total_api_keys: 0,
   active_api_keys: 0,
   total_accounts: 0,
-  normal_accounts: 0,
+  enabled_accounts: 0,
+  schedulable_accounts: 0,
   error_accounts: 0,
+  disabled_accounts: 0,
   ratelimit_accounts: 0,
   overload_accounts: 0,
   total_requests: 0,
@@ -71,6 +73,7 @@ const createDashboardStats = (): DashboardStats => ({
   total_tokens: 0,
   total_cost: 0,
   total_actual_cost: 0,
+  total_account_cost: 0,
   today_requests: 0,
   today_input_tokens: 0,
   today_output_tokens: 0,
@@ -79,6 +82,7 @@ const createDashboardStats = (): DashboardStats => ({
   today_tokens: 0,
   today_cost: 0,
   today_actual_cost: 0,
+  today_account_cost: 0,
   average_duration_ms: 0,
   uptime: 0,
   rpm: 0,
@@ -139,5 +143,44 @@ describe('admin DashboardView', () => {
       end_date: formatLocalDate(now),
       granularity: 'hour'
     }))
+  })
+
+  it('renders account buckets that sum to total while keeping schedulable visible', async () => {
+    getSnapshotV2.mockResolvedValue({
+      stats: {
+        ...createDashboardStats(),
+        total_accounts: 10,
+        enabled_accounts: 6,
+        schedulable_accounts: 4,
+        error_accounts: 3,
+        disabled_accounts: 1
+      },
+      trend: [],
+      models: []
+    })
+
+    const wrapper = mount(DashboardView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          LoadingSpinner: true,
+          Icon: true,
+          DateRangePicker: true,
+          Select: true,
+          ModelDistributionChart: true,
+          TokenUsageTrend: true,
+          Line: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('10')
+    expect(text).toContain('6 admin.dashboard.enabled')
+    expect(text).toContain('3 common.error')
+    expect(text).toContain('1 admin.dashboard.disabled')
+    expect(text).toContain('4 admin.dashboard.schedulable')
   })
 })

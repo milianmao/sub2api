@@ -87,11 +87,13 @@ func (h *DashboardHandler) GetStats(c *gin.Context) {
 		"active_api_keys": stats.ActiveAPIKeys,
 
 		// 账户统计
-		"total_accounts":     stats.TotalAccounts,
-		"normal_accounts":    stats.NormalAccounts,
-		"error_accounts":     stats.ErrorAccounts,
-		"ratelimit_accounts": stats.RateLimitAccounts,
-		"overload_accounts":  stats.OverloadAccounts,
+		"total_accounts":       stats.TotalAccounts,
+		"enabled_accounts":     stats.EnabledAccounts,
+		"schedulable_accounts": stats.SchedulableAccounts,
+		"error_accounts":       stats.ErrorAccounts,
+		"disabled_accounts":    stats.DisabledAccounts,
+		"ratelimit_accounts":   stats.RateLimitAccounts,
+		"overload_accounts":    stats.OverloadAccounts,
 
 		// 累计 Token 使用统计
 		"total_requests":              stats.TotalRequests,
