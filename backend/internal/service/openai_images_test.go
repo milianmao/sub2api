@@ -38,6 +38,7 @@ func TestResolveOpenAIImageUpstreamStrategy(t *testing.T) {
 	tests := []struct {
 		name    string
 		account *Account
+		group   *Group
 		channel *Channel
 		parsed  *OpenAIImagesRequest
 		want    OpenAIImageUpstreamStrategy
@@ -73,6 +74,32 @@ func TestResolveOpenAIImageUpstreamStrategy(t *testing.T) {
 			want:   OpenAIImageUpstreamChatGPTWebImage,
 		},
 		{
+			name:    "group override beats channel override",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+			group:   &Group{ID: groupID, Platform: PlatformOpenAI, OpenAIImageUpstream: "codex_responses"},
+			channel: &Channel{ID: 1, Status: StatusActive, FeaturesConfig: map[string]any{
+				"openai_image_upstream": map[string]any{PlatformOpenAI: "chatgpt_web_image"},
+			}},
+			parsed: &OpenAIImagesRequest{Model: "gpt-image-2", GroupID: &groupID},
+			want:   OpenAIImageUpstreamCodexResponses,
+		},
+		{
+			name: "account override beats group override",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: map[string]any{
+				"openai_image_upstream": "chatgpt_web_image",
+			}},
+			group:  &Group{ID: groupID, Platform: PlatformOpenAI, OpenAIImageUpstream: "codex_responses"},
+			parsed: &OpenAIImagesRequest{Model: "gpt-image-2", GroupID: &groupID},
+			want:   OpenAIImageUpstreamChatGPTWebImage,
+		},
+		{
+			name:    "codex image alias beats group override",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth},
+			group:   &Group{ID: groupID, Platform: PlatformOpenAI, OpenAIImageUpstream: "chatgpt_web_image"},
+			parsed:  &OpenAIImagesRequest{Model: "codex-gpt-image-2", GroupID: &groupID},
+			want:    OpenAIImageUpstreamCodexResponses,
+		},
+		{
 			name: "codex image alias forces codex responses",
 			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: map[string]any{
 				"openai_image_upstream": "chatgpt_web_image",
@@ -93,6 +120,9 @@ func TestResolveOpenAIImageUpstreamStrategy(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := &OpenAIGatewayService{}
+			if tt.group != nil {
+				tt.account.Groups = []*Group{tt.group}
+			}
 			if tt.channel != nil {
 				svc.channelService = newOpenAIImageGenerationControlChannelService(groupID, tt.channel)
 			}
