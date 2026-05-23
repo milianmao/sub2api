@@ -88,6 +88,8 @@ const (
 	FieldDefaultMappedModel = "default_mapped_model"
 	// FieldMessagesDispatchModelConfig holds the string denoting the messages_dispatch_model_config field in the database.
 	FieldMessagesDispatchModelConfig = "messages_dispatch_model_config"
+	// FieldOpenaiImageUpstream holds the string denoting the openai_image_upstream field in the database.
+	FieldOpenaiImageUpstream = "openai_image_upstream"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -201,6 +203,7 @@ var Columns = []string{
 	FieldRequirePrivacySet,
 	FieldDefaultMappedModel,
 	FieldMessagesDispatchModelConfig,
+	FieldOpenaiImageUpstream,
 	FieldRpmLimit,
 }
 
@@ -295,6 +298,10 @@ var (
 	DefaultMappedModelValidator func(string) error
 	// DefaultMessagesDispatchModelConfig holds the default value on creation for the "messages_dispatch_model_config" field.
 	DefaultMessagesDispatchModelConfig domain.OpenAIMessagesDispatchModelConfig
+	// DefaultOpenaiImageUpstream holds the default value on creation for the "openai_image_upstream" field.
+	DefaultOpenaiImageUpstream string
+	// OpenaiImageUpstreamValidator is a validator for the "openai_image_upstream" field. It is called by the builders before save.
+	OpenaiImageUpstreamValidator func(string) error
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
 )
@@ -470,6 +477,11 @@ func ByRequirePrivacySet(opts ...sql.OrderTermOption) OrderOption {
 // ByDefaultMappedModel orders the results by the default_mapped_model field.
 func ByDefaultMappedModel(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDefaultMappedModel, opts...).ToFunc()
+}
+
+// ByOpenaiImageUpstream orders the results by the openai_image_upstream field.
+func ByOpenaiImageUpstream(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOpenaiImageUpstream, opts...).ToFunc()
 }
 
 // ByRpmLimit orders the results by the rpm_limit field.
