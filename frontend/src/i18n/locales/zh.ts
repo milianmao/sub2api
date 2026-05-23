@@ -3169,6 +3169,7 @@ export default {
       refreshToken: '刷新令牌',
       copyAccessToken: '复制 Access Token',
       accessTokenCopied: 'Access Token 已复制',
+      emailCopied: '邮箱已复制',
       accessTokenUnavailable: '该账号没有可复制的 Access Token',
       generateCheckoutLink: '生成支付链接',
       checkoutLinkFailed: '生成支付链接失败',

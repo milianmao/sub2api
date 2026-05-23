@@ -219,13 +219,16 @@
           <template #cell-name="{ row, value }">
             <div class="flex flex-col">
               <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
-              <span
+              <button
                 v-if="row.extra?.email_address || row.extra?.email || row.credentials?.email"
-                class="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[200px]"
+                type="button"
+                data-test="account-email-copy"
+                class="max-w-[200px] truncate text-left text-xs text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 dark:text-gray-400 dark:hover:text-primary-400 dark:focus:ring-offset-dark-800"
                 :title="String(row.extra?.email_address || row.extra?.email || row.credentials?.email)"
+                @click="handleCopyAccountEmail(row)"
               >
                 {{ row.extra?.email_address || row.extra?.email || row.credentials?.email }}
-              </span>
+              </button>
             </div>
           </template>
           <template #cell-notes="{ value }">
@@ -1631,6 +1634,11 @@ const handleCopyAccessToken = async (a: Account) => {
     return
   }
   await copyToClipboard(accessToken, t('admin.accounts.accessTokenCopied'))
+}
+const handleCopyAccountEmail = async (a: Account) => {
+  const email = String(a.extra?.email_address || a.extra?.email || a.credentials?.email || '').trim()
+  if (!email) return
+  await copyToClipboard(email, t('admin.accounts.emailCopied'))
 }
 const handleDelete = (a: Account) => { deletingAcc.value = a; showDeleteDialog.value = true }
 const confirmDelete = async () => { if(!deletingAcc.value) return; try { await adminAPI.accounts.delete(deletingAcc.value.id); showDeleteDialog.value = false; deletingAcc.value = null; reload() } catch (error) { console.error('Failed to delete account:', error) } }

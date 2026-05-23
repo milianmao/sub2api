@@ -3175,6 +3175,7 @@ export default {
       refreshToken: 'Refresh Token',
       copyAccessToken: 'Copy Access Token',
       accessTokenCopied: 'Access Token copied',
+      emailCopied: 'Email copied',
       accessTokenUnavailable: 'This account has no Access Token to copy',
       generateCheckoutLink: 'Generate Payment Link',
       checkoutLinkFailed: 'Failed to generate payment link',
