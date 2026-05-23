@@ -31,7 +31,7 @@ type groupRepoStubForAdmin struct {
 	listWithFiltersGroups      []Group
 	listWithFiltersResult      *pagination.PaginationResult
 	listWithFiltersErr         error
-	visibleUserIDs            []int64
+	visibleUserIDs             []int64
 }
 
 func (s *groupRepoStubForAdmin) Create(_ context.Context, g *Group) error {
@@ -129,6 +129,97 @@ func (s *groupRepoStubForAdmin) UpdateSortOrders(_ context.Context, _ []GroupSor
 func (s *groupRepoStubForAdmin) SyncVisibleUsersForGroup(_ context.Context, _ int64, userIDs []int64) error {
 	s.visibleUserIDs = append([]int64(nil), userIDs...)
 	return nil
+}
+
+func TestNormalizeOpenAIImageUpstreamStrategyForGroupInput(t *testing.T) {
+	strategy, err := NormalizeOpenAIImageUpstreamStrategy("")
+	require.NoError(t, err)
+	require.Equal(t, string(OpenAIImageUpstreamAuto), strategy)
+
+	strategy, err = NormalizeOpenAIImageUpstreamStrategy(" chatgpt_web_image ")
+	require.NoError(t, err)
+	require.Equal(t, string(OpenAIImageUpstreamChatGPTWebImage), strategy)
+
+	_, err = NormalizeOpenAIImageUpstreamStrategy("bad")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "invalid openai image upstream strategy")
+}
+
+func TestGroupOpenAIImageUpstreamOverride(t *testing.T) {
+	group := &Group{Platform: PlatformOpenAI, OpenAIImageUpstream: "chatgpt_web_image"}
+	strategy, ok, err := group.OpenAIImageUpstreamOverride()
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, OpenAIImageUpstreamChatGPTWebImage, strategy)
+
+	group.OpenAIImageUpstream = "auto"
+	strategy, ok, err = group.OpenAIImageUpstreamOverride()
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, OpenAIImageUpstreamAuto, strategy)
+
+	group.OpenAIImageUpstream = ""
+	strategy, ok, err = group.OpenAIImageUpstreamOverride()
+	require.NoError(t, err)
+	require.False(t, ok)
+	require.Empty(t, strategy)
+
+	group.OpenAIImageUpstream = "invalid"
+	_, ok, err = group.OpenAIImageUpstreamOverride()
+	require.True(t, ok)
+	require.Error(t, err)
+}
+
+func TestAdminService_CreateGroupDefaultsOpenAIImageUpstreamToAuto(t *testing.T) {
+	repo := &groupRepoStubForAdmin{}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	group, err := svc.CreateGroup(context.Background(), &CreateGroupInput{
+		Name:           "openai-default",
+		Platform:       PlatformOpenAI,
+		RateMultiplier: 1,
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, "auto", group.OpenAIImageUpstream)
+	require.Equal(t, "auto", repo.created.OpenAIImageUpstream)
+}
+
+func TestAdminService_UpdateGroupPersistsOpenAIImageUpstream(t *testing.T) {
+	existingGroup := &Group{
+		ID:                  1,
+		Name:                "openai-group",
+		Platform:            PlatformOpenAI,
+		Status:              StatusActive,
+		OpenAIImageUpstream: "auto",
+	}
+	repo := &groupRepoStubForAdmin{getByID: existingGroup}
+	svc := &adminServiceImpl{groupRepo: repo}
+	strategy := "chatgpt_web_image"
+
+	group, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{OpenAIImageUpstream: &strategy})
+
+	require.NoError(t, err)
+	require.Equal(t, "chatgpt_web_image", group.OpenAIImageUpstream)
+	require.Equal(t, "chatgpt_web_image", repo.updated.OpenAIImageUpstream)
+}
+
+func TestAdminService_UpdateGroupRejectsInvalidOpenAIImageUpstream(t *testing.T) {
+	existingGroup := &Group{
+		ID:                  1,
+		Name:                "openai-group",
+		Platform:            PlatformOpenAI,
+		Status:              StatusActive,
+		OpenAIImageUpstream: "auto",
+	}
+	repo := &groupRepoStubForAdmin{getByID: existingGroup}
+	svc := &adminServiceImpl{groupRepo: repo}
+	strategy := "bad"
+
+	_, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{OpenAIImageUpstream: &strategy})
+
+	require.Error(t, err)
+	require.Nil(t, repo.updated)
 }
 
 func TestAdminService_ListGroups_PassesSortParams(t *testing.T) {
@@ -695,9 +786,9 @@ func (s *groupRepoStubForFallbackCycle) UpdateSortOrders(_ context.Context, _ []
 }
 
 type groupRepoStubForInvalidRequestFallback struct {
-	groups  map[int64]*Group
-	created *Group
-	updated *Group
+	groups         map[int64]*Group
+	created        *Group
+	updated        *Group
 	visibleUserIDs []int64
 }
 

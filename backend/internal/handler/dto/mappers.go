@@ -193,6 +193,7 @@ func groupFromServiceBase(g *service.Group) Group {
 		AllowOpenAICompat:               g.AllowOpenAICompat,
 		RequireOAuthOnly:                g.RequireOAuthOnly,
 		RequirePrivacySet:               g.RequirePrivacySet,
+		OpenAIImageUpstream:             g.OpenAIImageUpstream,
 		RPMLimit:                        g.RPMLimit,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,

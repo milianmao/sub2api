@@ -33,6 +33,14 @@ func parseOpenAIImageUpstreamStrategy(value string) (OpenAIImageUpstreamStrategy
 	}
 }
 
+func NormalizeOpenAIImageUpstreamStrategy(value string) (string, error) {
+	strategy, valid := parseOpenAIImageUpstreamStrategy(value)
+	if !valid {
+		return "", fmt.Errorf("invalid openai image upstream strategy %q", value)
+	}
+	return string(strategy), nil
+}
+
 func stringOverrideFromMap(values map[string]any, keys ...string) (string, bool) {
 	if values == nil {
 		return "", false

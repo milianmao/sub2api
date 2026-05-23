@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -65,6 +66,7 @@ type Group struct {
 	RequirePrivacySet           bool // 调度时仅允许 privacy 已成功设置的账号（OpenAI/Antigravity/Anthropic/Gemini）
 	DefaultMappedModel          string
 	MessagesDispatchModelConfig OpenAIMessagesDispatchModelConfig
+	OpenAIImageUpstream         string
 
 	// RPMLimit 分组级每分钟请求数上限（0 = 不限制）。
 	// 一旦设置即接管该分组用户的限流（覆盖用户级 rpm_limit），可被 user-group rpm_override 进一步覆盖。
@@ -120,6 +122,20 @@ func (g *Group) HasWeeklyLimit() bool {
 
 func (g *Group) HasMonthlyLimit() bool {
 	return g.MonthlyLimitUSD != nil && *g.MonthlyLimitUSD > 0
+}
+
+func (g *Group) OpenAIImageUpstreamOverride() (OpenAIImageUpstreamStrategy, bool, error) {
+	if g == nil || g.Platform != PlatformOpenAI {
+		return "", false, nil
+	}
+	if strings.TrimSpace(g.OpenAIImageUpstream) == "" {
+		return "", false, nil
+	}
+	strategy, valid := parseOpenAIImageUpstreamStrategy(g.OpenAIImageUpstream)
+	if !valid {
+		return "", true, fmt.Errorf("invalid openai image upstream strategy %q", g.OpenAIImageUpstream)
+	}
+	return strategy, true, nil
 }
 
 // GetImagePrice 根据 image_size 返回对应的图片生成价格

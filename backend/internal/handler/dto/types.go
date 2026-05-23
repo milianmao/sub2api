@@ -120,6 +120,9 @@ type Group struct {
 	RequireOAuthOnly  bool `json:"require_oauth_only"`
 	RequirePrivacySet bool `json:"require_privacy_set"`
 
+	// OpenAI image upstream strategy（仅 OpenAI 平台有效）
+	OpenAIImageUpstream string `json:"openai_image_upstream"`
+
 	// RPMLimit 分组级每分钟请求数上限（0 = 不限制），设置后覆盖用户级 rpm_limit。
 	RPMLimit int `json:"rpm_limit"`
 
