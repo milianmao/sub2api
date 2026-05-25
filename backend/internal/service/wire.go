@@ -45,6 +45,11 @@ func ProvideOAuthRefreshAPI(accountRepo AccountRepository, tokenCache GeminiToke
 	return NewOAuthRefreshAPI(accountRepo, tokenCache)
 }
 
+// ProvideCardMailboxService creates CardMailboxService with its default guarded HTTP client.
+func ProvideCardMailboxService(repo CardMailboxRepository) *CardMailboxService {
+	return NewCardMailboxService(repo, nil)
+}
+
 // ProvideOpenAIOAuthService creates OpenAIOAuthService with backend-api client dependencies.
 func ProvideOpenAIOAuthService(proxyRepo ProxyRepository, oauthClient OpenAIOAuthClient, privacyClientFactory PrivacyClientFactory) *OpenAIOAuthService {
 	svc := NewOpenAIOAuthService(proxyRepo, oauthClient)
@@ -540,6 +545,7 @@ var ProviderSet = wire.NewSet(
 	NewMicrosoftGraphHTTPClient,
 	wire.Bind(new(MicrosoftGraphClient), new(*MicrosoftGraphHTTPClient)),
 	NewMicrosoftEmailService,
+	ProvideCardMailboxService,
 )
 
 // ProvidePaymentConfigService wraps NewPaymentConfigService to accept the named

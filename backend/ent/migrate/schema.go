@@ -421,6 +421,41 @@ var (
 			},
 		},
 	}
+	// CardMailboxCredentialsColumns holds the columns for the "card_mailbox_credentials" table.
+	CardMailboxCredentialsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt64, Increment: true},
+		{Name: "created_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
+		{Name: "email", Type: field.TypeString, Size: 255},
+		{Name: "mailbox_url", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "last_code", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "last_status", Type: field.TypeString, Nullable: true, Size: 20},
+		{Name: "last_error", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "last_fetched_at", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "timestamptz"}},
+	}
+	// CardMailboxCredentialsTable holds the schema information for the "card_mailbox_credentials" table.
+	CardMailboxCredentialsTable = &schema.Table{
+		Name:       "card_mailbox_credentials",
+		Columns:    CardMailboxCredentialsColumns,
+		PrimaryKey: []*schema.Column{CardMailboxCredentialsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "cardmailboxcredential_email",
+				Unique:  true,
+				Columns: []*schema.Column{CardMailboxCredentialsColumns[3]},
+			},
+			{
+				Name:    "cardmailboxcredential_last_status",
+				Unique:  false,
+				Columns: []*schema.Column{CardMailboxCredentialsColumns[6]},
+			},
+			{
+				Name:    "cardmailboxcredential_last_fetched_at",
+				Unique:  false,
+				Columns: []*schema.Column{CardMailboxCredentialsColumns[8]},
+			},
+		},
+	}
 	// ChannelMonitorsColumns holds the columns for the "channel_monitors" table.
 	ChannelMonitorsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt64, Increment: true},
@@ -1768,6 +1803,7 @@ var (
 		AnnouncementReadsTable,
 		AuthIdentitiesTable,
 		AuthIdentityChannelsTable,
+		CardMailboxCredentialsTable,
 		ChannelMonitorsTable,
 		ChannelMonitorDailyRollupsTable,
 		ChannelMonitorHistoriesTable,
@@ -1829,6 +1865,9 @@ func init() {
 	AuthIdentityChannelsTable.ForeignKeys[0].RefTable = AuthIdentitiesTable
 	AuthIdentityChannelsTable.Annotation = &entsql.Annotation{
 		Table: "auth_identity_channels",
+	}
+	CardMailboxCredentialsTable.Annotation = &entsql.Annotation{
+		Table: "card_mailbox_credentials",
 	}
 	ChannelMonitorsTable.ForeignKeys[0].RefTable = ChannelMonitorRequestTemplatesTable
 	ChannelMonitorsTable.Annotation = &entsql.Annotation{

@@ -100,6 +100,19 @@ func RegisterAdminRoutes(
 
 		// Microsoft 邮箱管理
 		registerMicrosoftEmailRoutes(admin, h)
+
+		// 卡密邮箱管理
+		registerCardMailboxRoutes(admin, h)
+	}
+}
+
+func registerCardMailboxRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	cardMailboxes := admin.Group("/card-mailboxes")
+	{
+		cardMailboxes.GET("", h.Admin.CardMailbox.List)
+		cardMailboxes.POST("/import", h.Admin.CardMailbox.Import)
+		cardMailboxes.POST("/:id/fetch-code", h.Admin.CardMailbox.FetchCode)
+		cardMailboxes.DELETE("/:id", h.Admin.CardMailbox.Delete)
 	}
 }
 

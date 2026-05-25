@@ -32,6 +32,7 @@ import adminPaymentAPI from './payment'
 import affiliatesAPI from './affiliates'
 import riskControlAPI from './riskControl'
 import microsoftEmailsAPI from './microsoftEmails'
+import cardMailboxesAPI from './cardMailboxes'
 
 /**
  * Unified admin API object for convenient access
@@ -65,7 +66,8 @@ export const adminAPI = {
   payment: adminPaymentAPI,
   affiliates: affiliatesAPI,
   riskControl: riskControlAPI,
-  microsoftEmails: microsoftEmailsAPI
+  microsoftEmails: microsoftEmailsAPI,
+  cardMailboxes: cardMailboxesAPI
 }
 
 export {
@@ -97,7 +99,8 @@ export {
   adminPaymentAPI,
   affiliatesAPI,
   riskControlAPI,
-  microsoftEmailsAPI
+  microsoftEmailsAPI,
+  cardMailboxesAPI
 }
 
 export default adminAPI
@@ -123,3 +126,14 @@ export type {
   MicrosoftEmailFetchCodeResult,
   MicrosoftEmailBatchDeleteResult
 } from './microsoftEmails'
+export type {
+  CardMailboxFetchStatus,
+  CardMailboxListItem,
+  CardMailboxListParams,
+  CardMailboxListResponse,
+  CardMailboxImportRequest,
+  CardMailboxImportResult,
+  CardMailboxImportError,
+  CardMailboxFetchCodeResult,
+  CardMailboxDeleteResult
+} from './cardMailboxes'

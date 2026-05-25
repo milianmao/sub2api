@@ -501,6 +501,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/card-mailboxes',
+    name: 'AdminCardMailboxes',
+    component: () => import('@/views/admin/CardMailboxesView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Card Mailbox Management'
+    }
+  },
+  {
     path: '/admin/announcements',
     name: 'AdminAnnouncements',
     component: () => import('@/views/admin/AnnouncementsView.vue'),

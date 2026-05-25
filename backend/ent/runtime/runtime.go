@@ -12,6 +12,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/authidentity"
 	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
+	"github.com/Wei-Shaw/sub2api/ent/cardmailboxcredential"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitorhistory"
@@ -432,6 +433,51 @@ func init() {
 	authidentitychannelDescMetadata := authidentitychannelFields[6].Descriptor()
 	// authidentitychannel.DefaultMetadata holds the default value on creation for the metadata field.
 	authidentitychannel.DefaultMetadata = authidentitychannelDescMetadata.Default.(func() map[string]interface{})
+	cardmailboxcredentialMixin := schema.CardMailboxCredential{}.Mixin()
+	cardmailboxcredentialMixinFields0 := cardmailboxcredentialMixin[0].Fields()
+	_ = cardmailboxcredentialMixinFields0
+	cardmailboxcredentialFields := schema.CardMailboxCredential{}.Fields()
+	_ = cardmailboxcredentialFields
+	// cardmailboxcredentialDescCreatedAt is the schema descriptor for created_at field.
+	cardmailboxcredentialDescCreatedAt := cardmailboxcredentialMixinFields0[0].Descriptor()
+	// cardmailboxcredential.DefaultCreatedAt holds the default value on creation for the created_at field.
+	cardmailboxcredential.DefaultCreatedAt = cardmailboxcredentialDescCreatedAt.Default.(func() time.Time)
+	// cardmailboxcredentialDescUpdatedAt is the schema descriptor for updated_at field.
+	cardmailboxcredentialDescUpdatedAt := cardmailboxcredentialMixinFields0[1].Descriptor()
+	// cardmailboxcredential.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	cardmailboxcredential.DefaultUpdatedAt = cardmailboxcredentialDescUpdatedAt.Default.(func() time.Time)
+	// cardmailboxcredential.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	cardmailboxcredential.UpdateDefaultUpdatedAt = cardmailboxcredentialDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// cardmailboxcredentialDescEmail is the schema descriptor for email field.
+	cardmailboxcredentialDescEmail := cardmailboxcredentialFields[0].Descriptor()
+	// cardmailboxcredential.EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	cardmailboxcredential.EmailValidator = func() func(string) error {
+		validators := cardmailboxcredentialDescEmail.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(email string) error {
+			for _, fn := range fns {
+				if err := fn(email); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// cardmailboxcredentialDescMailboxURL is the schema descriptor for mailbox_url field.
+	cardmailboxcredentialDescMailboxURL := cardmailboxcredentialFields[1].Descriptor()
+	// cardmailboxcredential.MailboxURLValidator is a validator for the "mailbox_url" field. It is called by the builders before save.
+	cardmailboxcredential.MailboxURLValidator = cardmailboxcredentialDescMailboxURL.Validators[0].(func(string) error)
+	// cardmailboxcredentialDescLastCode is the schema descriptor for last_code field.
+	cardmailboxcredentialDescLastCode := cardmailboxcredentialFields[2].Descriptor()
+	// cardmailboxcredential.LastCodeValidator is a validator for the "last_code" field. It is called by the builders before save.
+	cardmailboxcredential.LastCodeValidator = cardmailboxcredentialDescLastCode.Validators[0].(func(string) error)
+	// cardmailboxcredentialDescLastStatus is the schema descriptor for last_status field.
+	cardmailboxcredentialDescLastStatus := cardmailboxcredentialFields[3].Descriptor()
+	// cardmailboxcredential.LastStatusValidator is a validator for the "last_status" field. It is called by the builders before save.
+	cardmailboxcredential.LastStatusValidator = cardmailboxcredentialDescLastStatus.Validators[0].(func(string) error)
 	channelmonitorMixin := schema.ChannelMonitor{}.Mixin()
 	channelmonitorMixinFields0 := channelmonitorMixin[0].Fields()
 	_ = channelmonitorMixinFields0

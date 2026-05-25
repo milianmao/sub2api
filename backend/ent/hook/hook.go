@@ -93,6 +93,18 @@ func (f AuthIdentityChannelFunc) Mutate(ctx context.Context, m ent.Mutation) (en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AuthIdentityChannelMutation", m)
 }
 
+// The CardMailboxCredentialFunc type is an adapter to allow the use of ordinary
+// function as CardMailboxCredential mutator.
+type CardMailboxCredentialFunc func(context.Context, *ent.CardMailboxCredentialMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CardMailboxCredentialFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CardMailboxCredentialMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CardMailboxCredentialMutation", m)
+}
+
 // The ChannelMonitorFunc type is an adapter to allow the use of ordinary
 // function as ChannelMonitor mutator.
 type ChannelMonitorFunc func(context.Context, *ent.ChannelMonitorMutation) (ent.Value, error)
