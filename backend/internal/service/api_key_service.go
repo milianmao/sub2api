@@ -403,6 +403,10 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 
 	// 验证分组权限（如果指定了分组）
 	if req.GroupID != nil {
+		if *req.GroupID <= 0 {
+			return nil, ErrInvalidAPIKeyGroupID
+		}
+
 		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
 		if err != nil {
 			return nil, fmt.Errorf("get group: %w", err)
@@ -607,6 +611,10 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 	groupIDChanged := false
 	var user *User
 	if req.GroupID != nil {
+		if *req.GroupID <= 0 {
+			return nil, ErrInvalidAPIKeyGroupID
+		}
+
 		// 验证分组权限
 		user, err = s.userRepo.GetByID(ctx, userID)
 		if err != nil {
@@ -630,6 +638,9 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		inputGroupIDs := []int64(nil)
 		if req.GroupIDs != nil {
 			inputGroupIDs = *req.GroupIDs
+			if len(inputGroupIDs) == 0 && apiKey.GroupID != nil {
+				return nil, ErrDefaultGroupNotAuthorized
+			}
 		}
 		groupIDs, err := normalizeAPIKeyGroupIDs(apiKey.GroupID, inputGroupIDs)
 		if err != nil {

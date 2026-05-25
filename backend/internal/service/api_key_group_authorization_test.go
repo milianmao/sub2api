@@ -215,6 +215,156 @@ func TestAPIKeyServiceUpdateNameOnlyPreservesAuthorizedGroups(t *testing.T) {
 	require.Equal(t, []int64{1, 2}, apiKeyRepo.updated.GroupIDs)
 }
 
+func TestAPIKeyServiceUpdateRejectsUnauthorizedAuthorizedGroup(t *testing.T) {
+	defaultGroupID := int64(1)
+	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{
+		apiKey: &APIKey{
+			ID:       10,
+			UserID:   7,
+			Key:      "custom-key-12345",
+			Name:     "key",
+			GroupID:  &defaultGroupID,
+			GroupIDs: []int64{1},
+		},
+	}
+	groupIDs := []int64{1, 2}
+	svc := &APIKeyService{
+		apiKeyRepo: apiKeyRepo,
+		userRepo: &stubUserRepoForGroupAuth{
+			users: map[int64]*User{7: {ID: 7, Level: 1}},
+		},
+		groupRepo: &stubGroupRepoForGroupAuth{
+			groups: map[int64]*Group{
+				1: {ID: 1, AccessMode: GroupAccessModePublic, MinUserLevel: 1},
+				2: {ID: 2, AccessMode: GroupAccessModeRestricted, MinUserLevel: 1},
+			},
+		},
+		userSubRepo: &stubUserSubscriptionRepoForGroupAuth{},
+	}
+
+	_, err := svc.Update(context.Background(), 10, 7, UpdateAPIKeyRequest{GroupIDs: &groupIDs})
+
+	require.ErrorIs(t, err, ErrGroupNotAllowed)
+	require.Nil(t, apiKeyRepo.updated)
+}
+
+func TestAPIKeyServiceUpdateExplicitAuthorizedGroups(t *testing.T) {
+	defaultGroupID := int64(1)
+	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{
+		apiKey: &APIKey{
+			ID:       10,
+			UserID:   7,
+			Key:      "custom-key-12345",
+			Name:     "key",
+			GroupID:  &defaultGroupID,
+			GroupIDs: []int64{1},
+		},
+	}
+	groupIDs := []int64{2, 1}
+	svc := &APIKeyService{
+		apiKeyRepo: apiKeyRepo,
+		userRepo: &stubUserRepoForGroupAuth{
+			users: map[int64]*User{7: {ID: 7, Level: 1, AllowedGroups: []int64{2}}},
+		},
+		groupRepo: &stubGroupRepoForGroupAuth{
+			groups: map[int64]*Group{
+				1: {ID: 1, AccessMode: GroupAccessModePublic, MinUserLevel: 1},
+				2: {ID: 2, AccessMode: GroupAccessModeRestricted, MinUserLevel: 1},
+			},
+		},
+		userSubRepo: &stubUserSubscriptionRepoForGroupAuth{},
+	}
+
+	out, err := svc.Update(context.Background(), 10, 7, UpdateAPIKeyRequest{GroupIDs: &groupIDs})
+
+	require.NoError(t, err)
+	require.Equal(t, []int64{1, 2}, out.GroupIDs)
+	require.NotNil(t, apiKeyRepo.updated)
+	require.Equal(t, []int64{1, 2}, apiKeyRepo.updated.GroupIDs)
+}
+
+func TestAPIKeyServiceCreateRejectsInvalidDefaultGroupIDBeforeLookup(t *testing.T) {
+	invalidGroupID := int64(0)
+	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{}
+	groupRepo := &stubGroupRepoForGroupAuth{}
+	svc := &APIKeyService{
+		apiKeyRepo: apiKeyRepo,
+		userRepo: &stubUserRepoForGroupAuth{
+			users: map[int64]*User{7: {ID: 7, Level: 1}},
+		},
+		groupRepo:   groupRepo,
+		userSubRepo: &stubUserSubscriptionRepoForGroupAuth{},
+	}
+
+	_, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{
+		Name:      "key",
+		GroupID:   &invalidGroupID,
+		CustomKey: stringPtrForGroupAuth("custom-key-12345"),
+	})
+
+	require.ErrorIs(t, err, ErrInvalidAPIKeyGroupID)
+	require.Empty(t, groupRepo.getByIDCalls)
+	require.Nil(t, apiKeyRepo.created)
+}
+
+func TestAPIKeyServiceUpdateRejectsInvalidDefaultGroupIDBeforeLookup(t *testing.T) {
+	defaultGroupID := int64(1)
+	invalidGroupID := int64(-1)
+	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{
+		apiKey: &APIKey{
+			ID:       10,
+			UserID:   7,
+			Key:      "custom-key-12345",
+			Name:     "key",
+			GroupID:  &defaultGroupID,
+			GroupIDs: []int64{1},
+		},
+	}
+	groupRepo := &stubGroupRepoForGroupAuth{}
+	svc := &APIKeyService{
+		apiKeyRepo: apiKeyRepo,
+		userRepo: &stubUserRepoForGroupAuth{
+			users: map[int64]*User{7: {ID: 7, Level: 1}},
+		},
+		groupRepo:   groupRepo,
+		userSubRepo: &stubUserSubscriptionRepoForGroupAuth{},
+	}
+
+	_, err := svc.Update(context.Background(), 10, 7, UpdateAPIKeyRequest{GroupID: &invalidGroupID})
+
+	require.ErrorIs(t, err, ErrInvalidAPIKeyGroupID)
+	require.Empty(t, groupRepo.getByIDCalls)
+	require.Nil(t, apiKeyRepo.updated)
+}
+
+func TestAPIKeyServiceUpdateExplicitEmptyAuthorizedGroups(t *testing.T) {
+	defaultGroupID := int64(1)
+	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{
+		apiKey: &APIKey{
+			ID:       10,
+			UserID:   7,
+			Key:      "custom-key-12345",
+			Name:     "key",
+			GroupID:  &defaultGroupID,
+			GroupIDs: []int64{1, 2},
+		},
+	}
+	groupIDs := []int64{}
+	svc := &APIKeyService{
+		apiKeyRepo: apiKeyRepo,
+		userRepo: &stubUserRepoForGroupAuth{
+			users: map[int64]*User{7: {ID: 7, Level: 1}},
+		},
+		groupRepo:   &stubGroupRepoForGroupAuth{},
+		userSubRepo: &stubUserSubscriptionRepoForGroupAuth{},
+	}
+
+	_, err := svc.Update(context.Background(), 10, 7, UpdateAPIKeyRequest{GroupIDs: &groupIDs})
+
+	require.ErrorIs(t, err, ErrDefaultGroupNotAuthorized)
+	require.Nil(t, apiKeyRepo.updated)
+}
+
 func stringPtrForGroupAuth(v string) *string {
 	return &v
 }
@@ -402,13 +552,15 @@ func (s *stubUserRepoForGroupAuth) DisableTotp(context.Context, int64) error {
 }
 
 type stubGroupRepoForGroupAuth struct {
-	groups map[int64]*Group
+	groups       map[int64]*Group
+	getByIDCalls []int64
 }
 
 func (s *stubGroupRepoForGroupAuth) Create(context.Context, *Group) error {
 	panic("unexpected Create call")
 }
 func (s *stubGroupRepoForGroupAuth) GetByID(_ context.Context, id int64) (*Group, error) {
+	s.getByIDCalls = append(s.getByIDCalls, id)
 	if group := s.groups[id]; group != nil {
 		clone := *group
 		return &clone, nil
