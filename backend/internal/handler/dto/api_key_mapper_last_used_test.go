@@ -38,3 +38,26 @@ func TestAPIKeyFromService_MapsNilLastUsedAt(t *testing.T) {
 	require.NotNil(t, out)
 	require.Nil(t, out.LastUsedAt)
 }
+
+func TestAPIKeyFromServiceMapsAuthorizedGroups(t *testing.T) {
+	defaultGroupID := int64(1)
+	key := &service.APIKey{
+		ID:       10,
+		UserID:   20,
+		Name:     "multi-group-key",
+		GroupID:  &defaultGroupID,
+		GroupIDs: []int64{1, 2},
+		Group:    &service.Group{ID: 1, Name: "default"},
+		Groups: []*service.Group{
+			{ID: 1, Name: "default"},
+			{ID: 2, Name: "image"},
+		},
+	}
+
+	out := APIKeyFromService(key)
+	require.NotNil(t, out)
+	require.Equal(t, []int64{1, 2}, out.GroupIDs)
+	require.Len(t, out.Groups, 2)
+	require.Equal(t, int64(1), out.Groups[0].ID)
+	require.Equal(t, int64(2), out.Groups[1].ID)
+}

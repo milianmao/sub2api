@@ -9,6 +9,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNormalizeAPIKeyGroupIDs(t *testing.T) {
+	group1 := int64(1)
+
+	tests := []struct {
+		name    string
+		groupID *int64
+		input   []int64
+		want    []int64
+		wantErr error
+	}{
+		{name: "group id only becomes authorized group", groupID: &group1, want: []int64{1}},
+		{name: "group ids include default", groupID: &group1, input: []int64{2, 1}, want: []int64{1, 2}},
+		{name: "nil default requires empty authorized groups", input: nil, want: nil},
+		{name: "nil default rejects authorized groups", input: []int64{1}, wantErr: ErrDefaultGroupNotAuthorized},
+		{name: "default must be included", groupID: &group1, input: []int64{2}, wantErr: ErrDefaultGroupNotAuthorized},
+		{name: "duplicates are removed", groupID: &group1, input: []int64{1, 1, 2}, want: []int64{1, 2}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := normalizeAPIKeyGroupIDs(tt.groupID, tt.input)
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestAPIKeyServiceCanUserBindGroupInternal_GroupAuthorization(t *testing.T) {
 	svc := &APIKeyService{}
 	user := &User{

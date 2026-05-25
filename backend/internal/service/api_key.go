@@ -27,12 +27,19 @@ func IsWindowExpired(windowStart *time.Time, duration time.Duration) bool {
 	return windowStart == nil || time.Since(*windowStart) >= duration
 }
 
+type APIKeyAuthorizedGroup struct {
+	GroupID  int64
+	Group    *Group
+	Priority int
+}
+
 type APIKey struct {
 	ID          int64
 	UserID      int64
 	Key         string
 	Name        string
 	GroupID     *int64
+	GroupIDs    []int64
 	Status      string
 	IPWhitelist []string
 	IPBlacklist []string
@@ -44,6 +51,8 @@ type APIKey struct {
 	UpdatedAt           time.Time
 	User                *User
 	Group               *Group
+	Groups              []*Group
+	AuthorizedGroups    []APIKeyAuthorizedGroup
 
 	// Quota fields
 	Quota     float64    // Quota limit in USD (0 = unlimited)
