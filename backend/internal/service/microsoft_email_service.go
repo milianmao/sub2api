@@ -46,14 +46,14 @@ func (s *MicrosoftEmailService) ImportTXT(ctx context.Context, content string) (
 		}
 
 		result.Total++
-		parts := strings.Split(line, "----")
+		parts := strings.SplitN(line, "----", 4)
 		if len(parts) != 4 {
 			result.Failed++
 			result.Errors = append(result.Errors, MicrosoftEmailImportError{Line: lineNo, Error: "invalid line format"})
 			continue
 		}
 
-		email := strings.TrimSpace(parts[0])
+		email := strings.TrimPrefix(strings.TrimSpace(parts[0]), "\ufeff")
 		password := strings.TrimSpace(parts[1])
 		clientID := strings.TrimSpace(parts[2])
 		refreshToken := strings.TrimSpace(parts[3])

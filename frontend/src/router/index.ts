@@ -495,7 +495,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Microsoft Email Management',
+      title: '微软邮箱管理',
       titleKey: 'admin.microsoftEmails.title',
       descriptionKey: 'admin.microsoftEmails.description'
     }

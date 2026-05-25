@@ -52,10 +52,11 @@
               </button>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-              <button type="button" class="btn btn-secondary" @click="openImportDialog">
-                <Icon name="upload" size="sm" />
-                <span>导入 TXT</span>
+              <button type="button" class="btn btn-secondary" :disabled="importing" @click="openImportFilePicker">
+                <Icon name="upload" size="sm" :class="importing ? 'animate-pulse' : ''" />
+                <span>{{ importing ? '导入中...' : '导入 TXT' }}</span>
               </button>
+              <input ref="importFileInput" class="hidden" type="file" accept=".txt,text/plain" @change="handleFileSelected" />
               <button type="button" class="btn btn-secondary" :disabled="!selectedIds.length || batchChecking" @click="handleBatchCheck">
                 <Icon name="sync" size="sm" :class="batchChecking ? 'animate-spin' : ''" />
                 <span>批量健康检查</span>
@@ -147,25 +148,12 @@
       </template>
     </TablePageLayout>
 
-    <BaseDialog :show="showImport" title="导入微软邮箱 TXT" width="wide" @close="closeImportDialog">
+    <BaseDialog :show="showImport" title="导入结果" width="wide" @close="closeImportDialog">
       <div class="space-y-4">
         <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-300">
           <div class="font-medium text-gray-900 dark:text-white">格式说明</div>
           <p class="mt-1">每行一个账号：email----password----client_id----refresh_token。导入结果只展示行号、邮箱和错误，不展示密码或 refresh_token。</p>
         </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="btn btn-secondary cursor-pointer">
-            <Icon name="upload" size="sm" />
-            <span>读取 .txt 文件</span>
-            <input class="hidden" type="file" accept=".txt,text/plain" @change="handleFileSelected" />
-          </label>
-          <button type="button" class="btn btn-secondary" :disabled="!importContent" @click="importContent = ''">清空</button>
-        </div>
-        <textarea
-          v-model="importContent"
-          class="form-textarea min-h-[220px] w-full font-mono text-sm"
-          placeholder="user@example.com----password----client-id----refresh-token"
-        />
         <div v-if="importResult" class="max-h-64 overflow-y-auto rounded-lg border border-gray-200 dark:border-dark-700">
           <div class="grid grid-cols-4 gap-2 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-500 dark:border-dark-700 dark:bg-dark-800 dark:text-gray-400">
             <span>总数 {{ importResult.total }}</span>
@@ -190,10 +178,6 @@
       <template #footer>
         <div class="flex justify-end gap-2">
           <button type="button" class="btn btn-secondary" @click="closeImportDialog">关闭</button>
-          <button type="button" class="btn btn-primary" :disabled="!importContent.trim() || importing" @click="handleImport">
-            <Icon name="upload" size="sm" :class="importing ? 'animate-pulse' : ''" />
-            <span>提交导入</span>
-          </button>
         </div>
       </template>
     </BaseDialog>
@@ -322,7 +306,7 @@ const pagination = reactive({
 })
 
 const showImport = ref(false)
-const importContent = ref('')
+const importFileInput = ref<HTMLInputElement | null>(null)
 const importResult = ref<MicrosoftEmailImportResult | null>(null)
 const showFetchCode = ref(false)
 const fetchCodeResult = ref<MicrosoftEmailFetchCodeResult | null>(null)
@@ -513,20 +497,21 @@ async function confirmBatchDelete() {
   }
 }
 
-function openImportDialog() {
-  showImport.value = true
+function openImportFilePicker() {
+  importFileInput.value?.click()
 }
 
 function closeImportDialog() {
   showImport.value = false
 }
 
-async function handleImport() {
-  const content = importContent.value.trim()
-  if (!content) return
+async function importTXTContent(content: string) {
+  const normalizedContent = content.trim()
+  if (!normalizedContent || importing.value) return
   importing.value = true
   try {
-    importResult.value = await adminAPI.microsoftEmails.importTXT({ content })
+    importResult.value = await adminAPI.microsoftEmails.importTXT({ content: normalizedContent })
+    showImport.value = true
     await load()
   } finally {
     importing.value = false
@@ -536,9 +521,9 @@ async function handleImport() {
 async function handleFileSelected(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
-  if (!file) return
-  importContent.value = await file.text()
   input.value = ''
+  if (!file) return
+  await importTXTContent(await file.text())
 }
 
 function closeFetchCodeDialog() {

@@ -4462,6 +4462,11 @@ export default {
       failedToDelete: '删除兑换码失败'
     },
 
+    microsoftEmails: {
+      title: '微软邮箱管理',
+      description: '管理微软邮箱账号、健康检查与验证码获取'
+    },
+
     // Announcements
     announcements: {
       title: '公告管理',

@@ -131,6 +131,21 @@ func TestMicrosoftEmailService_ImportTXT_CreatesAndUpdatesAccounts(t *testing.T)
 	require.Equal(t, "client2", stored.ClientID)
 }
 
+func TestMicrosoftEmailService_ImportTXT_AcceptsBOMAndDelimiterInRefreshToken(t *testing.T) {
+	repo := newFakeMicrosoftEmailRepo()
+	svc := NewMicrosoftEmailService(repo, fakeMicrosoftGraphClient{})
+
+	res, err := svc.ImportTXT(context.Background(), "\ufeffuser@example.com----pass----client----refresh----token\n")
+	require.NoError(t, err)
+	require.Equal(t, 1, res.Total)
+	require.Equal(t, 1, res.Created)
+	require.Equal(t, 0, res.Failed)
+
+	stored, err := repo.GetByEmail(context.Background(), "user@example.com")
+	require.NoError(t, err)
+	require.Equal(t, "refresh----token", stored.RefreshToken)
+}
+
 func TestMicrosoftEmailService_ImportTXT_ReportsLineErrors(t *testing.T) {
 	svc := NewMicrosoftEmailService(newFakeMicrosoftEmailRepo(), fakeMicrosoftGraphClient{})
 	res, err := svc.ImportTXT(context.Background(), "bad-line\ninvalid-email----p----c----r\n")

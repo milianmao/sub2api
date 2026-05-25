@@ -4307,6 +4307,11 @@ export default {
       }
     },
 
+    microsoftEmails: {
+      title: 'Microsoft Email Management',
+      description: 'Manage Microsoft email accounts, health checks, and verification codes'
+    },
+
     // Announcements
     announcements: {
       title: 'Announcements',
