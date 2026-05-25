@@ -154,6 +154,11 @@ func normalizeAPIKeyGroupIDs(defaultGroupID *int64, groupIDs []int64) ([]int64, 
 	if defaultGroupID != nil && *defaultGroupID <= 0 {
 		return nil, ErrInvalidAPIKeyGroupID
 	}
+	for _, id := range groupIDs {
+		if id <= 0 {
+			return nil, ErrInvalidAPIKeyGroupID
+		}
+	}
 	if defaultGroupID == nil {
 		if len(groupIDs) > 0 {
 			return nil, ErrDefaultGroupNotAuthorized
@@ -164,9 +169,6 @@ func normalizeAPIKeyGroupIDs(defaultGroupID *int64, groupIDs []int64) ([]int64, 
 	seen := make(map[int64]struct{}, len(groupIDs)+1)
 	out := make([]int64, 0, len(groupIDs)+1)
 	for _, id := range groupIDs {
-		if id <= 0 {
-			return nil, ErrInvalidAPIKeyGroupID
-		}
 		if _, ok := seen[id]; ok {
 			continue
 		}
