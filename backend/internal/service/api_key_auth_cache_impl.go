@@ -256,6 +256,17 @@ func cloneAPIKeyAuthModelRoutingSnapshot(values map[string][]int64) map[string][
 	return cloned
 }
 
+func cloneAPIKeyAuthMessagesDispatchModelConfig(config OpenAIMessagesDispatchModelConfig) OpenAIMessagesDispatchModelConfig {
+	cloned := config
+	if config.ExactModelMappings != nil {
+		cloned.ExactModelMappings = make(map[string]string, len(config.ExactModelMappings))
+		for k, v := range config.ExactModelMappings {
+			cloned.ExactModelMappings[k] = v
+		}
+	}
+	return cloned
+}
+
 func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 	if group == nil {
 		return nil
@@ -289,7 +300,7 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		AllowMessagesDispatch:           group.AllowMessagesDispatch,
 		AllowOpenAICompat:               group.AllowOpenAICompat,
 		DefaultMappedModel:              group.DefaultMappedModel,
-		MessagesDispatchModelConfig:     group.MessagesDispatchModelConfig,
+		MessagesDispatchModelConfig:     cloneAPIKeyAuthMessagesDispatchModelConfig(group.MessagesDispatchModelConfig),
 		RPMLimit:                        group.RPMLimit,
 	}
 }
@@ -328,7 +339,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		AllowMessagesDispatch:           snapshot.AllowMessagesDispatch,
 		AllowOpenAICompat:               snapshot.AllowOpenAICompat,
 		DefaultMappedModel:              snapshot.DefaultMappedModel,
-		MessagesDispatchModelConfig:     snapshot.MessagesDispatchModelConfig,
+		MessagesDispatchModelConfig:     cloneAPIKeyAuthMessagesDispatchModelConfig(snapshot.MessagesDispatchModelConfig),
 		RPMLimit:                        snapshot.RPMLimit,
 	}
 }

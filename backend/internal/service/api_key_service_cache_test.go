@@ -354,38 +354,79 @@ func TestAPIKeyService_SnapshotRoundTrip_DoesNotShareAuthorizedGroupState(t *tes
 			Platform:       PlatformAnthropic,
 			Status:         StatusActive,
 			VisibleUserIDs: []int64{2, 3},
+			MessagesDispatchModelConfig: OpenAIMessagesDispatchModelConfig{
+				ExactModelMappings: map[string]string{"claude-opus-4": "gpt-5.4"},
+			},
+			ModelRouting: map[string][]int64{"claude-opus-*": {12, 10}},
 		},
 		Groups: []*Group{
-			{ID: 12, Name: "secondary", Platform: PlatformOpenAI, Status: StatusActive, VisibleUserIDs: []int64{7, 8}},
+			{
+				ID:             12,
+				Name:           "secondary",
+				Platform:       PlatformOpenAI,
+				Status:         StatusActive,
+				VisibleUserIDs: []int64{7, 8},
+				MessagesDispatchModelConfig: OpenAIMessagesDispatchModelConfig{
+					ExactModelMappings: map[string]string{"claude-sonnet-4.5": "gpt-5.3-codex"},
+				},
+			},
 		},
 		AuthorizedGroups: []APIKeyAuthorizedGroup{
-			{GroupID: 12, Group: &Group{ID: 12, Name: "secondary", Platform: PlatformOpenAI, Status: StatusActive, VisibleUserIDs: []int64{7, 8}}, Priority: 1},
+			{
+				GroupID: 12,
+				Group: &Group{
+					ID:             12,
+					Name:           "secondary",
+					Platform:       PlatformOpenAI,
+					Status:         StatusActive,
+					VisibleUserIDs: []int64{7, 8},
+					MessagesDispatchModelConfig: OpenAIMessagesDispatchModelConfig{
+						ExactModelMappings: map[string]string{"claude-haiku-4.5": "gpt-5.4-mini"},
+					},
+				},
+				Priority: 1,
+			},
 		},
 	}
 
 	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
 	apiKey.GroupIDs[0] = 99
 	apiKey.Group.Name = "mutated-source-default"
+	apiKey.Group.VisibleUserIDs[0] = 99
+	apiKey.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-opus-4"] = "mutated-source-default"
+	apiKey.Group.ModelRouting["claude-opus-*"][0] = 99
 	apiKey.Groups[0].Name = "mutated-source-group"
+	apiKey.Groups[0].VisibleUserIDs[0] = 99
+	apiKey.Groups[0].MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"] = "mutated-source-group"
 	apiKey.AuthorizedGroups[0].Group.Name = "mutated-source-authorized"
+	apiKey.AuthorizedGroups[0].Group.VisibleUserIDs[0] = 99
+	apiKey.AuthorizedGroups[0].Group.MessagesDispatchModelConfig.ExactModelMappings["claude-haiku-4.5"] = "mutated-source-authorized"
 
 	first := svc.snapshotToAPIKey(apiKey.Key, snapshot)
 	first.GroupIDs[0] = 88
 	first.Group.Name = "mutated-restored-default"
 	first.Group.VisibleUserIDs[0] = 88
+	first.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-opus-4"] = "mutated-restored-default"
+	first.Group.ModelRouting["claude-opus-*"][0] = 88
 	first.Groups[0].Name = "mutated-restored-group"
 	first.Groups[0].VisibleUserIDs[0] = 88
+	first.Groups[0].MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"] = "mutated-restored-group"
 	first.AuthorizedGroups[0].Group.Name = "mutated-restored-authorized"
 	first.AuthorizedGroups[0].Group.VisibleUserIDs[0] = 88
+	first.AuthorizedGroups[0].Group.MessagesDispatchModelConfig.ExactModelMappings["claude-haiku-4.5"] = "mutated-restored-authorized"
 
 	second := svc.snapshotToAPIKey(apiKey.Key, snapshot)
 	require.Equal(t, []int64{12, 10}, second.GroupIDs)
 	require.Equal(t, "default", second.Group.Name)
 	require.Equal(t, []int64{2, 3}, second.Group.VisibleUserIDs)
+	require.Equal(t, "gpt-5.4", second.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-opus-4"])
+	require.Equal(t, map[string][]int64{"claude-opus-*": {12, 10}}, second.Group.ModelRouting)
 	require.Equal(t, "secondary", second.Groups[0].Name)
 	require.Equal(t, []int64{7, 8}, second.Groups[0].VisibleUserIDs)
+	require.Equal(t, "gpt-5.3-codex", second.Groups[0].MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"])
 	require.Equal(t, "secondary", second.AuthorizedGroups[0].Group.Name)
 	require.Equal(t, []int64{7, 8}, second.AuthorizedGroups[0].Group.VisibleUserIDs)
+	require.Equal(t, "gpt-5.4-mini", second.AuthorizedGroups[0].Group.MessagesDispatchModelConfig.ExactModelMappings["claude-haiku-4.5"])
 }
 
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {
