@@ -15,8 +15,20 @@ func TestIsImageGenerationIntent(t *testing.T) {
 		want     bool
 	}{
 		{
-			name:     "images endpoint",
+			name:     "images generations endpoint",
 			endpoint: "/v1/images/generations",
+			body:     []byte(`{"model":"gpt-image-2"}`),
+			want:     true,
+		},
+		{
+			name:     "images edits endpoint",
+			endpoint: "/v1/images/edits",
+			body:     []byte(`{"model":"gpt-image-2"}`),
+			want:     true,
+		},
+		{
+			name:     "images variations endpoint",
+			endpoint: "/v1/images/variations",
 			body:     []byte(`{"model":"gpt-image-2"}`),
 			want:     true,
 		},
@@ -39,6 +51,27 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			endpoint: "/v1/responses",
 			model:    "gpt-5.4",
 			body:     []byte(`{"model":"gpt-5.4","tool_choice":{"type":"image_generation"}}`),
+			want:     true,
+		},
+		{
+			name:     "responses output modality image",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","output_modalities":["text","image"]}`),
+			want:     true,
+		},
+		{
+			name:     "responses chatgpt web image recipient",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","input":[{"role":"assistant","recipient":"image_gen"}]}`),
+			want:     true,
+		},
+		{
+			name:     "responses codex image tool nested",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.4-codex",
+			body:     []byte(`{"model":"gpt-5.4-codex","input":[{"type":"function_call","name":"generate_image"}]}`),
 			want:     true,
 		},
 		{

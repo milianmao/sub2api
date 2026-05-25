@@ -28,6 +28,9 @@ func IsImageGenerationIntent(endpoint string, requestedModel string, body []byte
 	if IsImageGenerationEndpoint(endpoint) {
 		return true
 	}
+	if isOpenAIResponsesEndpoint(endpoint) {
+		return openAIResponsesBodyHasImageGenerationIntent(body)
+	}
 	if isOpenAIImageGenerationModel(requestedModel) {
 		return true
 	}
@@ -48,6 +51,9 @@ func IsImageGenerationIntentMap(endpoint string, requestedModel string, reqBody 
 	if IsImageGenerationEndpoint(endpoint) {
 		return true
 	}
+	if isOpenAIResponsesEndpoint(endpoint) {
+		return openAIResponsesMapHasImageGenerationIntent(reqBody)
+	}
 	if isOpenAIImageGenerationModel(requestedModel) {
 		return true
 	}
@@ -66,7 +72,7 @@ func IsImageGenerationIntentMap(endpoint string, requestedModel string, reqBody 
 // IsImageGenerationEndpoint identifies dedicated generated-image endpoints.
 func IsImageGenerationEndpoint(endpoint string) bool {
 	switch normalizeImageGenerationEndpoint(endpoint) {
-	case "/v1/images/generations", "/v1/images/edits", "/images/generations", "/images/edits":
+	case "/v1/images/generations", "/v1/images/edits", "/v1/images/variations", "/images/generations", "/images/edits", "/images/variations":
 		return true
 	default:
 		return false
@@ -83,6 +89,157 @@ func normalizeImageGenerationEndpoint(endpoint string) string {
 		endpoint = endpoint[:idx]
 	}
 	return strings.TrimRight(endpoint, "/")
+}
+
+func isOpenAIResponsesEndpoint(endpoint string) bool {
+	normalized := normalizeImageGenerationEndpoint(endpoint)
+	return normalized == openAIResponsesEndpoint || strings.HasPrefix(normalized, openAIResponsesEndpoint+"/")
+}
+
+func openAIResponsesBodyHasImageGenerationIntent(body []byte) bool {
+	if len(body) == 0 || !gjson.ValidBytes(body) {
+		return false
+	}
+	if model := strings.TrimSpace(gjson.GetBytes(body, "model").String()); isOpenAIImageGenerationModel(model) {
+		return true
+	}
+	if openAIJSONToolsContainImageGeneration(gjson.GetBytes(body, "tools")) {
+		return true
+	}
+	if openAIJSONToolChoiceSelectsImageGeneration(gjson.GetBytes(body, "tool_choice")) {
+		return true
+	}
+	return openAIJSONValueHasImageGenerationIntent(gjson.ParseBytes(body))
+}
+
+func openAIResponsesMapHasImageGenerationIntent(reqBody map[string]any) bool {
+	if reqBody == nil {
+		return false
+	}
+	if isOpenAIImageGenerationModel(firstNonEmptyString(reqBody["model"])) {
+		return true
+	}
+	if hasOpenAIImageGenerationTool(reqBody) {
+		return true
+	}
+	if openAIAnyToolChoiceSelectsImageGeneration(reqBody["tool_choice"]) {
+		return true
+	}
+	return openAIAnyValueHasImageGenerationIntent(reqBody)
+}
+
+func openAIJSONValueHasImageGenerationIntent(value gjson.Result) bool {
+	switch {
+	case value.IsArray():
+		found := false
+		value.ForEach(func(_, item gjson.Result) bool {
+			if openAIJSONValueHasImageGenerationIntent(item) {
+				found = true
+				return false
+			}
+			return true
+		})
+		return found
+	case value.IsObject():
+		if isOpenAIImageIntentToken(value.Get("type").String()) || isOpenAIImageIntentToken(value.Get("recipient").String()) || isOpenAIImageIntentToken(value.Get("name").String()) {
+			return true
+		}
+		if openAIJSONModalitiesContainImage(value.Get("modalities")) || openAIJSONModalitiesContainImage(value.Get("output_modalities")) || openAIJSONModalitiesContainImage(value.Get("response_modalities")) {
+			return true
+		}
+		found := false
+		value.ForEach(func(_, item gjson.Result) bool {
+			if openAIJSONValueHasImageGenerationIntent(item) {
+				found = true
+				return false
+			}
+			return true
+		})
+		return found
+	default:
+		return false
+	}
+}
+
+func openAIJSONModalitiesContainImage(value gjson.Result) bool {
+	if value.Type == gjson.String {
+		return isOpenAIImageModality(value.String())
+	}
+	if !value.IsArray() {
+		return false
+	}
+	found := false
+	value.ForEach(func(_, item gjson.Result) bool {
+		if item.Type == gjson.String && isOpenAIImageModality(item.String()) {
+			found = true
+			return false
+		}
+		return true
+	})
+	return found
+}
+
+func openAIAnyValueHasImageGenerationIntent(value any) bool {
+	switch v := value.(type) {
+	case map[string]any:
+		if isOpenAIImageIntentToken(firstNonEmptyString(v["type"])) || isOpenAIImageIntentToken(firstNonEmptyString(v["recipient"])) || isOpenAIImageIntentToken(firstNonEmptyString(v["name"])) {
+			return true
+		}
+		if openAIAnyModalitiesContainImage(v["modalities"]) || openAIAnyModalitiesContainImage(v["output_modalities"]) || openAIAnyModalitiesContainImage(v["response_modalities"]) {
+			return true
+		}
+		for _, item := range v {
+			if openAIAnyValueHasImageGenerationIntent(item) {
+				return true
+			}
+		}
+	case []any:
+		for _, item := range v {
+			if openAIAnyValueHasImageGenerationIntent(item) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func openAIAnyModalitiesContainImage(value any) bool {
+	switch v := value.(type) {
+	case string:
+		return isOpenAIImageModality(v)
+	case []any:
+		for _, item := range v {
+			if isOpenAIImageModality(firstNonEmptyString(item)) {
+				return true
+			}
+		}
+	case []string:
+		for _, item := range v {
+			if isOpenAIImageModality(item) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isOpenAIImageModality(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "image", "images", "output_image":
+		return true
+	default:
+		return false
+	}
+}
+
+func isOpenAIImageIntentToken(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "image_generation", "image_generation_call", "generate_image", "create_image", "output_image", "image_gen", "image-generation", "dalle", "dall-e":
+		return true
+	default:
+		return false
+	}
 }
 
 func openAIJSONToolsContainImageGeneration(tools gjson.Result) bool {
