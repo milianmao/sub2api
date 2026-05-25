@@ -58,6 +58,9 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 403, message)
 			return
 		}
+		if abortIfEffectiveAPIKeyGroupUnavailableGoogle(c, apiKey) {
+			return
+		}
 
 		// 简易模式：跳过余额和订阅检查
 		if cfg.RunMode == config.RunModeSimple {
@@ -159,6 +162,21 @@ func extractAPIKeyForGoogle(c *gin.Context) string {
 
 func allowGoogleQueryKey(path string) bool {
 	return strings.HasPrefix(path, "/v1beta") || strings.HasPrefix(path, "/antigravity/v1beta")
+}
+
+func abortIfEffectiveAPIKeyGroupUnavailableGoogle(c *gin.Context, apiKey *service.APIKey) bool {
+	effectiveGroup, err := service.ResolveEffectiveAPIKeyGroup(apiKey, effectiveGroupResolutionRequest(c))
+	if err != nil {
+		if errors.Is(err, service.ErrImageGroupNotAuthorized) {
+			abortWithGoogleError(c, 403, service.ImageGenerationPermissionMessage())
+			return true
+		}
+		abortWithGoogleError(c, 500, "Failed to resolve API key group")
+		return true
+	}
+	applyEffectiveAPIKeyGroup(apiKey, effectiveGroup)
+	setGroupContext(c, effectiveGroup)
+	return false
 }
 
 func abortWithGoogleError(c *gin.Context, status int, message string) {
