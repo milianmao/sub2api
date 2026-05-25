@@ -56,6 +56,7 @@ const ApiKeyCreateTestComponent = defineComponent({
     const formData = reactive({
       name: '',
       group_id: null as number | null,
+      group_ids: undefined as number[] | undefined,
     })
 
     const handleCreate = async () => {
@@ -66,6 +67,7 @@ const ApiKeyCreateTestComponent = defineComponent({
         const result = await mockCreate({
           name: formData.name,
           group_id: formData.group_id,
+          group_ids: formData.group_ids,
         })
         createdKey.value = result.key
         appStore.showSuccess('API Key 创建成功')
@@ -115,6 +117,7 @@ describe('ApiKey 创建流程', () => {
     expect(mockCreate).toHaveBeenCalledWith({
       name: 'My Test Key',
       group_id: null,
+      group_ids: undefined,
     })
 
     expect(wrapper.find('.created-key').text()).toBe('sk-test-key-12345')
@@ -138,6 +141,29 @@ describe('ApiKey 创建流程', () => {
     expect(mockCreate).toHaveBeenCalledWith({
       name: 'Group Key',
       group_id: 1,
+      group_ids: undefined,
+    })
+  })
+
+  it('submits default and authorized groups', async () => {
+    mockCreate.mockResolvedValue({
+      id: 3,
+      key: 'sk-authorized-groups-key',
+      name: 'Group Key',
+    })
+
+    const wrapper = mount(ApiKeyCreateTestComponent)
+
+    await wrapper.find('#name').setValue('Group Key')
+    await wrapper.find('#group').setValue('1')
+    ;(wrapper.vm as any).formData.group_ids = [1, 2]
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(mockCreate).toHaveBeenCalledWith({
+      name: 'Group Key',
+      group_id: 1,
+      group_ids: [1, 2],
     })
   })
 

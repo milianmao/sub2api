@@ -6,6 +6,43 @@
 import { apiClient } from './client'
 import type { ApiKey, CreateApiKeyRequest, UpdateApiKeyRequest, PaginatedResponse } from '@/types'
 
+type CreateApiKeyData = Omit<CreateApiKeyRequest, 'name'>
+
+function buildCreatePayload(name: string, data: CreateApiKeyData = {}): CreateApiKeyRequest {
+  const payload: CreateApiKeyRequest = { name }
+  if (data.group_id !== undefined) {
+    payload.group_id = data.group_id
+  }
+  if (data.group_ids !== undefined) {
+    payload.group_ids = data.group_ids
+  }
+  if (data.custom_key) {
+    payload.custom_key = data.custom_key
+  }
+  if (data.ip_whitelist && data.ip_whitelist.length > 0) {
+    payload.ip_whitelist = data.ip_whitelist
+  }
+  if (data.ip_blacklist && data.ip_blacklist.length > 0) {
+    payload.ip_blacklist = data.ip_blacklist
+  }
+  if (data.quota !== undefined && data.quota > 0) {
+    payload.quota = data.quota
+  }
+  if (data.expires_in_days !== undefined && data.expires_in_days > 0) {
+    payload.expires_in_days = data.expires_in_days
+  }
+  if (data.rate_limit_5h && data.rate_limit_5h > 0) {
+    payload.rate_limit_5h = data.rate_limit_5h
+  }
+  if (data.rate_limit_1d && data.rate_limit_1d > 0) {
+    payload.rate_limit_1d = data.rate_limit_1d
+  }
+  if (data.rate_limit_7d && data.rate_limit_7d > 0) {
+    payload.rate_limit_7d = data.rate_limit_7d
+  }
+  return payload
+}
+
 /**
  * List all API keys for current user
  * @param page - Page number (default: 1)
@@ -47,7 +84,7 @@ export async function getById(id: number): Promise<ApiKey> {
 
 /**
  * Create new API key
- * @param name - Key name
+ * @param nameOrRequest - Key name or complete create payload
  * @param groupId - Optional group ID
  * @param customKey - Optional custom key value
  * @param ipWhitelist - Optional IP whitelist
@@ -55,8 +92,10 @@ export async function getById(id: number): Promise<ApiKey> {
  * @param quota - Optional quota limit in USD (0 = unlimited)
  * @param expiresInDays - Optional days until expiry (undefined = never expires)
  * @param rateLimitData - Optional rate limit fields
+ * @param groupIds - Optional authorized group IDs
  * @returns Created API key
  */
+export async function create(request: CreateApiKeyRequest): Promise<ApiKey>
 export async function create(
   name: string,
   groupId?: number | null,
@@ -65,36 +104,37 @@ export async function create(
   ipBlacklist?: string[],
   quota?: number,
   expiresInDays?: number,
-  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number }
+  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
+  groupIds?: number[]
+): Promise<ApiKey>
+export async function create(
+  nameOrRequest: string | CreateApiKeyRequest,
+  groupId?: number | null,
+  customKey?: string,
+  ipWhitelist?: string[],
+  ipBlacklist?: string[],
+  quota?: number,
+  expiresInDays?: number,
+  rateLimitData?: { rate_limit_5h?: number; rate_limit_1d?: number; rate_limit_7d?: number },
+  groupIds?: number[]
 ): Promise<ApiKey> {
-  const payload: CreateApiKeyRequest = { name }
-  if (groupId !== undefined) {
-    payload.group_id = groupId
+  if (typeof nameOrRequest !== 'string') {
+    const { data } = await apiClient.post<ApiKey>('/keys', nameOrRequest)
+    return data
   }
-  if (customKey) {
-    payload.custom_key = customKey
-  }
-  if (ipWhitelist && ipWhitelist.length > 0) {
-    payload.ip_whitelist = ipWhitelist
-  }
-  if (ipBlacklist && ipBlacklist.length > 0) {
-    payload.ip_blacklist = ipBlacklist
-  }
-  if (quota !== undefined && quota > 0) {
-    payload.quota = quota
-  }
-  if (expiresInDays !== undefined && expiresInDays > 0) {
-    payload.expires_in_days = expiresInDays
-  }
-  if (rateLimitData?.rate_limit_5h && rateLimitData.rate_limit_5h > 0) {
-    payload.rate_limit_5h = rateLimitData.rate_limit_5h
-  }
-  if (rateLimitData?.rate_limit_1d && rateLimitData.rate_limit_1d > 0) {
-    payload.rate_limit_1d = rateLimitData.rate_limit_1d
-  }
-  if (rateLimitData?.rate_limit_7d && rateLimitData.rate_limit_7d > 0) {
-    payload.rate_limit_7d = rateLimitData.rate_limit_7d
-  }
+
+  const payload = buildCreatePayload(nameOrRequest, {
+    group_id: groupId,
+    group_ids: groupIds,
+    custom_key: customKey,
+    ip_whitelist: ipWhitelist,
+    ip_blacklist: ipBlacklist,
+    quota,
+    expires_in_days: expiresInDays,
+    rate_limit_5h: rateLimitData?.rate_limit_5h,
+    rate_limit_1d: rateLimitData?.rate_limit_1d,
+    rate_limit_7d: rateLimitData?.rate_limit_7d
+  })
 
   const { data } = await apiClient.post<ApiKey>('/keys', payload)
   return data
