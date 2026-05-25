@@ -5,6 +5,7 @@ package middleware
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -673,11 +674,12 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 		AllowImageGeneration: true,
 	}
 	user := &service.User{
-		ID:          7,
-		Role:        service.RoleUser,
-		Status:      service.StatusActive,
-		Balance:     10,
-		Concurrency: 3,
+		ID:                   7,
+		Role:                 service.RoleUser,
+		Status:               service.StatusActive,
+		Balance:              10,
+		Concurrency:          3,
+		UserGroupRPMOverride: intPtr(17),
 	}
 
 	newRouter := func(apiKey *service.APIKey) *gin.Engine {
@@ -698,10 +700,15 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
 			require.True(t, ok)
 			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+			overrideCleared := false
+			if apiKeyFromCtx.User != nil && apiKeyFromCtx.User.UserGroupRPMOverride == nil {
+				overrideCleared = true
+			}
 			c.JSON(http.StatusOK, gin.H{
-				"api_key_group_id":  apiKeyFromCtx.Group.ID,
-				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
-				"context_group_id":  groupFromCtx.ID,
+				"api_key_group_id":     apiKeyFromCtx.Group.ID,
+				"api_key_group_ptr":    *apiKeyFromCtx.GroupID,
+				"context_group_id":     groupFromCtx.ID,
+				"rpm_override_cleared": overrideCleared,
 			})
 		})
 		router.POST("/v1/chat/completions", func(c *gin.Context) {
@@ -712,6 +719,19 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 				"api_key_group_id":  apiKeyFromCtx.Group.ID,
 				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
 				"context_group_id":  groupFromCtx.ID,
+			})
+		})
+		router.POST("/v1/responses", func(c *gin.Context) {
+			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+			body, err := io.ReadAll(c.Request.Body)
+			require.NoError(t, err)
+			c.JSON(http.StatusOK, gin.H{
+				"api_key_group_id":  apiKeyFromCtx.Group.ID,
+				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
+				"context_group_id":  groupFromCtx.ID,
+				"body":              string(body),
 			})
 		})
 		return router
@@ -727,6 +747,8 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 			Group:            defaultGroup,
 			AuthorizedGroups: authorized,
 		}
+		userClone := *user
+		apiKey.User = &userClone
 		apiKey.GroupID = &defaultGroup.ID
 		return apiKey
 	}
@@ -757,6 +779,7 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 		require.Contains(t, w.Body.String(), `"api_key_group_id":202`)
 		require.Contains(t, w.Body.String(), `"api_key_group_ptr":202`)
 		require.Contains(t, w.Body.String(), `"context_group_id":202`)
+		require.Contains(t, w.Body.String(), `"rpm_override_cleared":true`)
 	})
 
 	t.Run("image request without authorized image group is forbidden", func(t *testing.T) {
@@ -772,6 +795,21 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 		require.Contains(t, w.Body.String(), service.ImageGenerationPermissionMessage())
 	})
 
+	t.Run("responses body image request switches group and preserves downstream body", func(t *testing.T) {
+		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
+		body := `{"model":"gpt-4o","tools":[{"type":"image_generation"}],"input":"cat"}`
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+		req.Header.Set("x-api-key", "test-key")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `"api_key_group_id":202`)
+		require.Contains(t, w.Body.String(), `"api_key_group_ptr":202`)
+		require.Contains(t, w.Body.String(), `"context_group_id":202`)
+		require.Contains(t, w.Body.String(), `"body":"{\"model\":\"gpt-4o\",\"tools\":[{\"type\":\"image_generation\"}],\"input\":\"cat\"}"`)
+	})
 	t.Run("non post image endpoint keeps default group", func(t *testing.T) {
 		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
 
@@ -785,6 +823,10 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 		require.Contains(t, w.Body.String(), `"api_key_group_ptr":101`)
 		require.Contains(t, w.Body.String(), `"context_group_id":101`)
 	})
+}
+
+func intPtr(v int) *int {
+	return &v
 }
 
 func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) *gin.Engine {

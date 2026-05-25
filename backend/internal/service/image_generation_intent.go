@@ -67,9 +67,14 @@ func normalizeImageGenerationEndpoint(endpoint string) string {
 	return strings.TrimRight(endpoint, "/")
 }
 
-func isOpenAIResponsesEndpoint(endpoint string) bool {
+// IsOpenAIResponsesEndpoint identifies Responses endpoints whose body can request generated images.
+func IsOpenAIResponsesEndpoint(endpoint string) bool {
 	normalized := normalizeImageGenerationEndpoint(endpoint)
 	return normalized == openAIResponsesEndpoint || strings.HasPrefix(normalized, openAIResponsesEndpoint+"/")
+}
+
+func isOpenAIResponsesEndpoint(endpoint string) bool {
+	return IsOpenAIResponsesEndpoint(endpoint)
 }
 
 func openAIResponsesBodyHasImageGenerationIntent(body []byte) bool {

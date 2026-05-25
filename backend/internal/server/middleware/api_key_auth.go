@@ -289,7 +289,7 @@ func effectiveGroupResolutionRequest(c *gin.Context) service.EffectiveGroupResol
 	if model, ok := c.Request.Context().Value(ctxkey.Model).(string); ok {
 		req.RequestedModel = strings.TrimSpace(model)
 	}
-	if c.Request.Body != nil {
+	if c.Request.Body != nil && service.IsOpenAIResponsesEndpoint(c.Request.URL.Path) {
 		body, err := io.ReadAll(c.Request.Body)
 		if err == nil {
 			req.Body = body
@@ -303,12 +303,22 @@ func applyEffectiveAPIKeyGroup(apiKey *service.APIKey, group *service.Group) {
 	if apiKey == nil {
 		return
 	}
+	originalGroupID := apiKey.GroupID
+	if originalGroupID == nil && apiKey.Group != nil {
+		originalGroupID = &apiKey.Group.ID
+	}
 	apiKey.Group = group
 	if group == nil {
 		apiKey.GroupID = nil
+		if originalGroupID != nil && apiKey.User != nil {
+			apiKey.User.UserGroupRPMOverride = nil
+		}
 		return
 	}
 	apiKey.GroupID = &group.ID
+	if originalGroupID != nil && *originalGroupID != group.ID && apiKey.User != nil {
+		apiKey.User.UserGroupRPMOverride = nil
+	}
 }
 
 func abortIfAPIKeyGroupUnavailable(c *gin.Context, apiKey *service.APIKey) bool {

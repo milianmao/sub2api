@@ -341,11 +341,12 @@ func TestApiKeyAuthWithSubscriptionGoogleEffectiveGroupResolution(t *testing.T) 
 		AllowImageGeneration: true,
 	}
 	user := &service.User{
-		ID:          7,
-		Role:        service.RoleUser,
-		Status:      service.StatusActive,
-		Balance:     10,
-		Concurrency: 3,
+		ID:                   7,
+		Role:                 service.RoleUser,
+		Status:               service.StatusActive,
+		Balance:              10,
+		Concurrency:          3,
+		UserGroupRPMOverride: googleIntPtr(23),
 	}
 
 	apiKey := &service.APIKey{
@@ -377,10 +378,15 @@ func TestApiKeyAuthWithSubscriptionGoogleEffectiveGroupResolution(t *testing.T) 
 		apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
 		require.True(t, ok)
 		groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+		overrideCleared := false
+		if apiKeyFromCtx.User != nil && apiKeyFromCtx.User.UserGroupRPMOverride == nil {
+			overrideCleared = true
+		}
 		c.JSON(http.StatusOK, gin.H{
-			"api_key_group_id":  apiKeyFromCtx.Group.ID,
-			"api_key_group_ptr": *apiKeyFromCtx.GroupID,
-			"context_group_id":  groupFromCtx.ID,
+			"api_key_group_id":     apiKeyFromCtx.Group.ID,
+			"api_key_group_ptr":    *apiKeyFromCtx.GroupID,
+			"context_group_id":     groupFromCtx.ID,
+			"rpm_override_cleared": overrideCleared,
 		})
 	})
 
@@ -393,6 +399,11 @@ func TestApiKeyAuthWithSubscriptionGoogleEffectiveGroupResolution(t *testing.T) 
 	require.Contains(t, rec.Body.String(), `"api_key_group_id":302`)
 	require.Contains(t, rec.Body.String(), `"api_key_group_ptr":302`)
 	require.Contains(t, rec.Body.String(), `"context_group_id":302`)
+	require.Contains(t, rec.Body.String(), `"rpm_override_cleared":true`)
+}
+
+func googleIntPtr(v int) *int {
+	return &v
 }
 
 func TestApiKeyAuthWithSubscriptionGoogle_QueryKeyAllowedOnV1Beta(t *testing.T) {
