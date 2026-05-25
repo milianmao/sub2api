@@ -334,6 +334,25 @@ func TestAdminService_AdminUpdateAPIKeyGroupID_BindActiveGroup(t *testing.T) {
 	require.Equal(t, "Pro", got.APIKey.Group.Name)
 }
 
+func TestAdminService_AdminUpdateAPIKeyGroupID_PersistsAuthorizedGroupIDs(t *testing.T) {
+	existing := &APIKey{ID: 1, UserID: 42, Key: "sk-test", GroupID: int64Ptr(1), GroupIDs: []int64{1}}
+	apiKeyRepo := &apiKeyRepoStubForGroupUpdate{key: existing}
+	groupRepo := &groupRepoStubForGroupUpdate{group: &Group{ID: 2, Name: "Image", Status: StatusActive}}
+	cache := &authCacheInvalidatorStub{}
+	svc := &adminServiceImpl{apiKeyRepo: apiKeyRepo, groupRepo: groupRepo, authCacheInvalidator: cache}
+
+	got, err := svc.AdminUpdateAPIKeyGroup(context.Background(), 1, AdminUpdateAPIKeyGroupRequest{
+		GroupID:  int64Ptr(2),
+		GroupIDs: []int64{1, 2},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, got.APIKey.GroupID)
+	require.Equal(t, int64(2), *got.APIKey.GroupID)
+	require.NotNil(t, apiKeyRepo.updated)
+	require.Equal(t, []int64{1, 2}, apiKeyRepo.updated.GroupIDs)
+	require.Contains(t, apiKeyRepo.updated.GroupIDs, int64(2))
+}
+
 func TestAdminService_AdminUpdateAPIKeyGroupID_SameGroup_Idempotent(t *testing.T) {
 	existing := &APIKey{ID: 1, Key: "sk-test", GroupID: int64Ptr(10), Group: &Group{ID: 10, Name: "Pro"}}
 	apiKeyRepo := &apiKeyRepoStubForGroupUpdate{key: existing}
