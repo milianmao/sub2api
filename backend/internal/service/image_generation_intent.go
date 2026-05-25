@@ -31,19 +31,7 @@ func IsImageGenerationIntent(endpoint string, requestedModel string, body []byte
 	if isOpenAIResponsesEndpoint(endpoint) {
 		return openAIResponsesBodyHasImageGenerationIntent(body)
 	}
-	if isOpenAIImageGenerationModel(requestedModel) {
-		return true
-	}
-	if len(body) == 0 || !gjson.ValidBytes(body) {
-		return false
-	}
-	if model := strings.TrimSpace(gjson.GetBytes(body, "model").String()); isOpenAIImageGenerationModel(model) {
-		return true
-	}
-	if openAIJSONToolsContainImageGeneration(gjson.GetBytes(body, "tools")) {
-		return true
-	}
-	return openAIJSONToolChoiceSelectsImageGeneration(gjson.GetBytes(body, "tool_choice"))
+	return false
 }
 
 // IsImageGenerationIntentMap is the map-backed variant used after service-side request mutation.
@@ -54,19 +42,7 @@ func IsImageGenerationIntentMap(endpoint string, requestedModel string, reqBody 
 	if isOpenAIResponsesEndpoint(endpoint) {
 		return openAIResponsesMapHasImageGenerationIntent(reqBody)
 	}
-	if isOpenAIImageGenerationModel(requestedModel) {
-		return true
-	}
-	if reqBody == nil {
-		return false
-	}
-	if isOpenAIImageGenerationModel(firstNonEmptyString(reqBody["model"])) {
-		return true
-	}
-	if hasOpenAIImageGenerationTool(reqBody) {
-		return true
-	}
-	return openAIAnyToolChoiceSelectsImageGeneration(reqBody["tool_choice"])
+	return false
 }
 
 // IsImageGenerationEndpoint identifies dedicated generated-image endpoints.

@@ -88,6 +88,27 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			body:     []byte(`{"model":"gpt-5.4","input":"write code"}`),
 			want:     false,
 		},
+		{
+			name:     "non responses image model is not image intent",
+			endpoint: "/v1/chat/completions",
+			model:    "gpt-image-2",
+			body:     []byte(`{"model":"gpt-image-2"}`),
+			want:     false,
+		},
+		{
+			name:     "non responses image tool is not image intent",
+			endpoint: "/v1/chat/completions",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","tools":[{"type":"image_generation"}]}`),
+			want:     false,
+		},
+		{
+			name:     "non responses tool choice is not image intent",
+			endpoint: "/v1/chat/completions",
+			model:    "gpt-5.4",
+			body:     []byte(`{"model":"gpt-5.4","tool_choice":{"type":"image_generation"}}`),
+			want:     false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -95,6 +116,36 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			require.Equal(t, tt.want, IsImageGenerationIntent(tt.endpoint, tt.model, tt.body))
 		})
 	}
+}
+
+func TestIsImageGenerationIntentMapIgnoresNonResponsesBodyIntent(t *testing.T) {
+	reqBody := map[string]any{
+		"model":       "gpt-image-2",
+		"tools":       []any{map[string]any{"type": "image_generation"}},
+		"tool_choice": map[string]any{"type": "image_generation"},
+	}
+
+	require.False(t, IsImageGenerationIntentMap("/v1/chat/completions", "gpt-image-2", reqBody))
+}
+
+func TestResolveEffectiveAPIKeyGroupIgnoresGetDedicatedImageEndpoint(t *testing.T) {
+	defaultGroup := testEffectiveGroup(1, PlatformAnthropic, false, StatusActive)
+	imageGroup := testEffectiveGroup(2, PlatformOpenAI, true, StatusActive)
+	apiKey := &APIKey{
+		GroupID: ptrInt64(1),
+		Group:   defaultGroup,
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 2, Group: imageGroup, Priority: 1},
+		},
+	}
+
+	got, err := ResolveEffectiveAPIKeyGroup(apiKey, EffectiveGroupResolutionRequest{
+		Method:   "GET",
+		Endpoint: "/v1/images/generations",
+	})
+
+	require.NoError(t, err)
+	require.Same(t, defaultGroup, got)
 }
 
 func TestResolveOpenAIResponsesImageBillingConfigUsesCurrentBodyModel(t *testing.T) {
