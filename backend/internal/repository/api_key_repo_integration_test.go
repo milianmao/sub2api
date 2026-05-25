@@ -25,8 +25,8 @@ type APIKeyRepoSuite struct {
 }
 
 func (s *APIKeyRepoSuite) SetupTest() {
-	s.ctx = context.Background()
 	tx := testEntTx(s.T())
+	s.ctx = dbent.NewTxContext(context.Background(), tx)
 	s.client = tx.Client()
 	s.repo = newAPIKeyRepositoryWithSQL(s.client, tx)
 }
@@ -229,6 +229,52 @@ func (s *APIKeyRepoSuite) TestUpdateReplacesAuthorizedGroups() {
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err)
 	s.assertAuthorizedGroups(got, []int64{newGroup.ID}, []int{50})
+}
+
+func (s *APIKeyRepoSuite) TestUpdateWithNilGroupIDsPreservesAuthorizedGroups() {
+	user := s.mustCreateUser("authorized-update-nil@test.com")
+	groupA := s.mustCreateGroup("g-authorized-nil-a")
+	groupB := s.mustCreateGroup("g-authorized-nil-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-authorized-update-nil",
+		Name:     "Authorized Update Nil",
+		GroupIDs: []int64{groupA.ID, groupB.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	key.Name = "Authorized Update Nil Renamed"
+	key.GroupIDs = nil
+	s.Require().NoError(s.repo.Update(s.ctx, key))
+
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().Equal("Authorized Update Nil Renamed", got.Name)
+	s.assertAuthorizedGroups(got, []int64{groupA.ID, groupB.ID}, []int{50, 50})
+}
+
+func (s *APIKeyRepoSuite) TestUpdateWithEmptyGroupIDsClearsAuthorizedGroups() {
+	user := s.mustCreateUser("authorized-update-empty@test.com")
+	groupA := s.mustCreateGroup("g-authorized-empty-a")
+	groupB := s.mustCreateGroup("g-authorized-empty-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-authorized-update-empty",
+		Name:     "Authorized Update Empty",
+		GroupIDs: []int64{groupA.ID, groupB.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	key.GroupIDs = []int64{}
+	s.Require().NoError(s.repo.Update(s.ctx, key))
+
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.assertAuthorizedGroups(got, []int64{}, []int{})
 }
 
 func (s *APIKeyRepoSuite) TestGetByIDOrdersAuthorizedGroupsByPriorityThenGroupID() {
