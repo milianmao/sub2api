@@ -9,6 +9,7 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
+	"github.com/Wei-Shaw/sub2api/ent/apikeygroup"
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	"github.com/Wei-Shaw/sub2api/ent/user"
@@ -60,13 +61,17 @@ func (r *apiKeyRepository) Create(ctx context.Context, key *service.APIKey) erro
 	}
 
 	created, err := builder.Save(ctx)
-	if err == nil {
-		key.ID = created.ID
-		key.LastUsedAt = created.LastUsedAt
-		key.CreatedAt = created.CreatedAt
-		key.UpdatedAt = created.UpdatedAt
+	if err != nil {
+		return translatePersistenceError(err, nil, service.ErrAPIKeyExists)
 	}
-	return translatePersistenceError(err, nil, service.ErrAPIKeyExists)
+	key.ID = created.ID
+	key.LastUsedAt = created.LastUsedAt
+	key.CreatedAt = created.CreatedAt
+	key.UpdatedAt = created.UpdatedAt
+	if err := r.replaceAPIKeyGroups(ctx, key.ID, key.GroupIDs); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIKey, error) {
@@ -74,6 +79,7 @@ func (r *apiKeyRepository) GetByID(ctx context.Context, id int64) (*service.APIK
 		Where(apikey.IDEQ(id)).
 		WithUser().
 		WithGroup().
+		WithAPIKeyGroups(withAPIKeyGroupsOrdered).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -112,6 +118,7 @@ func (r *apiKeyRepository) GetByKey(ctx context.Context, key string) (*service.A
 		Where(apikey.KeyEQ(key)).
 		WithUser().
 		WithGroup().
+		WithAPIKeyGroups(withAPIKeyGroupsOrdered).
 		Only(ctx)
 	if err != nil {
 		if dbent.IsNotFound(err) {
@@ -164,37 +171,10 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 				user.FieldRpmLimit,
 			)
 		}).
-		WithGroup(func(q *dbent.GroupQuery) {
-			q.Select(
-				group.FieldID,
-				group.FieldName,
-				group.FieldPlatform,
-				group.FieldStatus,
-				group.FieldSubscriptionType,
-				group.FieldRateMultiplier,
-				group.FieldDailyLimitUsd,
-				group.FieldWeeklyLimitUsd,
-				group.FieldMonthlyLimitUsd,
-				group.FieldAllowImageGeneration,
-				group.FieldImageRateIndependent,
-				group.FieldImageRateMultiplier,
-				group.FieldImagePrice1k,
-				group.FieldImagePrice2k,
-				group.FieldImagePrice4k,
-				group.FieldClaudeCodeOnly,
-				group.FieldFallbackGroupID,
-				group.FieldFallbackGroupIDOnInvalidRequest,
-				group.FieldModelRoutingEnabled,
-				group.FieldModelRouting,
-				group.FieldMcpXMLInject,
-				group.FieldSupportedModelScopes,
-				group.FieldAllowMessagesDispatch,
-				group.FieldAllowOpenaiCompat,
-				group.FieldDefaultMappedModel,
-				group.FieldMessagesDispatchModelConfig,
-				group.FieldOpenaiImageUpstream,
-				group.FieldRpmLimit,
-			)
+		WithGroup(apiKeyAuthGroupSelect).
+		WithAPIKeyGroups(func(q *dbent.APIKeyGroupQuery) {
+			withAPIKeyGroupsOrdered(q)
+			q.WithGroup(apiKeyAuthGroupSelect)
 		}).
 		Only(ctx)
 	if err != nil {
@@ -282,6 +262,10 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 		return service.ErrAPIKeyNotFound
 	}
 
+	if err := r.replaceAPIKeyGroups(ctx, key.ID, key.GroupIDs); err != nil {
+		return err
+	}
+
 	// 使用同一时间戳回填，避免并发删除导致二次查询失败。
 	key.UpdatedAt = now
 	return nil
@@ -345,6 +329,7 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 
 	keysQuery := q.
 		WithGroup().
+		WithAPIKeyGroups(withAPIKeyGroupsOrdered).
 		Offset(params.Offset()).
 		Limit(params.Limit())
 	for _, order := range apiKeyListOrder(params) {
@@ -359,6 +344,13 @@ func (r *apiKeyRepository) ListByUserID(ctx context.Context, userID int64, param
 	outKeys := make([]service.APIKey, 0, len(keys))
 	for i := range keys {
 		outKeys = append(outKeys, *apiKeyEntityToService(keys[i]))
+	}
+	outKeyPtrs := make([]*service.APIKey, 0, len(outKeys))
+	for i := range outKeys {
+		outKeyPtrs = append(outKeyPtrs, &outKeys[i])
+	}
+	if err := r.hydrateAPIKeyAuthorizationFields(ctx, outKeyPtrs); err != nil {
+		return nil, nil, err
 	}
 
 	return outKeys, paginationResultFromTotal(int64(total), params), nil
@@ -504,7 +496,10 @@ func (r *apiKeyRepository) ListKeysByUserID(ctx context.Context, userID int64) (
 
 func (r *apiKeyRepository) ListKeysByGroupID(ctx context.Context, groupID int64) ([]string, error) {
 	keys, err := r.activeQuery().
-		Where(apikey.GroupIDEQ(groupID)).
+		Where(apikey.Or(
+			apikey.GroupIDEQ(groupID),
+			apikey.HasAPIKeyGroupsWith(apikeygroup.GroupIDEQ(groupID)),
+		)).
 		Select(apikey.FieldKey).
 		Strings(ctx)
 	if err != nil {
@@ -627,6 +622,195 @@ func (r *apiKeyRepository) GetRateLimitData(ctx context.Context, id int64) (resu
 	return data, rows.Err()
 }
 
+func (r *apiKeyRepository) replaceAPIKeyGroups(ctx context.Context, apiKeyID int64, groupIDs []int64) error {
+	client := clientFromContext(ctx, r.client)
+	if _, err := client.APIKeyGroup.Delete().Where(apikeygroup.APIKeyIDEQ(apiKeyID)).Exec(ctx); err != nil {
+		return err
+	}
+	if len(groupIDs) == 0 {
+		return nil
+	}
+	seen := make(map[int64]struct{}, len(groupIDs))
+	for _, groupID := range groupIDs {
+		if groupID <= 0 {
+			continue
+		}
+		if _, exists := seen[groupID]; exists {
+			continue
+		}
+		seen[groupID] = struct{}{}
+		if err := client.APIKeyGroup.Create().
+			SetAPIKeyID(apiKeyID).
+			SetGroupID(groupID).
+			SetPriority(50).
+			Exec(ctx); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func withAPIKeyGroupsOrdered(q *dbent.APIKeyGroupQuery) {
+	q.Order(apikeygroup.ByPriority(), apikeygroup.ByGroupID()).WithGroup()
+}
+
+func hydrateAPIKeyAuthorizedGroups(ctx context.Context, exec sqlQueryExecutor, keys []*service.APIKey) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	if exec == nil {
+		return fmt.Errorf("sql executor is not configured")
+	}
+
+	byID := make(map[int64]*service.APIKey, len(keys))
+	ids := make([]int64, 0, len(keys))
+	for _, key := range keys {
+		if key == nil || key.ID <= 0 {
+			continue
+		}
+		if _, exists := byID[key.ID]; exists {
+			continue
+		}
+		byID[key.ID] = key
+		ids = append(ids, key.ID)
+		key.GroupIDs = nil
+		key.Groups = nil
+		key.AuthorizedGroups = nil
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	apiKeyIDPlaceholders, apiKeyIDArgs := numberedPlaceholders(ids, 1)
+	rows, err := exec.QueryContext(ctx, `
+		SELECT ag.api_key_id,
+			ag.group_id,
+			ag.priority,
+			g.name,
+			g.description,
+			g.platform,
+			g.rate_multiplier,
+			g.is_exclusive,
+			g.access_mode,
+			g.min_user_level,
+			g.status,
+			g.subscription_type,
+			g.daily_limit_usd,
+			g.weekly_limit_usd,
+			g.monthly_limit_usd,
+			g.allow_image_generation,
+			g.image_rate_independent,
+			g.image_rate_multiplier,
+			g.image_price_1k,
+			g.image_price_2k,
+			g.image_price_4k,
+			g.default_validity_days,
+			g.claude_code_only,
+			g.fallback_group_id,
+			g.fallback_group_id_on_invalid_request,
+			g.model_routing,
+			g.model_routing_enabled,
+			g.mcp_xml_inject,
+			g.supported_model_scopes,
+			g.sort_order,
+			g.allow_messages_dispatch,
+			g.allow_openai_compat,
+			g.require_oauth_only,
+			g.require_privacy_set,
+			g.default_mapped_model,
+			g.messages_dispatch_model_config,
+			g.openai_image_upstream,
+			g.rpm_limit,
+			g.created_at,
+			g.updated_at
+		FROM api_key_groups ag
+		JOIN groups g ON g.id = ag.group_id AND g.deleted_at IS NULL
+		WHERE ag.api_key_id IN (`+apiKeyIDPlaceholders+`)
+		ORDER BY ag.api_key_id, ag.priority ASC, ag.group_id ASC
+	`, apiKeyIDArgs...)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var (
+			apiKeyID int64
+			groupID  int64
+			priority int
+			groupRow dbent.Group
+		)
+		if err := rows.Scan(
+			&apiKeyID,
+			&groupID,
+			&priority,
+			&groupRow.Name,
+			&groupRow.Description,
+			&groupRow.Platform,
+			&groupRow.RateMultiplier,
+			&groupRow.IsExclusive,
+			&groupRow.AccessMode,
+			&groupRow.MinUserLevel,
+			&groupRow.Status,
+			&groupRow.SubscriptionType,
+			&groupRow.DailyLimitUsd,
+			&groupRow.WeeklyLimitUsd,
+			&groupRow.MonthlyLimitUsd,
+			&groupRow.AllowImageGeneration,
+			&groupRow.ImageRateIndependent,
+			&groupRow.ImageRateMultiplier,
+			&groupRow.ImagePrice1k,
+			&groupRow.ImagePrice2k,
+			&groupRow.ImagePrice4k,
+			&groupRow.DefaultValidityDays,
+			&groupRow.ClaudeCodeOnly,
+			&groupRow.FallbackGroupID,
+			&groupRow.FallbackGroupIDOnInvalidRequest,
+			&groupRow.ModelRouting,
+			&groupRow.ModelRoutingEnabled,
+			&groupRow.McpXMLInject,
+			&groupRow.SupportedModelScopes,
+			&groupRow.SortOrder,
+			&groupRow.AllowMessagesDispatch,
+			&groupRow.AllowOpenaiCompat,
+			&groupRow.RequireOauthOnly,
+			&groupRow.RequirePrivacySet,
+			&groupRow.DefaultMappedModel,
+			&groupRow.MessagesDispatchModelConfig,
+			&groupRow.OpenaiImageUpstream,
+			&groupRow.RpmLimit,
+			&groupRow.CreatedAt,
+			&groupRow.UpdatedAt,
+		); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		groupRow.ID = groupID
+		if key, ok := byID[apiKeyID]; ok {
+			groupSvc := groupEntityToService(&groupRow)
+			key.GroupIDs = append(key.GroupIDs, groupID)
+			key.Groups = append(key.Groups, groupSvc)
+			key.AuthorizedGroups = append(key.AuthorizedGroups, service.APIKeyAuthorizedGroup{
+				GroupID:  groupID,
+				Group:    groupSvc,
+				Priority: priority,
+			})
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	authorizedGroups := make([]*service.Group, 0)
+	for _, key := range byID {
+		for i := range key.AuthorizedGroups {
+			authorizedGroups = append(authorizedGroups, key.AuthorizedGroups[i].Group)
+		}
+	}
+	return hydrateGroupAuthorizationFields(ctx, exec, authorizedGroups)
+}
+
 func (r *apiKeyRepository) hydrateAPIKeyAuthorizationFields(ctx context.Context, keys []*service.APIKey) error {
 	exec := txAwareSQLExecutor(ctx, r.sql, r.client)
 	if exec == nil {
@@ -651,6 +835,9 @@ func (r *apiKeyRepository) hydrateAPIKeyAuthorizationFields(ctx context.Context,
 		return err
 	}
 	if err := hydrateGroupAuthorizationFields(ctx, exec, groups); err != nil {
+		return err
+	}
+	if err := hydrateAPIKeyAuthorizedGroups(ctx, exec, keys); err != nil {
 		return err
 	}
 	return nil
@@ -939,6 +1126,19 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 	if m.Edges.Group != nil {
 		out.Group = groupEntityToService(m.Edges.Group)
 	}
+	for _, keyGroup := range m.Edges.APIKeyGroups {
+		if keyGroup == nil {
+			continue
+		}
+		groupSvc := groupEntityToService(keyGroup.Edges.Group)
+		out.GroupIDs = append(out.GroupIDs, keyGroup.GroupID)
+		out.Groups = append(out.Groups, groupSvc)
+		out.AuthorizedGroups = append(out.AuthorizedGroups, service.APIKeyAuthorizedGroup{
+			GroupID:  keyGroup.GroupID,
+			Group:    groupSvc,
+			Priority: keyGroup.Priority,
+		})
+	}
 	return out
 }
 
@@ -1022,6 +1222,39 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}
+}
+
+func apiKeyAuthGroupSelect(q *dbent.GroupQuery) {
+	q.Select(
+		group.FieldID,
+		group.FieldName,
+		group.FieldPlatform,
+		group.FieldStatus,
+		group.FieldSubscriptionType,
+		group.FieldRateMultiplier,
+		group.FieldDailyLimitUsd,
+		group.FieldWeeklyLimitUsd,
+		group.FieldMonthlyLimitUsd,
+		group.FieldAllowImageGeneration,
+		group.FieldImageRateIndependent,
+		group.FieldImageRateMultiplier,
+		group.FieldImagePrice1k,
+		group.FieldImagePrice2k,
+		group.FieldImagePrice4k,
+		group.FieldClaudeCodeOnly,
+		group.FieldFallbackGroupID,
+		group.FieldFallbackGroupIDOnInvalidRequest,
+		group.FieldModelRoutingEnabled,
+		group.FieldModelRouting,
+		group.FieldMcpXMLInject,
+		group.FieldSupportedModelScopes,
+		group.FieldAllowMessagesDispatch,
+		group.FieldAllowOpenaiCompat,
+		group.FieldDefaultMappedModel,
+		group.FieldMessagesDispatchModelConfig,
+		group.FieldOpenaiImageUpstream,
+		group.FieldRpmLimit,
+	)
 }
 
 func derefString(s *string) string {
