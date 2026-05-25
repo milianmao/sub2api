@@ -28,6 +28,7 @@ var (
 	ErrAPIKeyInvalidChars        = infraerrors.BadRequest("API_KEY_INVALID_CHARS", "api key can only contain letters, numbers, underscores, and hyphens")
 	ErrAPIKeyRateLimited         = infraerrors.TooManyRequests("API_KEY_RATE_LIMITED", "too many failed attempts, please try again later")
 	ErrInvalidIPPattern          = infraerrors.BadRequest("INVALID_IP_PATTERN", "invalid IP or CIDR pattern")
+	ErrInvalidAPIKeyGroupID      = infraerrors.BadRequest("INVALID_API_KEY_GROUP_ID", "api key group id must be greater than 0")
 	ErrDefaultGroupNotAuthorized = infraerrors.BadRequest("DEFAULT_GROUP_NOT_AUTHORIZED", "default group not authorized")
 	// ErrAPIKeyExpired        = infraerrors.Forbidden("API_KEY_EXPIRED", "api key has expired")
 	ErrAPIKeyExpired = infraerrors.Forbidden("API_KEY_EXPIRED", "api key 已过期")
@@ -150,6 +151,9 @@ type APIKeyAuthCacheInvalidator interface {
 }
 
 func normalizeAPIKeyGroupIDs(defaultGroupID *int64, groupIDs []int64) ([]int64, error) {
+	if defaultGroupID != nil && *defaultGroupID <= 0 {
+		return nil, ErrInvalidAPIKeyGroupID
+	}
 	if defaultGroupID == nil {
 		if len(groupIDs) > 0 {
 			return nil, ErrDefaultGroupNotAuthorized
@@ -161,7 +165,7 @@ func normalizeAPIKeyGroupIDs(defaultGroupID *int64, groupIDs []int64) ([]int64, 
 	out := make([]int64, 0, len(groupIDs)+1)
 	for _, id := range groupIDs {
 		if id <= 0 {
-			continue
+			return nil, ErrInvalidAPIKeyGroupID
 		}
 		if _, ok := seen[id]; ok {
 			continue
@@ -177,6 +181,19 @@ func normalizeAPIKeyGroupIDs(defaultGroupID *int64, groupIDs []int64) ([]int64, 
 	}
 	slices.Sort(out)
 	return out, nil
+}
+
+func (s *APIKeyService) validateAPIKeyGroupAccess(ctx context.Context, user *User, groupIDs []int64) error {
+	for _, groupID := range groupIDs {
+		group, err := s.groupRepo.GetByID(ctx, groupID)
+		if err != nil {
+			return fmt.Errorf("get group: %w", err)
+		}
+		if !s.canUserBindGroup(ctx, user, group) {
+			return ErrGroupNotAllowed
+		}
+	}
+	return nil
 }
 
 // CreateAPIKeyRequest 创建API Key请求
@@ -202,7 +219,7 @@ type CreateAPIKeyRequest struct {
 type UpdateAPIKeyRequest struct {
 	Name        *string  `json:"name"`
 	GroupID     *int64   `json:"group_id"`
-	GroupIDs    []int64  `json:"group_ids"`
+	GroupIDs    *[]int64 `json:"group_ids"`
 	Status      *string  `json:"status"`
 	IPWhitelist []string `json:"ip_whitelist"` // IP 白名单（空数组清空）
 	IPBlacklist []string `json:"ip_blacklist"` // IP 黑名单（空数组清空）
@@ -436,6 +453,9 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err != nil {
 		return nil, err
 	}
+	if err := s.validateAPIKeyGroupAccess(ctx, user, groupIDs); err != nil {
+		return nil, err
+	}
 
 	// 创建API Key记录
 	apiKey := &APIKey{
@@ -584,9 +604,11 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.Name = *req.Name
 	}
 
+	groupIDChanged := false
+	var user *User
 	if req.GroupID != nil {
 		// 验证分组权限
-		user, err := s.userRepo.GetByID(ctx, userID)
+		user, err = s.userRepo.GetByID(ctx, userID)
 		if err != nil {
 			return nil, fmt.Errorf("get user: %w", err)
 		}
@@ -601,13 +623,29 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		}
 
 		apiKey.GroupID = req.GroupID
+		groupIDChanged = true
 	}
 
-	groupIDs, err := normalizeAPIKeyGroupIDs(apiKey.GroupID, req.GroupIDs)
-	if err != nil {
-		return nil, err
+	if req.GroupIDs != nil || groupIDChanged {
+		inputGroupIDs := []int64(nil)
+		if req.GroupIDs != nil {
+			inputGroupIDs = *req.GroupIDs
+		}
+		groupIDs, err := normalizeAPIKeyGroupIDs(apiKey.GroupID, inputGroupIDs)
+		if err != nil {
+			return nil, err
+		}
+		if user == nil {
+			user, err = s.userRepo.GetByID(ctx, userID)
+			if err != nil {
+				return nil, fmt.Errorf("get user: %w", err)
+			}
+		}
+		if err := s.validateAPIKeyGroupAccess(ctx, user, groupIDs); err != nil {
+			return nil, err
+		}
+		apiKey.GroupIDs = groupIDs
 	}
-	apiKey.GroupIDs = groupIDs
 
 	if req.Status != nil {
 		apiKey.Status = *req.Status
