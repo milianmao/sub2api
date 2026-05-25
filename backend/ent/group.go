@@ -113,15 +113,19 @@ type GroupEdges struct {
 	UsageLogs []*UsageLog `json:"usage_logs,omitempty"`
 	// Accounts holds the value of the accounts edge.
 	Accounts []*Account `json:"accounts,omitempty"`
+	// AuthorizedAPIKeys holds the value of the authorized_api_keys edge.
+	AuthorizedAPIKeys []*APIKey `json:"authorized_api_keys,omitempty"`
 	// AllowedUsers holds the value of the allowed_users edge.
 	AllowedUsers []*User `json:"allowed_users,omitempty"`
 	// AccountGroups holds the value of the account_groups edge.
 	AccountGroups []*AccountGroup `json:"account_groups,omitempty"`
+	// APIKeyGroups holds the value of the api_key_groups edge.
+	APIKeyGroups []*APIKeyGroup `json:"api_key_groups,omitempty"`
 	// UserAllowedGroups holds the value of the user_allowed_groups edge.
 	UserAllowedGroups []*UserAllowedGroup `json:"user_allowed_groups,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [10]bool
 }
 
 // APIKeysOrErr returns the APIKeys value or an error if the edge
@@ -169,10 +173,19 @@ func (e GroupEdges) AccountsOrErr() ([]*Account, error) {
 	return nil, &NotLoadedError{edge: "accounts"}
 }
 
+// AuthorizedAPIKeysOrErr returns the AuthorizedAPIKeys value or an error if the edge
+// was not loaded in eager-loading.
+func (e GroupEdges) AuthorizedAPIKeysOrErr() ([]*APIKey, error) {
+	if e.loadedTypes[5] {
+		return e.AuthorizedAPIKeys, nil
+	}
+	return nil, &NotLoadedError{edge: "authorized_api_keys"}
+}
+
 // AllowedUsersOrErr returns the AllowedUsers value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) AllowedUsersOrErr() ([]*User, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.AllowedUsers, nil
 	}
 	return nil, &NotLoadedError{edge: "allowed_users"}
@@ -181,16 +194,25 @@ func (e GroupEdges) AllowedUsersOrErr() ([]*User, error) {
 // AccountGroupsOrErr returns the AccountGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) AccountGroupsOrErr() ([]*AccountGroup, error) {
-	if e.loadedTypes[6] {
+	if e.loadedTypes[7] {
 		return e.AccountGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "account_groups"}
 }
 
+// APIKeyGroupsOrErr returns the APIKeyGroups value or an error if the edge
+// was not loaded in eager-loading.
+func (e GroupEdges) APIKeyGroupsOrErr() ([]*APIKeyGroup, error) {
+	if e.loadedTypes[8] {
+		return e.APIKeyGroups, nil
+	}
+	return nil, &NotLoadedError{edge: "api_key_groups"}
+}
+
 // UserAllowedGroupsOrErr returns the UserAllowedGroups value or an error if the edge
 // was not loaded in eager-loading.
 func (e GroupEdges) UserAllowedGroupsOrErr() ([]*UserAllowedGroup, error) {
-	if e.loadedTypes[7] {
+	if e.loadedTypes[9] {
 		return e.UserAllowedGroups, nil
 	}
 	return nil, &NotLoadedError{edge: "user_allowed_groups"}
@@ -516,6 +538,11 @@ func (_m *Group) QueryAccounts() *AccountQuery {
 	return NewGroupClient(_m.config).QueryAccounts(_m)
 }
 
+// QueryAuthorizedAPIKeys queries the "authorized_api_keys" edge of the Group entity.
+func (_m *Group) QueryAuthorizedAPIKeys() *APIKeyQuery {
+	return NewGroupClient(_m.config).QueryAuthorizedAPIKeys(_m)
+}
+
 // QueryAllowedUsers queries the "allowed_users" edge of the Group entity.
 func (_m *Group) QueryAllowedUsers() *UserQuery {
 	return NewGroupClient(_m.config).QueryAllowedUsers(_m)
@@ -524,6 +551,11 @@ func (_m *Group) QueryAllowedUsers() *UserQuery {
 // QueryAccountGroups queries the "account_groups" edge of the Group entity.
 func (_m *Group) QueryAccountGroups() *AccountGroupQuery {
 	return NewGroupClient(_m.config).QueryAccountGroups(_m)
+}
+
+// QueryAPIKeyGroups queries the "api_key_groups" edge of the Group entity.
+func (_m *Group) QueryAPIKeyGroups() *APIKeyGroupQuery {
+	return NewGroupClient(_m.config).QueryAPIKeyGroups(_m)
 }
 
 // QueryUserAllowedGroups queries the "user_allowed_groups" edge of the Group entity.

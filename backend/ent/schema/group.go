@@ -203,6 +203,9 @@ func (Group) Edges() []ent.Edge {
 		edge.From("accounts", Account.Type).
 			Ref("groups").
 			Through("account_groups", AccountGroup.Type),
+		edge.From("authorized_api_keys", APIKey.Type).
+			Ref("authorized_groups").
+			Through("api_key_groups", APIKeyGroup.Type),
 		edge.From("allowed_users", User.Type).
 			Ref("allowed_groups").
 			Through("user_allowed_groups", UserAllowedGroup.Type),
