@@ -408,6 +408,7 @@
 
         <div>
           <label class="input-label">{{ t('keys.groupLabel') }}</label>
+          <p class="input-hint mb-2">{{ t('keys.defaultGroupHint') }}</p>
           <Select
             v-model="formData.group_id"
             :options="groupOptions"

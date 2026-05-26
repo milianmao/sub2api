@@ -9,6 +9,7 @@ import (
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
 
@@ -221,4 +222,48 @@ func TestAPIKeyRepository_UpdateWithEmptyGroupIDsClearsAuthorizedGroups(t *testi
 		Only(ctx)
 	require.NoError(t, err)
 	require.Empty(t, got.Edges.APIKeyGroups)
+}
+
+func TestAPIKeyRepository_LoadAuthorizedGroupsThroughGetAndList(t *testing.T) {
+	repo, client := newAPIKeyRepoSQLite(t)
+	ctx := context.Background()
+	user := mustCreateAPIKeyRepoUser(t, ctx, client, "authorized-groups-read@test.com")
+	defaultGroup := mustCreateAPIKeyRepoGroup(t, ctx, client, "unit-default-group")
+	groupA := mustCreateAPIKeyRepoGroup(t, ctx, client, "unit-authorized-a")
+	groupB := mustCreateAPIKeyRepoGroup(t, ctx, client, "unit-authorized-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-authorized-groups-read",
+		Name:     "Authorized groups read",
+		GroupID:  &defaultGroup.ID,
+		GroupIDs: []int64{groupB.ID, groupA.ID},
+		Status:   service.StatusActive,
+	}
+	require.NoError(t, repo.Create(ctx, key))
+
+	got, err := repo.GetByID(ctx, key.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got.Group)
+	require.Equal(t, defaultGroup.ID, got.Group.ID)
+	require.Equal(t, []int64{groupA.ID, groupB.ID}, got.GroupIDs)
+	require.Len(t, got.Groups, 2)
+	require.Len(t, got.AuthorizedGroups, 2)
+	require.Equal(t, groupA.ID, got.Groups[0].ID)
+	require.Equal(t, groupB.ID, got.Groups[1].ID)
+	require.Equal(t, groupA.ID, got.AuthorizedGroups[0].GroupID)
+	require.Equal(t, groupB.ID, got.AuthorizedGroups[1].GroupID)
+
+	items, _, err := repo.ListByUserID(
+		ctx,
+		user.ID,
+		pagination.PaginationParams{Page: 1, PageSize: 10},
+		service.APIKeyListFilters{},
+	)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	require.Equal(t, []int64{groupA.ID, groupB.ID}, items[0].GroupIDs)
+	require.Len(t, items[0].AuthorizedGroups, 2)
+	require.Equal(t, groupA.ID, items[0].AuthorizedGroups[0].GroupID)
+	require.Equal(t, groupB.ID, items[0].AuthorizedGroups[1].GroupID)
 }
