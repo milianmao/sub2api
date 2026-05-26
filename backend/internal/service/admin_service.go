@@ -348,6 +348,11 @@ type BulkUpdateAccountResult struct {
 	Error     string `json:"error,omitempty"`
 }
 
+type AdminUpdateAPIKeyGroupRequest struct {
+	GroupID  *int64
+	GroupIDs []int64
+}
+
 // AdminUpdateAPIKeyGroupIDResult is the result of AdminUpdateAPIKeyGroupID.
 type AdminUpdateAPIKeyGroupIDResult struct {
 	APIKey                 *APIKey
@@ -2304,17 +2309,21 @@ func (s *adminServiceImpl) UpdateGroupSortOrders(ctx context.Context, updates []
 // AdminUpdateAPIKeyGroupID 管理员修改 API Key 分组绑定
 // groupID: nil=不修改, 指向0=解绑, 指向正整数=绑定到目标分组
 func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID int64, groupID *int64) (*AdminUpdateAPIKeyGroupIDResult, error) {
+	return s.AdminUpdateAPIKeyGroup(ctx, keyID, AdminUpdateAPIKeyGroupRequest{GroupID: groupID})
+}
+
+func (s *adminServiceImpl) AdminUpdateAPIKeyGroup(ctx context.Context, keyID int64, req AdminUpdateAPIKeyGroupRequest) (*AdminUpdateAPIKeyGroupIDResult, error) {
 	apiKey, err := s.apiKeyRepo.GetByID(ctx, keyID)
 	if err != nil {
 		return nil, err
 	}
 
-	if groupID == nil {
+	if req.GroupID == nil {
 		// nil 表示不修改，直接返回
 		return &AdminUpdateAPIKeyGroupIDResult{APIKey: apiKey}, nil
 	}
 
-	if *groupID < 0 {
+	if *req.GroupID < 0 {
 		return nil, infraerrors.BadRequest("INVALID_GROUP_ID", "group_id must be non-negative")
 	}
 
@@ -2323,13 +2332,13 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 		apiKey.GroupIDs = append([]int64(nil), req.GroupIDs...)
 	}
 
-	if *groupID == 0 {
+	if *req.GroupID == 0 {
 		// 0 表示解绑分组（不修改 user_allowed_groups，避免影响用户其他 Key）
 		apiKey.GroupID = nil
 		apiKey.Group = nil
 	} else {
 		// 验证目标分组存在且状态为 active
-		group, err := s.groupRepo.GetByID(ctx, *groupID)
+		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
 		if err != nil {
 			return nil, err
 		}
@@ -2358,7 +2367,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 			if s.userSubRepo == nil {
 				return nil, infraerrors.InternalServer("SUBSCRIPTION_REPOSITORY_UNAVAILABLE", "subscription repository is not configured")
 			}
-			if _, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, apiKey.UserID, *groupID); err != nil {
+			if _, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, apiKey.UserID, *req.GroupID); err != nil {
 				if errors.Is(err, ErrSubscriptionNotFound) {
 					return nil, infraerrors.BadRequest("SUBSCRIPTION_REQUIRED", "user does not have an active subscription for this group")
 				}
@@ -2366,7 +2375,7 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 			}
 		}
 
-		gid := *groupID
+		gid := *req.GroupID
 		apiKey.GroupID = &gid
 		apiKey.Group = group
 
