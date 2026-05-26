@@ -416,6 +416,7 @@
             :search-placeholder="t('keys.searchGroup')"
             :disabled="showEditModal && !canReassignKeyGroup"
             data-tour="key-form-group"
+            @update:model-value="handleDefaultGroupChange"
           >
             <template #selected="{ option }">
               <GroupBadge
@@ -440,6 +441,16 @@
               />
             </template>
           </Select>
+        </div>
+
+        <div v-if="!showEditModal || canReassignKeyGroup">
+          <GroupSelector
+            v-model="formData.group_ids"
+            :groups="groups"
+            :label="t('keys.authorizedGroups')"
+            :searchable="true"
+          />
+          <p class="input-hint">{{ t('keys.authorizedGroupsHint') }}</p>
         </div>
 
         <!-- Custom Key Section (only for create) -->
@@ -1060,19 +1071,20 @@ const { t } = useI18n()
 import { keysAPI, authAPI, usageAPI, userGroupsAPI } from '@/api'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import TablePageLayout from '@/components/layout/TablePageLayout.vue'
-	import DataTable from '@/components/common/DataTable.vue'
-	import Pagination from '@/components/common/Pagination.vue'
-	import BaseDialog from '@/components/common/BaseDialog.vue'
-	import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
-	import EmptyState from '@/components/common/EmptyState.vue'
-	import Select from '@/components/common/Select.vue'
-	import SearchInput from '@/components/common/SearchInput.vue'
-	import Icon from '@/components/icons/Icon.vue'
-	import UseKeyModal from '@/components/keys/UseKeyModal.vue'
-	import EndpointPopover from '@/components/keys/EndpointPopover.vue'
-	import GroupBadge from '@/components/common/GroupBadge.vue'
-	import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-	import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform } from '@/types'
+import DataTable from '@/components/common/DataTable.vue'
+import Pagination from '@/components/common/Pagination.vue'
+import BaseDialog from '@/components/common/BaseDialog.vue'
+import ConfirmDialog from '@/components/common/ConfirmDialog.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import Select from '@/components/common/Select.vue'
+import SearchInput from '@/components/common/SearchInput.vue'
+import Icon from '@/components/icons/Icon.vue'
+import UseKeyModal from '@/components/keys/UseKeyModal.vue'
+import EndpointPopover from '@/components/keys/EndpointPopover.vue'
+import GroupBadge from '@/components/common/GroupBadge.vue'
+import GroupSelector from '@/components/common/GroupSelector.vue'
+import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
+import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1179,6 +1191,7 @@ const setGroupButtonRef = (keyId: number, el: Element | ComponentPublicInstance 
 const formData = ref({
   name: '',
   group_id: null as number | null,
+  group_ids: [] as number[],
   status: 'active' as 'active' | 'inactive',
   use_custom_key: false,
   custom_key: '',
@@ -1261,6 +1274,21 @@ const groupOptions = computed(() =>
     platform: group.platform
   }))
 )
+
+const ensureDefaultGroupAuthorized = () => {
+  const groupId = formData.value.group_id
+  if (groupId === null || formData.value.group_ids.includes(groupId)) return
+  formData.value.group_ids = [groupId, ...formData.value.group_ids]
+}
+
+const handleDefaultGroupChange = () => {
+  ensureDefaultGroupAuthorized()
+}
+
+const authorizedGroupIdsForSubmit = () => {
+  ensureDefaultGroupAuthorized()
+  return Array.from(new Set(formData.value.group_ids))
+}
 
 // Group dropdown search
 const groupSearchQuery = ref('')
@@ -1402,6 +1430,7 @@ const editKey = (key: ApiKey) => {
   formData.value = {
     name: key.name,
     group_id: key.group_id,
+    group_ids: key.group_ids?.length ? [...key.group_ids] : key.group_id === null ? [] : [key.group_id],
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
     custom_key: '',
@@ -1417,6 +1446,9 @@ const editKey = (key: ApiKey) => {
     enable_expiration: hasExpiration,
     expiration_preset: 'custom',
     expiration_date: key.expires_at ? formatDateTimeLocal(key.expires_at) : ''
+  }
+  if (key.group_id !== null && !formData.value.group_ids.includes(key.group_id)) {
+    formData.value.group_ids = [key.group_id, ...formData.value.group_ids]
   }
   showEditModal.value = true
 }
@@ -1473,7 +1505,14 @@ const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
   if (key.group_id === newGroupId) return
 
   try {
-    await keysAPI.update(key.id, { group_id: newGroupId })
+    const updates: { group_id: number | null; group_ids?: number[] } = { group_id: newGroupId }
+    if (newGroupId !== null) {
+      const currentGroupIds = key.group_ids?.length
+        ? key.group_ids
+        : key.group_id === null ? [] : [key.group_id]
+      updates.group_ids = Array.from(new Set([newGroupId, ...currentGroupIds]))
+    }
+    await keysAPI.update(key.id, updates)
     appStore.showSuccess(t('keys.groupChangedSuccess'))
     loadApiKeys()
   } catch (error) {
@@ -1564,7 +1603,9 @@ const handleSubmit = async () => {
         rate_limit_7d: rateLimitData.rate_limit_7d,
       }
       if (canReassignKeyGroup.value) {
-        (updates as typeof updates & { group_id: number | null }).group_id = formData.value.group_id
+        const authorizedGroupIds = authorizedGroupIdsForSubmit()
+        ;(updates as typeof updates & { group_id: number | null; group_ids: number[] }).group_id = formData.value.group_id
+        ;(updates as typeof updates & { group_id: number | null; group_ids: number[] }).group_ids = authorizedGroupIds
       }
       await keysAPI.update(selectedKey.value.id, updates)
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
@@ -1578,7 +1619,8 @@ const handleSubmit = async () => {
         ipBlacklist,
         quota,
         expiresInDays,
-        rateLimitData
+        rateLimitData,
+        authorizedGroupIdsForSubmit()
       )
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
@@ -1624,6 +1666,7 @@ const closeModals = () => {
   formData.value = {
     name: '',
     group_id: null,
+    group_ids: [],
     status: 'active',
     use_custom_key: false,
     custom_key: '',

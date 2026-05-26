@@ -7,6 +7,7 @@ import (
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/apikey"
 	"github.com/Wei-Shaw/sub2api/ent/enttest"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
@@ -43,6 +44,16 @@ func mustCreateAPIKeyRepoUser(t *testing.T, ctx context.Context, client *dbent.C
 		Save(ctx)
 	require.NoError(t, err)
 	return userEntityToService(u)
+}
+
+func mustCreateAPIKeyRepoGroup(t *testing.T, ctx context.Context, client *dbent.Client, name string) *service.Group {
+	t.Helper()
+	g, err := client.Group.Create().
+		SetName(name).
+		SetStatus(service.StatusActive).
+		Save(ctx)
+	require.NoError(t, err)
+	return groupEntityToService(g)
 }
 
 func TestAPIKeyRepository_CreateWithLastUsedAt(t *testing.T) {
@@ -153,4 +164,61 @@ func TestAPIKeyRepository_CreateDuplicateKey(t *testing.T) {
 	require.NoError(t, repo.Create(ctx, first))
 	err := repo.Create(ctx, second)
 	require.ErrorIs(t, err, service.ErrAPIKeyExists)
+}
+
+func TestAPIKeyRepository_UpdateWithNilGroupIDsPreservesAuthorizedGroups(t *testing.T) {
+	repo, client := newAPIKeyRepoSQLite(t)
+	ctx := context.Background()
+	user := mustCreateAPIKeyRepoUser(t, ctx, client, "update-nil-groups@test.com")
+	groupA := mustCreateAPIKeyRepoGroup(t, ctx, client, "unit-update-nil-a")
+	groupB := mustCreateAPIKeyRepoGroup(t, ctx, client, "unit-update-nil-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-update-nil-groups",
+		Name:     "Update nil groups",
+		Status:   service.StatusActive,
+		GroupIDs: []int64{groupA.ID, groupB.ID},
+	}
+	require.NoError(t, repo.Create(ctx, key))
+
+	key.Name = "Update nil groups renamed"
+	key.GroupIDs = nil
+	require.NoError(t, repo.Update(ctx, key))
+
+	got, err := client.APIKey.Query().
+		Where(apikey.IDEQ(key.ID)).
+		WithAPIKeyGroups(withAPIKeyGroupsOrdered).
+		Only(ctx)
+	require.NoError(t, err)
+	require.Equal(t, "Update nil groups renamed", got.Name)
+	require.Len(t, got.Edges.APIKeyGroups, 2)
+	require.Equal(t, []int64{groupA.ID, groupB.ID}, []int64{got.Edges.APIKeyGroups[0].GroupID, got.Edges.APIKeyGroups[1].GroupID})
+}
+
+func TestAPIKeyRepository_UpdateWithEmptyGroupIDsClearsAuthorizedGroups(t *testing.T) {
+	repo, client := newAPIKeyRepoSQLite(t)
+	ctx := context.Background()
+	user := mustCreateAPIKeyRepoUser(t, ctx, client, "update-empty-groups@test.com")
+	groupA := mustCreateAPIKeyRepoGroup(t, ctx, client, "unit-update-empty-a")
+	groupB := mustCreateAPIKeyRepoGroup(t, ctx, client, "unit-update-empty-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-update-empty-groups",
+		Name:     "Update empty groups",
+		Status:   service.StatusActive,
+		GroupIDs: []int64{groupA.ID, groupB.ID},
+	}
+	require.NoError(t, repo.Create(ctx, key))
+
+	key.GroupIDs = []int64{}
+	require.NoError(t, repo.Update(ctx, key))
+
+	got, err := client.APIKey.Query().
+		Where(apikey.IDEQ(key.ID)).
+		WithAPIKeyGroups(withAPIKeyGroupsOrdered).
+		Only(ctx)
+	require.NoError(t, err)
+	require.Empty(t, got.Edges.APIKeyGroups)
 }

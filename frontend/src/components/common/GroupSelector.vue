@@ -1,7 +1,7 @@
 <template>
   <div>
     <label class="input-label">
-      {{ t('admin.users.groups') }}
+      {{ label || t('admin.users.groups') }}
       <span class="font-normal text-gray-400">{{ t('common.selectedCount', { count: modelValue.length }) }}</span>
     </label>
     <div
@@ -61,13 +61,21 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import GroupBadge from './GroupBadge.vue'
 import Icon from '@/components/icons/Icon.vue'
-import type { AdminGroup, GroupPlatform } from '@/types'
+import type { Group, GroupPlatform } from '@/types'
 
 const { t } = useI18n()
 
+type SelectableGroup = Pick<
+  Group,
+  'id' | 'name' | 'description' | 'platform' | 'subscription_type' | 'rate_multiplier'
+> & {
+  account_count?: number
+}
+
 interface Props {
   modelValue: number[]
-  groups: AdminGroup[]
+  groups: SelectableGroup[]
+  label?: string
   platform?: GroupPlatform // Optional platform filter
   mixedScheduling?: boolean // For antigravity accounts: allow anthropic/gemini groups
   searchable?: boolean | 'auto'
@@ -89,7 +97,7 @@ const isSearchable = computed(() => {
 
 // Filter groups by platform if specified
 const filteredGroups = computed(() => {
-  let result: AdminGroup[] = props.groups
+  let result: SelectableGroup[] = props.groups
   if (props.platform) {
     // antigravity 账户启用混合调度后，可选择 anthropic/gemini 分组
     if (props.platform === 'antigravity' && props.mixedScheduling) {

@@ -5,8 +5,10 @@ package middleware
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -650,6 +652,181 @@ func TestAPIKeyAuthTouchesLastUsedInStandardMode(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, w.Code)
 	require.Equal(t, 1, touchCalls)
+}
+
+func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	defaultGroup := &service.Group{
+		ID:                   101,
+		Name:                 "default-openai",
+		Status:               service.StatusActive,
+		Platform:             service.PlatformOpenAI,
+		Hydrated:             true,
+		AllowImageGeneration: false,
+	}
+	imageGroup := &service.Group{
+		ID:                   202,
+		Name:                 "image-openai",
+		Status:               service.StatusActive,
+		Platform:             service.PlatformOpenAI,
+		Hydrated:             true,
+		AllowImageGeneration: true,
+	}
+	user := &service.User{
+		ID:                   7,
+		Role:                 service.RoleUser,
+		Status:               service.StatusActive,
+		Balance:              10,
+		Concurrency:          3,
+		UserGroupRPMOverride: intPtr(17),
+	}
+
+	newRouter := func(apiKey *service.APIKey) *gin.Engine {
+		apiKeyRepo := &stubApiKeyRepo{
+			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+				if key != apiKey.Key {
+					return nil, service.ErrAPIKeyNotFound
+				}
+				clone := *apiKey
+				return &clone, nil
+			},
+		}
+		cfg := &config.Config{RunMode: config.RunModeSimple}
+		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
+		router := gin.New()
+		router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
+		router.Any("/v1/images/generations", func(c *gin.Context) {
+			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+			overrideCleared := false
+			if apiKeyFromCtx.User != nil && apiKeyFromCtx.User.UserGroupRPMOverride == nil {
+				overrideCleared = true
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"api_key_group_id":     apiKeyFromCtx.Group.ID,
+				"api_key_group_ptr":    *apiKeyFromCtx.GroupID,
+				"context_group_id":     groupFromCtx.ID,
+				"rpm_override_cleared": overrideCleared,
+			})
+		})
+		router.POST("/v1/chat/completions", func(c *gin.Context) {
+			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+			c.JSON(http.StatusOK, gin.H{
+				"api_key_group_id":  apiKeyFromCtx.Group.ID,
+				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
+				"context_group_id":  groupFromCtx.ID,
+			})
+		})
+		router.POST("/v1/responses", func(c *gin.Context) {
+			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+			body, err := io.ReadAll(c.Request.Body)
+			require.NoError(t, err)
+			c.JSON(http.StatusOK, gin.H{
+				"api_key_group_id":  apiKeyFromCtx.Group.ID,
+				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
+				"context_group_id":  groupFromCtx.ID,
+				"body":              string(body),
+			})
+		})
+		return router
+	}
+
+	newAPIKey := func(authorized []service.APIKeyAuthorizedGroup) *service.APIKey {
+		apiKey := &service.APIKey{
+			ID:               100,
+			UserID:           user.ID,
+			Key:              "test-key",
+			Status:           service.StatusActive,
+			User:             user,
+			Group:            defaultGroup,
+			AuthorizedGroups: authorized,
+		}
+		userClone := *user
+		apiKey.User = &userClone
+		apiKey.GroupID = &defaultGroup.ID
+		return apiKey
+	}
+
+	t.Run("normal request keeps default group", func(t *testing.T) {
+		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[]}`))
+		req.Header.Set("x-api-key", "test-key")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `"api_key_group_id":101`)
+		require.Contains(t, w.Body.String(), `"api_key_group_ptr":101`)
+		require.Contains(t, w.Body.String(), `"context_group_id":101`)
+	})
+
+	t.Run("image request switches to authorized image group", func(t *testing.T) {
+		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"gpt-image-1","prompt":"cat"}`))
+		req.Header.Set("x-api-key", "test-key")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `"api_key_group_id":202`)
+		require.Contains(t, w.Body.String(), `"api_key_group_ptr":202`)
+		require.Contains(t, w.Body.String(), `"context_group_id":202`)
+		require.Contains(t, w.Body.String(), `"rpm_override_cleared":true`)
+	})
+
+	t.Run("image request without authorized image group is forbidden", func(t *testing.T) {
+		router := newRouter(newAPIKey(nil))
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"gpt-image-1","prompt":"cat"}`))
+		req.Header.Set("x-api-key", "test-key")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusForbidden, w.Code)
+		require.Contains(t, w.Body.String(), "IMAGE_GROUP_NOT_AUTHORIZED")
+		require.Contains(t, w.Body.String(), service.ImageGenerationPermissionMessage())
+	})
+
+	t.Run("responses body image request switches group and preserves downstream body", func(t *testing.T) {
+		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
+		body := `{"model":"gpt-4o","tools":[{"type":"image_generation"}],"input":"cat"}`
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
+		req.Header.Set("x-api-key", "test-key")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `"api_key_group_id":202`)
+		require.Contains(t, w.Body.String(), `"api_key_group_ptr":202`)
+		require.Contains(t, w.Body.String(), `"context_group_id":202`)
+		require.Contains(t, w.Body.String(), `"body":"{\"model\":\"gpt-4o\",\"tools\":[{\"type\":\"image_generation\"}],\"input\":\"cat\"}"`)
+	})
+	t.Run("non post image endpoint keeps default group", func(t *testing.T) {
+		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/v1/images/generations", nil)
+		req.Header.Set("x-api-key", "test-key")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Contains(t, w.Body.String(), `"api_key_group_id":101`)
+		require.Contains(t, w.Body.String(), `"api_key_group_ptr":101`)
+		require.Contains(t, w.Body.String(), `"context_group_id":101`)
+	})
+}
+
+func intPtr(v int) *int {
+	return &v
 }
 
 func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) *gin.Engine {

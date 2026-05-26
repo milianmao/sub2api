@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -318,6 +319,91 @@ func TestApiKeyAuthWithSubscriptionGoogleSetsGroupContext(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestApiKeyAuthWithSubscriptionGoogleEffectiveGroupResolution(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	defaultGroup := &service.Group{
+		ID:                   301,
+		Name:                 "default-openai",
+		Status:               service.StatusActive,
+		Platform:             service.PlatformOpenAI,
+		Hydrated:             true,
+		AllowImageGeneration: false,
+	}
+	imageGroup := &service.Group{
+		ID:                   302,
+		Name:                 "image-openai",
+		Status:               service.StatusActive,
+		Platform:             service.PlatformOpenAI,
+		Hydrated:             true,
+		AllowImageGeneration: true,
+	}
+	user := &service.User{
+		ID:                   7,
+		Role:                 service.RoleUser,
+		Status:               service.StatusActive,
+		Balance:              10,
+		Concurrency:          3,
+		UserGroupRPMOverride: googleIntPtr(23),
+	}
+
+	apiKey := &service.APIKey{
+		ID:     100,
+		UserID: user.ID,
+		Key:    "test-key",
+		Status: service.StatusActive,
+		User:   user,
+		Group:  defaultGroup,
+		AuthorizedGroups: []service.APIKeyAuthorizedGroup{
+			{GroupID: imageGroup.ID, Group: imageGroup},
+		},
+	}
+	apiKey.GroupID = &defaultGroup.ID
+
+	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
+		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	})
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	r := gin.New()
+	r.Use(APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, cfg))
+	r.POST("/v1/images/generations", func(c *gin.Context) {
+		apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+		require.True(t, ok)
+		groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+		overrideCleared := false
+		if apiKeyFromCtx.User != nil && apiKeyFromCtx.User.UserGroupRPMOverride == nil {
+			overrideCleared = true
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"api_key_group_id":     apiKeyFromCtx.Group.ID,
+			"api_key_group_ptr":    *apiKeyFromCtx.GroupID,
+			"context_group_id":     groupFromCtx.ID,
+			"rpm_override_cleared": overrideCleared,
+		})
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"gpt-image-1","prompt":"cat"}`))
+	req.Header.Set("x-api-key", apiKey.Key)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"api_key_group_id":302`)
+	require.Contains(t, rec.Body.String(), `"api_key_group_ptr":302`)
+	require.Contains(t, rec.Body.String(), `"context_group_id":302`)
+	require.Contains(t, rec.Body.String(), `"rpm_override_cleared":true`)
+}
+
+func googleIntPtr(v int) *int {
+	return &v
 }
 
 func TestApiKeyAuthWithSubscriptionGoogle_QueryKeyAllowedOnV1Beta(t *testing.T) {

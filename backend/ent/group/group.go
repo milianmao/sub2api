@@ -102,10 +102,14 @@ const (
 	EdgeUsageLogs = "usage_logs"
 	// EdgeAccounts holds the string denoting the accounts edge name in mutations.
 	EdgeAccounts = "accounts"
+	// EdgeAuthorizedAPIKeys holds the string denoting the authorized_api_keys edge name in mutations.
+	EdgeAuthorizedAPIKeys = "authorized_api_keys"
 	// EdgeAllowedUsers holds the string denoting the allowed_users edge name in mutations.
 	EdgeAllowedUsers = "allowed_users"
 	// EdgeAccountGroups holds the string denoting the account_groups edge name in mutations.
 	EdgeAccountGroups = "account_groups"
+	// EdgeAPIKeyGroups holds the string denoting the api_key_groups edge name in mutations.
+	EdgeAPIKeyGroups = "api_key_groups"
 	// EdgeUserAllowedGroups holds the string denoting the user_allowed_groups edge name in mutations.
 	EdgeUserAllowedGroups = "user_allowed_groups"
 	// Table holds the table name of the group in the database.
@@ -143,6 +147,11 @@ const (
 	// AccountsInverseTable is the table name for the Account entity.
 	// It exists in this package in order to avoid circular dependency with the "account" package.
 	AccountsInverseTable = "accounts"
+	// AuthorizedAPIKeysTable is the table that holds the authorized_api_keys relation/edge. The primary key declared below.
+	AuthorizedAPIKeysTable = "api_key_groups"
+	// AuthorizedAPIKeysInverseTable is the table name for the APIKey entity.
+	// It exists in this package in order to avoid circular dependency with the "apikey" package.
+	AuthorizedAPIKeysInverseTable = "api_keys"
 	// AllowedUsersTable is the table that holds the allowed_users relation/edge. The primary key declared below.
 	AllowedUsersTable = "user_allowed_groups"
 	// AllowedUsersInverseTable is the table name for the User entity.
@@ -155,6 +164,13 @@ const (
 	AccountGroupsInverseTable = "account_groups"
 	// AccountGroupsColumn is the table column denoting the account_groups relation/edge.
 	AccountGroupsColumn = "group_id"
+	// APIKeyGroupsTable is the table that holds the api_key_groups relation/edge.
+	APIKeyGroupsTable = "api_key_groups"
+	// APIKeyGroupsInverseTable is the table name for the APIKeyGroup entity.
+	// It exists in this package in order to avoid circular dependency with the "apikeygroup" package.
+	APIKeyGroupsInverseTable = "api_key_groups"
+	// APIKeyGroupsColumn is the table column denoting the api_key_groups relation/edge.
+	APIKeyGroupsColumn = "group_id"
 	// UserAllowedGroupsTable is the table that holds the user_allowed_groups relation/edge.
 	UserAllowedGroupsTable = "user_allowed_groups"
 	// UserAllowedGroupsInverseTable is the table name for the UserAllowedGroup entity.
@@ -211,6 +227,9 @@ var (
 	// AccountsPrimaryKey and AccountsColumn2 are the table columns denoting the
 	// primary key for the accounts relation (M2M).
 	AccountsPrimaryKey = []string{"account_id", "group_id"}
+	// AuthorizedAPIKeysPrimaryKey and AuthorizedAPIKeysColumn2 are the table columns denoting the
+	// primary key for the authorized_api_keys relation (M2M).
+	AuthorizedAPIKeysPrimaryKey = []string{"api_key_id", "group_id"}
 	// AllowedUsersPrimaryKey and AllowedUsersColumn2 are the table columns denoting the
 	// primary key for the allowed_users relation (M2M).
 	AllowedUsersPrimaryKey = []string{"user_id", "group_id"}
@@ -559,6 +578,20 @@ func ByAccounts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByAuthorizedAPIKeysCount orders the results by authorized_api_keys count.
+func ByAuthorizedAPIKeysCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newAuthorizedAPIKeysStep(), opts...)
+	}
+}
+
+// ByAuthorizedAPIKeys orders the results by authorized_api_keys terms.
+func ByAuthorizedAPIKeys(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAuthorizedAPIKeysStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByAllowedUsersCount orders the results by allowed_users count.
 func ByAllowedUsersCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -584,6 +617,20 @@ func ByAccountGroupsCount(opts ...sql.OrderTermOption) OrderOption {
 func ByAccountGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newAccountGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByAPIKeyGroupsCount orders the results by api_key_groups count.
+func ByAPIKeyGroupsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newAPIKeyGroupsStep(), opts...)
+	}
+}
+
+// ByAPIKeyGroups orders the results by api_key_groups terms.
+func ByAPIKeyGroups(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAPIKeyGroupsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
 
@@ -635,6 +682,13 @@ func newAccountsStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.M2M, true, AccountsTable, AccountsPrimaryKey...),
 	)
 }
+func newAuthorizedAPIKeysStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(AuthorizedAPIKeysInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, true, AuthorizedAPIKeysTable, AuthorizedAPIKeysPrimaryKey...),
+	)
+}
 func newAllowedUsersStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -647,6 +701,13 @@ func newAccountGroupsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AccountGroupsInverseTable, AccountGroupsColumn),
 		sqlgraph.Edge(sqlgraph.O2M, true, AccountGroupsTable, AccountGroupsColumn),
+	)
+}
+func newAPIKeyGroupsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(APIKeyGroupsInverseTable, APIKeyGroupsColumn),
+		sqlgraph.Edge(sqlgraph.O2M, true, APIKeyGroupsTable, APIKeyGroupsColumn),
 	)
 }
 func newUserAllowedGroupsStep() *sqlgraph.Step {

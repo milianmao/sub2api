@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -113,6 +115,9 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 			return
 		}
 		if abortIfAPIKeyGroupUnavailable(c, apiKey) {
+			return
+		}
+		if abortIfEffectiveAPIKeyGroupUnavailable(c, apiKey) {
 			return
 		}
 
@@ -256,6 +261,64 @@ func setGroupContext(c *gin.Context, group *service.Group) {
 	}
 	ctx := context.WithValue(c.Request.Context(), ctxkey.Group, group)
 	c.Request = c.Request.WithContext(ctx)
+}
+
+func abortIfEffectiveAPIKeyGroupUnavailable(c *gin.Context, apiKey *service.APIKey) bool {
+	effectiveGroup, err := service.ResolveEffectiveAPIKeyGroup(apiKey, effectiveGroupResolutionRequest(c))
+	if err != nil {
+		if errors.Is(err, service.ErrImageGroupNotAuthorized) {
+			AbortWithError(c, 403, "IMAGE_GROUP_NOT_AUTHORIZED", service.ImageGenerationPermissionMessage())
+			return true
+		}
+		AbortWithError(c, 500, "INTERNAL_ERROR", "Failed to resolve API key group")
+		return true
+	}
+	applyEffectiveAPIKeyGroup(apiKey, effectiveGroup)
+	setGroupContext(c, effectiveGroup)
+	return false
+}
+
+func effectiveGroupResolutionRequest(c *gin.Context) service.EffectiveGroupResolutionRequest {
+	if c == nil || c.Request == nil {
+		return service.EffectiveGroupResolutionRequest{}
+	}
+	req := service.EffectiveGroupResolutionRequest{
+		Method:   c.Request.Method,
+		Endpoint: c.Request.URL.Path,
+	}
+	if model, ok := c.Request.Context().Value(ctxkey.Model).(string); ok {
+		req.RequestedModel = strings.TrimSpace(model)
+	}
+	if c.Request.Body != nil && service.IsOpenAIResponsesEndpoint(c.Request.URL.Path) {
+		body, err := io.ReadAll(c.Request.Body)
+		if err == nil {
+			req.Body = body
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	}
+	return req
+}
+
+func applyEffectiveAPIKeyGroup(apiKey *service.APIKey, group *service.Group) {
+	if apiKey == nil {
+		return
+	}
+	originalGroupID := apiKey.GroupID
+	if originalGroupID == nil && apiKey.Group != nil {
+		originalGroupID = &apiKey.Group.ID
+	}
+	apiKey.Group = group
+	if group == nil {
+		apiKey.GroupID = nil
+		if originalGroupID != nil && apiKey.User != nil {
+			apiKey.User.UserGroupRPMOverride = nil
+		}
+		return
+	}
+	apiKey.GroupID = &group.ID
+	if originalGroupID != nil && *originalGroupID != group.ID && apiKey.User != nil {
+		apiKey.User.UserGroupRPMOverride = nil
+	}
 }
 
 func abortIfAPIKeyGroupUnavailable(c *gin.Context, apiKey *service.APIKey) bool {

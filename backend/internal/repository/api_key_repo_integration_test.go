@@ -4,11 +4,13 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
+	"github.com/Wei-Shaw/sub2api/ent/apikeygroup"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/require"
@@ -23,8 +25,8 @@ type APIKeyRepoSuite struct {
 }
 
 func (s *APIKeyRepoSuite) SetupTest() {
-	s.ctx = context.Background()
 	tx := testEntTx(s.T())
+	s.ctx = dbent.NewTxContext(context.Background(), tx)
 	s.client = tx.Client()
 	s.repo = newAPIKeyRepositoryWithSQL(s.client, tx)
 }
@@ -165,6 +167,170 @@ func (s *APIKeyRepoSuite) TestGetByKeyForAuth_LoadsAuthorizationFields() {
 	s.Require().Equal(3, got.Group.MinUserLevel)
 }
 
+func (s *APIKeyRepoSuite) TestCreateLoadsAuthorizedGroupsThroughGetAndList() {
+	user := s.mustCreateUser("authorized-create@test.com")
+	defaultGroup := s.mustCreateGroup("g-authorized-default")
+	groupA := s.mustCreateGroup("g-authorized-a")
+	groupB := s.mustCreateGroup("g-authorized-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-authorized-create",
+		Name:     "Authorized Create",
+		GroupID:  &defaultGroup.ID,
+		GroupIDs: []int64{groupB.ID, groupA.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.assertAuthorizedGroups(got, []int64{groupA.ID, groupB.ID}, []int{50, 50})
+	s.Require().NotNil(got.Group)
+	s.Require().Equal(defaultGroup.ID, got.Group.ID)
+
+	byKey, err := s.repo.GetByKey(s.ctx, key.Key)
+	s.Require().NoError(err)
+	s.assertAuthorizedGroups(byKey, []int64{groupA.ID, groupB.ID}, []int{50, 50})
+
+	forAuth, err := s.repo.GetByKeyForAuth(s.ctx, key.Key)
+	s.Require().NoError(err)
+	s.assertAuthorizedGroups(forAuth, []int64{groupA.ID, groupB.ID}, []int{50, 50})
+
+	keys, _, err := s.repo.ListByUserID(s.ctx, user.ID, pagination.PaginationParams{Page: 1, PageSize: 10}, service.APIKeyListFilters{})
+	s.Require().NoError(err)
+	s.Require().Len(keys, 1)
+	s.assertAuthorizedGroups(&keys[0], []int64{groupA.ID, groupB.ID}, []int{50, 50})
+}
+
+func (s *APIKeyRepoSuite) TestUpdateReplacesAuthorizedGroups() {
+	user := s.mustCreateUser("authorized-update@test.com")
+	oldGroup := s.mustCreateGroup("g-authorized-old")
+	newGroup := s.mustCreateGroup("g-authorized-new")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-authorized-update",
+		Name:     "Authorized Update",
+		GroupIDs: []int64{oldGroup.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	key.GroupIDs = []int64{newGroup.ID}
+	s.Require().NoError(s.repo.Update(s.ctx, key))
+
+	rows, err := s.client.APIKeyGroup.Query().Where(apikeygroup.APIKeyIDEQ(key.ID)).Order(apikeygroup.ByGroupID()).All(s.ctx)
+	s.Require().NoError(err)
+	s.Require().Len(rows, 1)
+	s.Require().Equal(newGroup.ID, rows[0].GroupID)
+	s.Require().Equal(50, rows[0].Priority)
+
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.assertAuthorizedGroups(got, []int64{newGroup.ID}, []int{50})
+}
+
+func (s *APIKeyRepoSuite) TestUpdateWithNilGroupIDsPreservesAuthorizedGroups() {
+	user := s.mustCreateUser("authorized-update-nil@test.com")
+	groupA := s.mustCreateGroup("g-authorized-nil-a")
+	groupB := s.mustCreateGroup("g-authorized-nil-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-authorized-update-nil",
+		Name:     "Authorized Update Nil",
+		GroupIDs: []int64{groupA.ID, groupB.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	key.Name = "Authorized Update Nil Renamed"
+	key.GroupIDs = nil
+	s.Require().NoError(s.repo.Update(s.ctx, key))
+
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.Require().Equal("Authorized Update Nil Renamed", got.Name)
+	s.assertAuthorizedGroups(got, []int64{groupA.ID, groupB.ID}, []int{50, 50})
+}
+
+func (s *APIKeyRepoSuite) TestUpdateWithEmptyGroupIDsClearsAuthorizedGroups() {
+	user := s.mustCreateUser("authorized-update-empty@test.com")
+	groupA := s.mustCreateGroup("g-authorized-empty-a")
+	groupB := s.mustCreateGroup("g-authorized-empty-b")
+
+	key := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-authorized-update-empty",
+		Name:     "Authorized Update Empty",
+		GroupIDs: []int64{groupA.ID, groupB.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+
+	key.GroupIDs = []int64{}
+	s.Require().NoError(s.repo.Update(s.ctx, key))
+
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.assertAuthorizedGroups(got, []int64{}, []int{})
+}
+
+func (s *APIKeyRepoSuite) TestGetByIDOrdersAuthorizedGroupsByPriorityThenGroupID() {
+	user := s.mustCreateUser("authorized-order@test.com")
+	groupA := s.mustCreateGroup("g-authorized-order-a")
+	groupB := s.mustCreateGroup("g-authorized-order-b")
+	groupC := s.mustCreateGroup("g-authorized-order-c")
+
+	key := &service.APIKey{
+		UserID: user.ID,
+		Key:    "sk-authorized-order",
+		Name:   "Authorized Order",
+		Status: service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, key))
+	s.Require().NoError(s.client.APIKeyGroup.Create().SetAPIKeyID(key.ID).SetGroupID(groupC.ID).SetPriority(20).Exec(s.ctx))
+	s.Require().NoError(s.client.APIKeyGroup.Create().SetAPIKeyID(key.ID).SetGroupID(groupB.ID).SetPriority(10).Exec(s.ctx))
+	s.Require().NoError(s.client.APIKeyGroup.Create().SetAPIKeyID(key.ID).SetGroupID(groupA.ID).SetPriority(10).Exec(s.ctx))
+
+	got, err := s.repo.GetByID(s.ctx, key.ID)
+	s.Require().NoError(err)
+	s.assertAuthorizedGroups(got, []int64{groupA.ID, groupB.ID, groupC.ID}, []int{10, 10, 20})
+}
+
+func (s *APIKeyRepoSuite) TestListKeysByGroupIDIncludesAuthorizedGroups() {
+	user := s.mustCreateUser("authorized-listkeys@test.com")
+	defaultGroup := s.mustCreateGroup("g-authorized-listkeys-default")
+	authorizedGroup := s.mustCreateGroup("g-authorized-listkeys-authorized")
+
+	defaultKey := &service.APIKey{
+		UserID:  user.ID,
+		Key:     "sk-listkeys-default",
+		Name:    "Default Key",
+		GroupID: &defaultGroup.ID,
+		Status:  service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, defaultKey))
+
+	authorizedKey := &service.APIKey{
+		UserID:   user.ID,
+		Key:      "sk-listkeys-authorized",
+		Name:     "Authorized Key",
+		GroupIDs: []int64{authorizedGroup.ID},
+		Status:   service.StatusActive,
+	}
+	s.Require().NoError(s.repo.Create(s.ctx, authorizedKey))
+
+	keys, err := s.repo.ListKeysByGroupID(s.ctx, authorizedGroup.ID)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]string{"sk-listkeys-authorized"}, keys)
+
+	keys, err = s.repo.ListKeysByGroupID(s.ctx, defaultGroup.ID)
+	s.Require().NoError(err)
+	s.Require().ElementsMatch([]string{"sk-listkeys-default"}, keys)
+}
+
 // --- Update ---
 
 func (s *APIKeyRepoSuite) TestUpdate() {
@@ -271,7 +437,7 @@ func (s *APIKeyRepoSuite) TestListByUserID() {
 func (s *APIKeyRepoSuite) TestListByUserID_Pagination() {
 	user := s.mustCreateUser("paging@test.com")
 	for i := 0; i < 5; i++ {
-		s.mustCreateApiKey(user.ID, "sk-page-"+string(rune('a'+i)), "Key", nil)
+		s.mustCreateApiKey(user.ID, "sk-page-"+fmt.Sprint(i), "Key", nil)
 	}
 
 	keys, page, err := s.repo.ListByUserID(s.ctx, user.ID, pagination.PaginationParams{Page: 1, PageSize: 2}, service.APIKeyListFilters{})
@@ -451,6 +617,22 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 	countAfter, err := s.repo.CountByGroupID(s.ctx, group.ID)
 	s.Require().NoError(err, "CountByGroupID after clear")
 	s.Require().Equal(int64(0), countAfter, "expected 0 keys in group after clear")
+}
+
+func (s *APIKeyRepoSuite) assertAuthorizedGroups(key *service.APIKey, wantGroupIDs []int64, wantPriorities []int) {
+	s.T().Helper()
+	s.Require().NotNil(key)
+	s.Require().Equal(wantGroupIDs, key.GroupIDs)
+	s.Require().Len(key.Groups, len(wantGroupIDs))
+	s.Require().Len(key.AuthorizedGroups, len(wantGroupIDs))
+	for i, wantGroupID := range wantGroupIDs {
+		s.Require().NotNil(key.Groups[i])
+		s.Require().Equal(wantGroupID, key.Groups[i].ID)
+		s.Require().Equal(wantGroupID, key.AuthorizedGroups[i].GroupID)
+		s.Require().NotNil(key.AuthorizedGroups[i].Group)
+		s.Require().Equal(wantGroupID, key.AuthorizedGroups[i].Group.ID)
+		s.Require().Equal(wantPriorities[i], key.AuthorizedGroups[i].Priority)
+	}
 }
 
 func (s *APIKeyRepoSuite) mustCreateUser(email string) *service.User {

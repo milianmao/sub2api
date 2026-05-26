@@ -273,6 +273,162 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesMessagesDispatchModelConfig(t 
 	require.Equal(t, apiKey.Group.MessagesDispatchModelConfig, roundTrip.Group.MessagesDispatchModelConfig)
 }
 
+func TestAPIKeyService_SnapshotRoundTrip_PreservesAuthorizedGroups(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, &config.Config{})
+	defaultGroupID := int64(9)
+	apiKey := &APIKey{
+		ID:       1,
+		UserID:   2,
+		GroupID:  &defaultGroupID,
+		GroupIDs: []int64{12, 10},
+		Key:      "k-authorized-groups",
+		Name:     "Authorized Groups Key",
+		Status:   StatusActive,
+		User: &User{
+			ID:          2,
+			Status:      StatusActive,
+			Role:        RoleUser,
+			Balance:     10,
+			Concurrency: 3,
+		},
+		Group: &Group{
+			ID:             defaultGroupID,
+			Name:           "default",
+			Platform:       PlatformAnthropic,
+			Status:         StatusActive,
+			RateMultiplier: 1,
+			VisibleUserIDs: []int64{2, 3},
+		},
+		Groups: []*Group{
+			{ID: 12, Name: "secondary", Platform: PlatformOpenAI, Status: StatusActive, RateMultiplier: 1.2},
+			{ID: 10, Name: "primary", Platform: PlatformGemini, Status: StatusActive, RateMultiplier: 1.1},
+		},
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 12, Group: &Group{ID: 12, Name: "secondary", Platform: PlatformOpenAI, Status: StatusActive}, Priority: 1},
+			{GroupID: 10, Group: &Group{ID: 10, Name: "primary", Platform: PlatformGemini, Status: StatusActive}, Priority: 2},
+		},
+	}
+
+	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
+	restored := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+
+	require.NotNil(t, restored)
+	require.NotNil(t, restored.GroupID)
+	require.Equal(t, defaultGroupID, *restored.GroupID)
+	require.NotNil(t, restored.Group)
+	require.Equal(t, defaultGroupID, restored.Group.ID)
+	require.Equal(t, "default", restored.Group.Name)
+	require.Equal(t, []int64{12, 10}, restored.GroupIDs)
+	require.Len(t, restored.Groups, 2)
+	require.Equal(t, int64(12), restored.Groups[0].ID)
+	require.Equal(t, int64(10), restored.Groups[1].ID)
+	require.Len(t, restored.AuthorizedGroups, 2)
+	require.Equal(t, int64(12), restored.AuthorizedGroups[0].GroupID)
+	require.Equal(t, 1, restored.AuthorizedGroups[0].Priority)
+	require.Equal(t, int64(10), restored.AuthorizedGroups[1].GroupID)
+	require.Equal(t, 2, restored.AuthorizedGroups[1].Priority)
+	require.NotNil(t, restored.AuthorizedGroups[0].Group)
+	require.Equal(t, "secondary", restored.AuthorizedGroups[0].Group.Name)
+}
+
+func TestAPIKeyService_SnapshotRoundTrip_DoesNotShareAuthorizedGroupState(t *testing.T) {
+	svc := NewAPIKeyService(nil, nil, nil, nil, nil, nil, &config.Config{})
+	defaultGroupID := int64(9)
+	apiKey := &APIKey{
+		ID:       1,
+		UserID:   2,
+		GroupID:  &defaultGroupID,
+		GroupIDs: []int64{12, 10},
+		Key:      "k-authorized-groups-copy",
+		Status:   StatusActive,
+		User: &User{
+			ID:          2,
+			Status:      StatusActive,
+			Role:        RoleUser,
+			Balance:     10,
+			Concurrency: 3,
+		},
+		Group: &Group{
+			ID:             defaultGroupID,
+			Name:           "default",
+			Platform:       PlatformAnthropic,
+			Status:         StatusActive,
+			VisibleUserIDs: []int64{2, 3},
+			MessagesDispatchModelConfig: OpenAIMessagesDispatchModelConfig{
+				ExactModelMappings: map[string]string{"claude-opus-4": "gpt-5.4"},
+			},
+			ModelRouting: map[string][]int64{"claude-opus-*": {12, 10}},
+		},
+		Groups: []*Group{
+			{
+				ID:             12,
+				Name:           "secondary",
+				Platform:       PlatformOpenAI,
+				Status:         StatusActive,
+				VisibleUserIDs: []int64{7, 8},
+				MessagesDispatchModelConfig: OpenAIMessagesDispatchModelConfig{
+					ExactModelMappings: map[string]string{"claude-sonnet-4.5": "gpt-5.3-codex"},
+				},
+			},
+		},
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{
+				GroupID: 12,
+				Group: &Group{
+					ID:             12,
+					Name:           "secondary",
+					Platform:       PlatformOpenAI,
+					Status:         StatusActive,
+					VisibleUserIDs: []int64{7, 8},
+					MessagesDispatchModelConfig: OpenAIMessagesDispatchModelConfig{
+						ExactModelMappings: map[string]string{"claude-haiku-4.5": "gpt-5.4-mini"},
+					},
+				},
+				Priority: 1,
+			},
+		},
+	}
+
+	snapshot := svc.snapshotFromAPIKey(context.Background(), apiKey)
+	apiKey.GroupIDs[0] = 99
+	apiKey.Group.Name = "mutated-source-default"
+	apiKey.Group.VisibleUserIDs[0] = 99
+	apiKey.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-opus-4"] = "mutated-source-default"
+	apiKey.Group.ModelRouting["claude-opus-*"][0] = 99
+	apiKey.Groups[0].Name = "mutated-source-group"
+	apiKey.Groups[0].VisibleUserIDs[0] = 99
+	apiKey.Groups[0].MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"] = "mutated-source-group"
+	apiKey.AuthorizedGroups[0].Group.Name = "mutated-source-authorized"
+	apiKey.AuthorizedGroups[0].Group.VisibleUserIDs[0] = 99
+	apiKey.AuthorizedGroups[0].Group.MessagesDispatchModelConfig.ExactModelMappings["claude-haiku-4.5"] = "mutated-source-authorized"
+
+	first := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+	first.GroupIDs[0] = 88
+	first.Group.Name = "mutated-restored-default"
+	first.Group.VisibleUserIDs[0] = 88
+	first.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-opus-4"] = "mutated-restored-default"
+	first.Group.ModelRouting["claude-opus-*"][0] = 88
+	first.Groups[0].Name = "mutated-restored-group"
+	first.Groups[0].VisibleUserIDs[0] = 88
+	first.Groups[0].MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"] = "mutated-restored-group"
+	first.AuthorizedGroups[0].Group.Name = "mutated-restored-authorized"
+	first.AuthorizedGroups[0].Group.VisibleUserIDs[0] = 88
+	first.AuthorizedGroups[0].Group.MessagesDispatchModelConfig.ExactModelMappings["claude-haiku-4.5"] = "mutated-restored-authorized"
+
+	second := svc.snapshotToAPIKey(apiKey.Key, snapshot)
+	require.Equal(t, []int64{12, 10}, second.GroupIDs)
+	require.Equal(t, "default", second.Group.Name)
+	require.Equal(t, []int64{2, 3}, second.Group.VisibleUserIDs)
+	require.Equal(t, "gpt-5.4", second.Group.MessagesDispatchModelConfig.ExactModelMappings["claude-opus-4"])
+	require.Equal(t, map[string][]int64{"claude-opus-*": {12, 10}}, second.Group.ModelRouting)
+	require.Equal(t, "secondary", second.Groups[0].Name)
+	require.Equal(t, []int64{7, 8}, second.Groups[0].VisibleUserIDs)
+	require.Equal(t, "gpt-5.3-codex", second.Groups[0].MessagesDispatchModelConfig.ExactModelMappings["claude-sonnet-4.5"])
+	require.Equal(t, "secondary", second.AuthorizedGroups[0].Group.Name)
+	require.Equal(t, []int64{7, 8}, second.AuthorizedGroups[0].Group.VisibleUserIDs)
+	require.Equal(t, "gpt-5.4-mini", second.AuthorizedGroups[0].Group.MessagesDispatchModelConfig.ExactModelMappings["claude-haiku-4.5"])
+}
+
 func TestAPIKeyService_GetByKey_IgnoresLegacyAuthCacheSnapshotWithoutMessagesDispatchConfig(t *testing.T) {
 	cache := &authCacheStub{}
 	var repoCalls int32
