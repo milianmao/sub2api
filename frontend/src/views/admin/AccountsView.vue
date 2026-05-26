@@ -1647,12 +1647,17 @@ const handleGenerateCheckoutLink = async (a: Account) => {
   }
 }
 const handleCopyAccessToken = async (a: Account) => {
-  const accessToken = typeof a.credentials?.access_token === 'string' ? a.credentials.access_token.trim() : ''
-  if (!accessToken) {
+  try {
+    const accessToken = (await adminAPI.accounts.getAccessToken(a.id)).trim()
+    if (!accessToken) {
+      appStore.showError(t('admin.accounts.accessTokenUnavailable'))
+      return
+    }
+    await copyToClipboard(accessToken, t('admin.accounts.accessTokenCopied'))
+  } catch (error) {
+    console.error('Failed to get access token:', error)
     appStore.showError(t('admin.accounts.accessTokenUnavailable'))
-    return
   }
-  await copyToClipboard(accessToken, t('admin.accounts.accessTokenCopied'))
 }
 const handleCopyAccountEmail = async (a: Account) => {
   const email = String(a.extra?.email_address || a.extra?.email || a.credentials?.email || '').trim()

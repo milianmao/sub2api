@@ -661,6 +661,15 @@ export async function setPrivacy(id: number): Promise<Account> {
   return data
 }
 
+export interface AccountAccessTokenResponse {
+  access_token: string
+}
+
+export async function getAccessToken(id: number): Promise<string> {
+  const { data } = await apiClient.get<AccountAccessTokenResponse>(`/admin/accounts/${id}/access-token`)
+  return data.access_token
+}
+
 export async function generateCheckoutLink(id: number): Promise<string> {
   const { data } = await apiClient.post<string>(`/admin/accounts/${id}/checkout-link`, undefined, { responseType: 'text' })
   return data
@@ -706,6 +715,7 @@ export const accountsAPI = {
   batchClearError,
   batchRefresh,
   setPrivacy,
+  getAccessToken,
   generateCheckoutLink
 }
 
