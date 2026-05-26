@@ -98,7 +98,7 @@ export async function getById(id: number): Promise<ApiKey> {
 export async function create(request: CreateApiKeyRequest): Promise<ApiKey>
 export async function create(
   name: string,
-  groupId?: number | null,
+  groupIdOrGroupIds?: number | number[] | null,
   customKey?: string,
   ipWhitelist?: string[],
   ipBlacklist?: string[],
@@ -109,7 +109,7 @@ export async function create(
 ): Promise<ApiKey>
 export async function create(
   nameOrRequest: string | CreateApiKeyRequest,
-  groupId?: number | null,
+  groupIdOrGroupIds?: number | number[] | null,
   customKey?: string,
   ipWhitelist?: string[],
   ipBlacklist?: string[],
@@ -123,9 +123,11 @@ export async function create(
     return data
   }
 
+  const groupId = Array.isArray(groupIdOrGroupIds) ? undefined : groupIdOrGroupIds
+  const normalizedGroupIds = groupIds ?? (Array.isArray(groupIdOrGroupIds) ? groupIdOrGroupIds : undefined)
   const payload = buildCreatePayload(nameOrRequest, {
     group_id: groupId,
-    group_ids: groupIds,
+    group_ids: normalizedGroupIds,
     custom_key: customKey,
     ip_whitelist: ipWhitelist,
     ip_blacklist: ipBlacklist,

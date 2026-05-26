@@ -21,10 +21,10 @@ func TestNormalizeAPIKeyGroupIDs(t *testing.T) {
 		wantErr error
 	}{
 		{name: "group id only becomes authorized group", groupID: &group1, want: []int64{1}},
-		{name: "group ids include default", groupID: &group1, input: []int64{2, 1}, want: []int64{1, 2}},
-		{name: "nil default requires empty authorized groups", input: nil, want: nil},
-		{name: "nil default rejects authorized groups", input: []int64{1}, wantErr: ErrDefaultGroupNotAuthorized},
-		{name: "default must be included", groupID: &group1, input: []int64{2}, wantErr: ErrDefaultGroupNotAuthorized},
+		{name: "group ids include legacy group id", groupID: &group1, input: []int64{2, 1}, want: []int64{1, 2}},
+		{name: "group ids without legacy group id are source of truth", groupID: &group1, input: []int64{2}, want: []int64{2}},
+		{name: "nil default rejects empty group set", input: nil, wantErr: ErrDefaultGroupNotAuthorized},
+		{name: "nil default accepts group ids", input: []int64{1}, want: []int64{1}},
 		{name: "duplicates are removed", groupID: &group1, input: []int64{1, 1, 2}, want: []int64{1, 2}},
 		{name: "non-positive ids are rejected", groupID: &group1, input: []int64{1, 0}, wantErr: ErrInvalidAPIKeyGroupID},
 		{name: "nil default rejects zero authorized group as invalid", input: []int64{0}, wantErr: ErrInvalidAPIKeyGroupID},
@@ -193,6 +193,38 @@ func TestAPIKeyServiceCreateRejectsUnauthorizedAuthorizedGroup(t *testing.T) {
 	require.Nil(t, apiKeyRepo.created)
 }
 
+func TestAPIKeyServiceCreateUsesGroupIDsAsSingleGroupSet(t *testing.T) {
+	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{}
+	svc := &APIKeyService{
+		apiKeyRepo: apiKeyRepo,
+		userRepo: &stubUserRepoForGroupAuth{
+			users: map[int64]*User{7: {ID: 7, Level: 1, AllowedGroups: []int64{2}}},
+		},
+		groupRepo: &stubGroupRepoForGroupAuth{
+			groups: map[int64]*Group{
+				1: {ID: 1, AccessMode: GroupAccessModePublic, MinUserLevel: 1},
+				2: {ID: 2, AccessMode: GroupAccessModeRestricted, MinUserLevel: 1},
+			},
+		},
+		userSubRepo: &stubUserSubscriptionRepoForGroupAuth{},
+	}
+
+	out, err := svc.Create(context.Background(), 7, CreateAPIKeyRequest{
+		Name:      "key",
+		GroupIDs:  []int64{2, 1},
+		CustomKey: stringPtrForGroupAuth("custom-key-12345"),
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, []int64{1, 2}, out.GroupIDs)
+	require.NotNil(t, out.GroupID)
+	require.Equal(t, int64(1), *out.GroupID)
+	require.NotNil(t, apiKeyRepo.created)
+	require.Equal(t, []int64{1, 2}, apiKeyRepo.created.GroupIDs)
+	require.NotNil(t, apiKeyRepo.created.GroupID)
+	require.Equal(t, int64(1), *apiKeyRepo.created.GroupID)
+}
+
 func TestAPIKeyServiceUpdateNameOnlyPreservesAuthorizedGroups(t *testing.T) {
 	defaultGroupID := int64(1)
 	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{
@@ -248,6 +280,44 @@ func TestAPIKeyServiceUpdateRejectsUnauthorizedAuthorizedGroup(t *testing.T) {
 
 	require.ErrorIs(t, err, ErrGroupNotAllowed)
 	require.Nil(t, apiKeyRepo.updated)
+}
+
+func TestAPIKeyServiceUpdateUsesGroupIDsAsSingleGroupSet(t *testing.T) {
+	defaultGroupID := int64(1)
+	apiKeyRepo := &stubAPIKeyRepoForGroupAuth{
+		apiKey: &APIKey{
+			ID:       10,
+			UserID:   7,
+			Key:      "custom-key-12345",
+			Name:     "key",
+			GroupID:  &defaultGroupID,
+			GroupIDs: []int64{1},
+		},
+	}
+	groupIDs := []int64{2}
+	svc := &APIKeyService{
+		apiKeyRepo: apiKeyRepo,
+		userRepo: &stubUserRepoForGroupAuth{
+			users: map[int64]*User{7: {ID: 7, Level: 1, AllowedGroups: []int64{2}}},
+		},
+		groupRepo: &stubGroupRepoForGroupAuth{
+			groups: map[int64]*Group{
+				2: {ID: 2, AccessMode: GroupAccessModeRestricted, MinUserLevel: 1},
+			},
+		},
+		userSubRepo: &stubUserSubscriptionRepoForGroupAuth{},
+	}
+
+	out, err := svc.Update(context.Background(), 10, 7, UpdateAPIKeyRequest{GroupIDs: &groupIDs})
+
+	require.NoError(t, err)
+	require.Equal(t, []int64{2}, out.GroupIDs)
+	require.NotNil(t, out.GroupID)
+	require.Equal(t, int64(2), *out.GroupID)
+	require.NotNil(t, apiKeyRepo.updated)
+	require.Equal(t, []int64{2}, apiKeyRepo.updated.GroupIDs)
+	require.NotNil(t, apiKeyRepo.updated.GroupID)
+	require.Equal(t, int64(2), *apiKeyRepo.updated.GroupID)
 }
 
 func TestAPIKeyServiceUpdateExplicitAuthorizedGroups(t *testing.T) {

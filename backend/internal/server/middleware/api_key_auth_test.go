@@ -673,6 +673,18 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 		Hydrated:             true,
 		AllowImageGeneration: true,
 	}
+	subscriptionGroup := &service.Group{
+		ID:                  303,
+		Name:                "subscription-routed",
+		Status:              service.StatusActive,
+		Platform:            service.PlatformAnthropic,
+		Hydrated:            true,
+		SubscriptionType:    service.SubscriptionTypeSubscription,
+		ModelRoutingEnabled: true,
+		ModelRouting: map[string][]int64{
+			"claude-sub-*": {77},
+		},
+	}
 	user := &service.User{
 		ID:                   7,
 		Role:                 service.RoleUser,
@@ -822,6 +834,76 @@ func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
 		require.Contains(t, w.Body.String(), `"api_key_group_id":101`)
 		require.Contains(t, w.Body.String(), `"api_key_group_ptr":101`)
 		require.Contains(t, w.Body.String(), `"context_group_id":101`)
+	})
+
+	t.Run("subscription validation uses model routed effective group", func(t *testing.T) {
+		apiKey := newAPIKey([]service.APIKeyAuthorizedGroup{
+			{GroupID: subscriptionGroup.ID, Group: subscriptionGroup, Priority: 1},
+		})
+		apiKey.GroupIDs = []int64{defaultGroup.ID, subscriptionGroup.ID}
+
+		apiKeyRepo := &stubApiKeyRepo{
+			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+				if key != apiKey.Key {
+					return nil, service.ErrAPIKeyNotFound
+				}
+				clone := *apiKey
+				return &clone, nil
+			},
+		}
+		cfg := &config.Config{RunMode: config.RunModeStandard}
+		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
+
+		var lookedUpGroupID int64
+		subscriptionRepo := &stubUserSubscriptionRepo{
+			getActive: func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
+				lookedUpGroupID = groupID
+				if groupID != subscriptionGroup.ID {
+					return nil, service.ErrSubscriptionNotFound
+				}
+				return &service.UserSubscription{
+					ID:        909,
+					UserID:    userID,
+					GroupID:   groupID,
+					Status:    service.SubscriptionStatusActive,
+					ExpiresAt: time.Now().Add(time.Hour),
+				}, nil
+			},
+			updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
+			activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
+			resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
+			resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
+			resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
+		}
+		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
+		router := gin.New()
+		router.Use(func(c *gin.Context) {
+			ctx := context.WithValue(c.Request.Context(), ctxkey.Model, "claude-sub-20250514")
+			c.Request = c.Request.WithContext(ctx)
+			c.Next()
+		})
+		router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))
+		router.POST("/v1/messages", func(c *gin.Context) {
+			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+			require.True(t, ok)
+			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
+			c.JSON(http.StatusOK, gin.H{
+				"api_key_group_id":  apiKeyFromCtx.Group.ID,
+				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
+				"context_group_id":  groupFromCtx.ID,
+			})
+		})
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"claude-sub-20250514"}`))
+		req.Header.Set("x-api-key", "test-key")
+		router.ServeHTTP(w, req)
+
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, subscriptionGroup.ID, lookedUpGroupID)
+		require.Contains(t, w.Body.String(), `"api_key_group_id":303`)
+		require.Contains(t, w.Body.String(), `"api_key_group_ptr":303`)
+		require.Contains(t, w.Body.String(), `"context_group_id":303`)
 	})
 }
 
