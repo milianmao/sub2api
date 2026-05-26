@@ -59,9 +59,17 @@ const ApiKeyCreateTestComponent = defineComponent({
       group_ids: undefined as number[] | undefined,
     })
 
+    const ensureDefaultGroupAuthorized = () => {
+      if (formData.group_id === null) return
+      const groupIds = formData.group_ids ?? []
+      if (groupIds.includes(formData.group_id)) return
+      formData.group_ids = [formData.group_id, ...groupIds]
+    }
+
     const handleCreate = async () => {
       if (!formData.name) return
 
+      ensureDefaultGroupAuthorized()
       loading.value = true
       try {
         const result = await mockCreate({
@@ -141,7 +149,7 @@ describe('ApiKey 创建流程', () => {
     expect(mockCreate).toHaveBeenCalledWith({
       name: 'Group Key',
       group_id: 1,
-      group_ids: undefined,
+      group_ids: [1],
     })
   })
 
@@ -162,6 +170,28 @@ describe('ApiKey 创建流程', () => {
 
     expect(mockCreate).toHaveBeenCalledWith({
       name: 'Group Key',
+      group_id: 1,
+      group_ids: [1, 2],
+    })
+  })
+
+  it('自动把默认分组加入授权分组后提交', async () => {
+    mockCreate.mockResolvedValue({
+      id: 4,
+      key: 'sk-authorized-default-key',
+      name: 'Default Included Key',
+    })
+
+    const wrapper = mount(ApiKeyCreateTestComponent)
+
+    await wrapper.find('#name').setValue('Default Included Key')
+    await wrapper.find('#group').setValue('1')
+    ;(wrapper.vm as any).formData.group_ids = [2]
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(mockCreate).toHaveBeenCalledWith({
+      name: 'Default Included Key',
       group_id: 1,
       group_ids: [1, 2],
     })
