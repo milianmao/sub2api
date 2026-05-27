@@ -125,6 +125,12 @@
                         {{ t('admin.accounts.toolActions') }}
                       </div>
                     </div>
+                    <button data-test="open-liveness-check" class="account-tools-menu-item" @click="openLivenessCheck">
+                      <span class="account-tools-menu-icon bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300">
+                        <Icon name="shield" size="sm" />
+                      </span>
+                      <span class="flex-1 text-left">{{ t('admin.accounts.liveness.entry') }}</span>
+                    </button>
                     <button class="account-tools-menu-item" @click="openErrorPassthrough">
                       <span class="account-tools-menu-icon bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-300">
                         <Icon name="shield" size="sm" />
@@ -381,6 +387,14 @@
     </ConfirmDialog>
     <ErrorPassthroughRulesModal :show="showErrorPassthrough" @close="showErrorPassthrough = false" />
     <TLSFingerprintProfilesModal :show="showTLSFingerprintProfiles" @close="showTLSFingerprintProfiles = false" />
+    <AccountLivenessCheckModal
+      :show="showLivenessCheck"
+      :selected-ids="selIds"
+      :filters="livenessFilters"
+      :filtered-count="pagination.total"
+      @close="closeLivenessCheck"
+      @completed="handleLivenessCheckCompleted"
+    />
   </AppLayout>
 </template>
 
@@ -410,6 +424,7 @@ import ImportDataModal from '@/components/admin/account/ImportDataModal.vue'
 import ReAuthAccountModal from '@/components/admin/account/ReAuthAccountModal.vue'
 import AccountTestModal from '@/components/admin/account/AccountTestModal.vue'
 import AccountStatsModal from '@/components/admin/account/AccountStatsModal.vue'
+import AccountLivenessCheckModal from '@/components/admin/account/AccountLivenessCheckModal.vue'
 import ScheduledTestsPanel from '@/components/admin/account/ScheduledTestsPanel.vue'
 import type { SelectOption } from '@/components/common/Select.vue'
 import AccountStatusIndicator from '@/components/account/AccountStatusIndicator.vue'
@@ -489,6 +504,7 @@ const showTest = ref(false)
 const showStats = ref(false)
 const showErrorPassthrough = ref(false)
 const showTLSFingerprintProfiles = ref(false)
+const showLivenessCheck = ref(false)
 const edAcc = ref<Account | null>(null)
 const tempUnschedAcc = ref<Account | null>(null)
 const deletingAcc = ref<Account | null>(null)
@@ -895,7 +911,8 @@ const isAnyModalOpen = computed(() => {
     showStats.value ||
     showSchedulePanel.value ||
     showErrorPassthrough.value ||
-    showTLSFingerprintProfiles.value
+    showTLSFingerprintProfiles.value ||
+    showLivenessCheck.value
   )
 })
 
@@ -1013,6 +1030,21 @@ const openImportData = () => {
 const openImportChatGPTSession = () => {
   closeAccountToolsDropdown()
   showImportChatGPTSession.value = true
+}
+
+const openLivenessCheck = () => {
+  closeAccountToolsDropdown()
+  showLivenessCheck.value = true
+}
+
+const closeLivenessCheck = () => {
+  showLivenessCheck.value = false
+}
+
+const handleLivenessCheckCompleted = async () => {
+  showLivenessCheck.value = false
+  await reload()
+  usageManualRefreshToken.value += 1
 }
 
 const openExportDataDialogFromMenu = () => {
@@ -1441,6 +1473,7 @@ const buildAccountQueryFilters = () => ({
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order
 })
+const livenessFilters = computed(() => buildAccountQueryFilters())
 const accountMatchesCurrentFilters = (account: Account) => {
   const filters = buildAccountQueryFilters()
   if (filters.platform && account.platform !== filters.platform) return false

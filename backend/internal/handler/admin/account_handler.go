@@ -11,6 +11,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -43,21 +44,26 @@ func NewOAuthHandler(oauthService *service.OAuthService) *OAuthHandler {
 	}
 }
 
+type accountLivenessTestRunner interface {
+	RunTestBackground(ctx context.Context, accountID int64, modelID string) (*service.ScheduledTestResult, error)
+}
+
 // AccountHandler handles admin account management
 type AccountHandler struct {
-	adminService            service.AdminService
-	oauthService            *service.OAuthService
-	openaiOAuthService      *service.OpenAIOAuthService
-	geminiOAuthService      *service.GeminiOAuthService
-	antigravityOAuthService *service.AntigravityOAuthService
-	rateLimitService        *service.RateLimitService
-	accountUsageService     *service.AccountUsageService
-	accountTestService      *service.AccountTestService
-	concurrencyService      *service.ConcurrencyService
-	crsSyncService          *service.CRSSyncService
-	sessionLimitCache       service.SessionLimitCache
-	rpmCache                service.RPMCache
-	tokenCacheInvalidator   service.TokenCacheInvalidator
+	adminService              service.AdminService
+	oauthService              *service.OAuthService
+	openaiOAuthService        *service.OpenAIOAuthService
+	geminiOAuthService        *service.GeminiOAuthService
+	antigravityOAuthService   *service.AntigravityOAuthService
+	rateLimitService          *service.RateLimitService
+	accountUsageService       *service.AccountUsageService
+	accountTestService        *service.AccountTestService
+	accountLivenessTestRunner accountLivenessTestRunner
+	concurrencyService        *service.ConcurrencyService
+	crsSyncService            *service.CRSSyncService
+	sessionLimitCache         service.SessionLimitCache
+	rpmCache                  service.RPMCache
+	tokenCacheInvalidator     service.TokenCacheInvalidator
 }
 
 // NewAccountHandler creates a new admin account handler
@@ -77,19 +83,20 @@ func NewAccountHandler(
 	tokenCacheInvalidator service.TokenCacheInvalidator,
 ) *AccountHandler {
 	return &AccountHandler{
-		adminService:            adminService,
-		oauthService:            oauthService,
-		openaiOAuthService:      openaiOAuthService,
-		geminiOAuthService:      geminiOAuthService,
-		antigravityOAuthService: antigravityOAuthService,
-		rateLimitService:        rateLimitService,
-		accountUsageService:     accountUsageService,
-		accountTestService:      accountTestService,
-		concurrencyService:      concurrencyService,
-		crsSyncService:          crsSyncService,
-		sessionLimitCache:       sessionLimitCache,
-		rpmCache:                rpmCache,
-		tokenCacheInvalidator:   tokenCacheInvalidator,
+		adminService:              adminService,
+		oauthService:              oauthService,
+		openaiOAuthService:        openaiOAuthService,
+		geminiOAuthService:        geminiOAuthService,
+		antigravityOAuthService:   antigravityOAuthService,
+		rateLimitService:          rateLimitService,
+		accountUsageService:       accountUsageService,
+		accountTestService:        accountTestService,
+		accountLivenessTestRunner: accountTestService,
+		concurrencyService:        concurrencyService,
+		crsSyncService:            crsSyncService,
+		sessionLimitCache:         sessionLimitCache,
+		rpmCache:                  rpmCache,
+		tokenCacheInvalidator:     tokenCacheInvalidator,
 	}
 }
 
@@ -1855,6 +1862,54 @@ type BatchTodayStatsRequest struct {
 	AccountIDs []int64 `json:"account_ids" binding:"required"`
 }
 
+type AccountLivenessCheckRequest struct {
+	Scope       string                      `json:"scope" binding:"required,oneof=selected filtered"`
+	AccountIDs  []int64                     `json:"account_ids"`
+	Filters     AccountLivenessCheckFilters `json:"filters"`
+	Concurrency int                         `json:"concurrency"`
+}
+
+type AccountLivenessCheckFilters struct {
+	Platform    string `json:"platform"`
+	Type        string `json:"type"`
+	Status      string `json:"status"`
+	Group       string `json:"group"`
+	Search      string `json:"search"`
+	PrivacyMode string `json:"privacy_mode"`
+	SortBy      string `json:"sort_by"`
+	SortOrder   string `json:"sort_order"`
+}
+
+type AccountLivenessCheckResponse struct {
+	Total            int                                     `json:"total"`
+	Completed        int                                     `json:"completed"`
+	Success          int                                     `json:"success"`
+	Failed           int                                     `json:"failed"`
+	Skipped          int                                     `json:"skipped"`
+	AverageLatencyMs int64                                   `json:"average_latency_ms"`
+	ByPlatform       map[string]AccountLivenessPlatformStats `json:"by_platform"`
+	FailureReasons   map[string]int                          `json:"failure_reasons"`
+	Items            []AccountLivenessCheckItem              `json:"items"`
+}
+
+type AccountLivenessPlatformStats struct {
+	Success int `json:"success"`
+	Failed  int `json:"failed"`
+	Skipped int `json:"skipped"`
+}
+
+type AccountLivenessCheckItem struct {
+	AccountID    int64  `json:"account_id"`
+	AccountName  string `json:"account_name"`
+	Platform     string `json:"platform"`
+	Type         string `json:"type"`
+	Result       string `json:"result"`
+	LatencyMs    int64  `json:"latency_ms"`
+	StatusBefore string `json:"status_before"`
+	StatusAfter  string `json:"status_after"`
+	Message      string `json:"message"`
+}
+
 // GetBatchTodayStats 批量获取多个账号的今日统计。
 // POST /api/v1/admin/accounts/today-stats/batch
 func (h *AccountHandler) GetBatchTodayStats(c *gin.Context) {
@@ -1899,6 +1954,235 @@ func (h *AccountHandler) GetBatchTodayStats(c *gin.Context) {
 	}
 	c.Header("X-Snapshot-Cache", "miss")
 	response.Success(c, payload)
+}
+
+// LivenessCheck runs batch account liveness checks.
+// POST /api/v1/admin/accounts/liveness-check
+func (h *AccountHandler) LivenessCheck(c *gin.Context) {
+	var req AccountLivenessCheckRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+	if h.accountLivenessTestRunner == nil {
+		response.Error(c, http.StatusServiceUnavailable, "Account test service unavailable")
+		return
+	}
+
+	accounts, err := h.resolveLivenessAccounts(c.Request.Context(), req)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if len(accounts) == 0 {
+		response.BadRequest(c, "no accounts matched")
+		return
+	}
+
+	concurrency := normalizeAccountLivenessConcurrency(req.Concurrency)
+	jobs := make(chan *service.Account)
+	results := make(chan AccountLivenessCheckItem, len(accounts))
+
+	var wg sync.WaitGroup
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for account := range jobs {
+				results <- h.runAccountLivenessCheck(c.Request.Context(), account)
+			}
+		}()
+	}
+
+	for _, account := range accounts {
+		jobs <- account
+	}
+	close(jobs)
+	wg.Wait()
+	close(results)
+
+	payload := AccountLivenessCheckResponse{
+		Total:          len(accounts),
+		ByPlatform:     map[string]AccountLivenessPlatformStats{},
+		FailureReasons: map[string]int{},
+		Items:          make([]AccountLivenessCheckItem, 0, len(accounts)),
+	}
+	var latencyTotal int64
+	for item := range results {
+		payload.Completed++
+		payload.Items = append(payload.Items, item)
+		updateAccountLivenessPlatformStats(payload.ByPlatform, item.Platform, item.Result)
+		switch item.Result {
+		case "success":
+			payload.Success++
+			latencyTotal += item.LatencyMs
+		case "failed":
+			payload.Failed++
+			payload.FailureReasons[classifyAccountLivenessFailure(item.Message)]++
+		case "skipped":
+			payload.Skipped++
+		}
+	}
+	if payload.Success > 0 {
+		payload.AverageLatencyMs = latencyTotal / int64(payload.Success)
+	}
+	sort.Slice(payload.Items, func(i, j int) bool {
+		return payload.Items[i].AccountID < payload.Items[j].AccountID
+	})
+
+	response.Success(c, payload)
+}
+
+func (h *AccountHandler) resolveLivenessAccounts(ctx context.Context, req AccountLivenessCheckRequest) ([]*service.Account, error) {
+	switch req.Scope {
+	case "selected":
+		ids := normalizeInt64IDList(req.AccountIDs)
+		if len(ids) == 0 {
+			return nil, errors.New("account_ids is required")
+		}
+		if len(ids) > accountLivenessMaxAccounts {
+			return nil, fmt.Errorf("too many accounts: max %d", accountLivenessMaxAccounts)
+		}
+		return h.adminService.GetAccountsByIDs(ctx, ids)
+	case "filtered":
+		groupID := int64(0)
+		if strings.TrimSpace(req.Filters.Group) != "" {
+			parsed, err := strconv.ParseInt(req.Filters.Group, 10, 64)
+			if err != nil {
+				return nil, errors.New("invalid group filter")
+			}
+			groupID = parsed
+		}
+		sortBy := req.Filters.SortBy
+		if sortBy == "" {
+			sortBy = "name"
+		}
+		sortOrder := req.Filters.SortOrder
+		if sortOrder == "" {
+			sortOrder = "asc"
+		}
+		items, _, err := h.adminService.ListAccounts(ctx, 1, accountLivenessMaxAccounts+1, req.Filters.Platform, req.Filters.Type, req.Filters.Status, req.Filters.Search, groupID, req.Filters.PrivacyMode, sortBy, sortOrder)
+		if err != nil {
+			return nil, err
+		}
+		if len(items) > accountLivenessMaxAccounts {
+			return nil, fmt.Errorf("too many accounts: max %d", accountLivenessMaxAccounts)
+		}
+		accounts := make([]*service.Account, 0, len(items))
+		for i := range items {
+			account := items[i]
+			accounts = append(accounts, &account)
+		}
+		return accounts, nil
+	default:
+		return nil, errors.New("invalid scope")
+	}
+}
+
+func (h *AccountHandler) runAccountLivenessCheck(ctx context.Context, account *service.Account) AccountLivenessCheckItem {
+	item := AccountLivenessCheckItem{
+		AccountID:    account.ID,
+		AccountName:  account.Name,
+		Platform:     account.Platform,
+		Type:         account.Type,
+		StatusBefore: account.Status,
+		StatusAfter:  account.Status,
+	}
+	if account.Status == service.StatusDisabled {
+		item.Result = "skipped"
+		item.Message = "账号已禁用，跳过检测"
+		return item
+	}
+
+	result, err := h.accountLivenessTestRunner.RunTestBackground(ctx, account.ID, "")
+	if err != nil {
+		item.Result = "failed"
+		item.Message = sanitizeAccountLivenessMessage(err.Error())
+	} else if result == nil {
+		item.Result = "skipped"
+		item.Message = "没有检测结果"
+	} else if result.Status == "success" {
+		item.Result = "success"
+		item.LatencyMs = result.LatencyMs
+		item.Message = "检测成功"
+		if updated, clearErr := h.adminService.ClearAccountError(ctx, account.ID); clearErr == nil && updated != nil {
+			item.StatusAfter = updated.Status
+		} else if clearErr != nil {
+			item.Result = "failed"
+			item.Message = sanitizeAccountLivenessMessage(clearErr.Error())
+		}
+	} else {
+		item.Result = "failed"
+		item.LatencyMs = result.LatencyMs
+		item.Message = sanitizeAccountLivenessMessage(result.ErrorMessage)
+		if item.Message == "检测失败" && result.ResponseText != "" {
+			item.Message = sanitizeAccountLivenessMessage(result.ResponseText)
+		}
+	}
+
+	if item.Result == "failed" {
+		if err := h.adminService.SetAccountError(ctx, account.ID, item.Message); err == nil {
+			item.StatusAfter = service.StatusError
+		} else {
+			item.Message = sanitizeAccountLivenessMessage(err.Error())
+		}
+	}
+	return item
+}
+
+const (
+	accountLivenessDefaultConcurrency = 5
+	accountLivenessMaxConcurrency     = 10
+	accountLivenessMaxAccounts        = 200
+)
+
+func normalizeAccountLivenessConcurrency(value int) int {
+	if value <= 0 {
+		return accountLivenessDefaultConcurrency
+	}
+	if value > accountLivenessMaxConcurrency {
+		return accountLivenessMaxConcurrency
+	}
+	return value
+}
+
+func classifyAccountLivenessFailure(message string) string {
+	lower := strings.ToLower(message)
+	switch {
+	case strings.Contains(lower, "401"), strings.Contains(lower, "403"), strings.Contains(lower, "unauthorized"), strings.Contains(lower, "forbidden"), strings.Contains(lower, "token"), strings.Contains(lower, "api key"):
+		return "auth"
+	case strings.Contains(lower, "429"), strings.Contains(lower, "rate limit"), strings.Contains(lower, "quota"), strings.Contains(lower, "credit"):
+		return "rate_limit"
+	case strings.Contains(lower, "timeout"), strings.Contains(lower, "deadline exceeded"), strings.Contains(lower, "context deadline"):
+		return "timeout"
+	default:
+		return "other"
+	}
+}
+
+func sanitizeAccountLivenessMessage(message string) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return "检测失败"
+	}
+	message = strings.ReplaceAll(message, "abc123", "[redacted]")
+	if len(message) > 240 {
+		message = message[:240]
+	}
+	return message
+}
+
+func updateAccountLivenessPlatformStats(stats map[string]AccountLivenessPlatformStats, platform string, result string) {
+	item := stats[platform]
+	switch result {
+	case "success":
+		item.Success++
+	case "failed":
+		item.Failed++
+	case "skipped":
+		item.Skipped++
+	}
+	stats[platform] = item
 }
 
 // SetSchedulableRequest represents the request body for setting schedulable status

@@ -303,6 +303,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	accounts := admin.Group("/accounts")
 	{
 		accounts.GET("", h.Admin.Account.List)
+		accounts.POST("/liveness-check", h.Admin.Account.LivenessCheck)
 		accounts.GET("/:id", h.Admin.Account.GetByID)
 		accounts.GET("/:id/access-token", h.Admin.Account.GetAccessToken)
 		accounts.POST("", h.Admin.Account.Create)

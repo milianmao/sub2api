@@ -416,6 +416,57 @@ export interface BatchTodayStatsResponse {
   stats: Record<string, WindowStats>
 }
 
+export type AccountLivenessCheckScope = 'selected' | 'filtered'
+export type AccountLivenessCheckResult = 'success' | 'failed' | 'skipped'
+
+export interface AccountLivenessCheckFilters {
+  platform?: string
+  type?: string
+  status?: string
+  group?: string
+  search?: string
+  privacy_mode?: string
+  sort_by?: string
+  sort_order?: 'asc' | 'desc'
+}
+
+export interface AccountLivenessCheckRequest {
+  scope: AccountLivenessCheckScope
+  account_ids?: number[]
+  filters?: AccountLivenessCheckFilters
+  concurrency?: number
+}
+
+export interface AccountLivenessPlatformStats {
+  success: number
+  failed: number
+  skipped: number
+}
+
+export interface AccountLivenessCheckItem {
+  account_id: number
+  account_name: string
+  platform: string
+  type: string
+  result: AccountLivenessCheckResult
+  latency_ms: number
+  status_before: string
+  status_after: string
+  message: string
+}
+
+export interface AccountLivenessCheckResponse {
+  total: number
+  completed: number
+  success: number
+  failed: number
+  skipped: number
+  average_latency_ms: number
+  by_platform: Record<string, AccountLivenessPlatformStats>
+  failure_reasons: Record<string, number>
+  items: AccountLivenessCheckItem[]
+}
+
 /**
  * 批量获取多个账号的今日统计
  * @param accountIds - 账号 ID 列表
@@ -425,6 +476,17 @@ export async function getBatchTodayStats(accountIds: number[]): Promise<BatchTod
   const { data } = await apiClient.post<BatchTodayStatsResponse>('/admin/accounts/today-stats/batch', {
     account_ids: accountIds
   })
+  return data
+}
+
+export async function livenessCheck(
+  payload: AccountLivenessCheckRequest
+): Promise<AccountLivenessCheckResponse> {
+  const { data } = await apiClient.post<AccountLivenessCheckResponse>(
+    '/admin/accounts/liveness-check',
+    payload,
+    { timeout: 180000 }
+  )
   return data
 }
 
@@ -691,6 +753,7 @@ export const accountsAPI = {
   getUsage,
   getTodayStats,
   getBatchTodayStats,
+  livenessCheck,
   clearRateLimit,
   recoverState,
   resetAccountQuota,

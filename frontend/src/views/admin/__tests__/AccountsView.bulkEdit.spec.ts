@@ -10,6 +10,7 @@ const {
   getAllProxies,
   getAllGroups,
   generateCheckoutLink,
+  livenessCheck,
   copyToClipboard,
   showSuccess,
   showError,
@@ -21,6 +22,7 @@ const {
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
   generateCheckoutLink: vi.fn(),
+  livenessCheck: vi.fn(),
   copyToClipboard: vi.fn(),
   showSuccess: vi.fn(),
   showError: vi.fn(),
@@ -37,7 +39,8 @@ vi.mock('@/api/admin', () => ({
       batchClearError: vi.fn(),
       batchRefresh: vi.fn(),
       toggleSchedulable: vi.fn(),
-      generateCheckoutLink
+      generateCheckoutLink,
+      livenessCheck
     },
     proxies: {
       getAll: getAllProxies
@@ -125,6 +128,7 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockReset()
     getAllGroups.mockReset()
     generateCheckoutLink.mockReset()
+    livenessCheck.mockReset()
     copyToClipboard.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
@@ -147,6 +151,17 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
     generateCheckoutLink.mockResolvedValue('https://chatgpt.com/checkout/example')
+    livenessCheck.mockResolvedValue({
+      total: 0,
+      completed: 0,
+      success: 0,
+      failed: 0,
+      skipped: 0,
+      average_latency_ms: 0,
+      by_platform: {},
+      failure_reasons: {},
+      items: []
+    })
     copyToClipboard.mockResolvedValue(true)
   })
 
@@ -525,6 +540,72 @@ describe('admin AccountsView bulk edit scope', () => {
     await flushPromises()
 
     expect(copyToClipboard).toHaveBeenCalledWith('owner@example.com', 'admin.accounts.emailCopied')
+  })
+
+  it('opens account liveness check modal from more actions and reloads after completion', async () => {
+    listAccounts.mockResolvedValueOnce({
+      items: [],
+      total: 12,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          AccountLivenessCheckModal: {
+            props: ['show', 'filteredCount'],
+            emits: ['completed'],
+            template: '<div data-test="liveness-modal" :data-show="String(show)" :data-filtered-count="String(filteredCount)"><button data-test="liveness-complete" @click="$emit(\'completed\')">complete</button></div>'
+          },
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.get('button[title="admin.accounts.moreActions"]').trigger('click')
+    await wrapper.get('[data-test="open-liveness-check"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="liveness-modal"]').attributes('data-show')).toBe('true')
+    expect(wrapper.get('[data-test="liveness-modal"]').attributes('data-filtered-count')).toBe('12')
+
+    const callsBeforeComplete = listAccounts.mock.calls.length
+    await wrapper.get('[data-test="liveness-complete"]').trigger('click')
+    await flushPromises()
+
+    expect(listAccounts.mock.calls.length).toBeGreaterThan(callsBeforeComplete)
   })
 
   it('maps paused status filter to unschedulable when loading filtered results', async () => {
