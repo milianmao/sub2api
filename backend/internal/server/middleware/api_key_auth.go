@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net/http"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -138,8 +139,8 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 
 		// ── 5. 加载订阅（订阅模式时始终加载） ───────────────────────
 
-		// skipBilling: /v1/usage 只需鉴权，跳过所有计费执行
-		skipBilling := c.Request.URL.Path == "/v1/usage"
+		// skipBilling: usage 和模型元数据接口只需鉴权，跳过所有计费执行
+		skipBilling := shouldSkipAPIKeyBilling(c)
 
 		var subscription *service.UserSubscription
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
@@ -309,7 +310,7 @@ func applyEffectiveAPIKeyGroup(apiKey *service.APIKey, group *service.Group) {
 	}
 	apiKey.Group = group
 	if group == nil {
-		apiKey.GroupID = nil
+		apiKey.GroupID = originalGroupID
 		if originalGroupID != nil && apiKey.User != nil {
 			apiKey.User.UserGroupRPMOverride = nil
 		}
@@ -342,4 +343,23 @@ func validateAPIKeyGroupAvailable(apiKey *service.APIKey) (string, string, bool)
 		return "GROUP_DISABLED", "API Key 所属分组已停用", false
 	}
 	return "", "", true
+}
+
+func shouldSkipAPIKeyBilling(c *gin.Context) bool {
+	if c == nil || c.Request == nil || c.Request.URL == nil {
+		return false
+	}
+	path := c.Request.URL.Path
+	if path == "/v1/usage" {
+		return true
+	}
+	if c.Request.Method != http.MethodGet {
+		return false
+	}
+	switch path {
+	case "/v1/models", "/v1beta/models", "/antigravity/models", "/antigravity/v1/models", "/antigravity/v1beta/models":
+		return true
+	}
+	return strings.HasPrefix(path, "/v1beta/models/") ||
+		strings.HasPrefix(path, "/antigravity/v1beta/models/")
 }
