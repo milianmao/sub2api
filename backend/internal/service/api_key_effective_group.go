@@ -33,6 +33,13 @@ func ResolveEffectiveAPIKeyGroup(apiKey *APIKey, req EffectiveGroupResolutionReq
 	}
 
 	requestedModel := strings.TrimSpace(req.RequestedModel)
+	if requestedPlatform := effectiveGroupRequestedPlatform(req); requestedPlatform != "" {
+		for _, group := range candidates {
+			if isActiveAPIKeyGroup(group) && group.Platform == requestedPlatform {
+				return group, nil
+			}
+		}
+	}
 	if requestedModel != "" {
 		for _, group := range candidates {
 			if isActiveAPIKeyGroup(group) && len(group.GetRoutingAccountIDs(requestedModel)) > 0 {
@@ -65,6 +72,17 @@ func isEffectiveImageGenerationIntent(req EffectiveGroupResolutionRequest) bool 
 		return IsImageGenerationIntentMap(req.Endpoint, req.RequestedModel, req.BodyMap)
 	}
 	return IsImageGenerationIntent(req.Endpoint, req.RequestedModel, req.Body)
+}
+
+func effectiveGroupRequestedPlatform(req EffectiveGroupResolutionRequest) string {
+	if !strings.EqualFold(strings.TrimSpace(req.Method), "GET") {
+		return ""
+	}
+	endpoint := strings.TrimRight(strings.TrimSpace(req.Endpoint), "/")
+	if endpoint == "/v1beta/models" {
+		return PlatformGemini
+	}
+	return ""
 }
 
 func isAuthorizedOpenAIImageGroup(group *Group) bool {

@@ -79,6 +79,28 @@ func TestResolveEffectiveAPIKeyGroupFallsBackToFirstActiveAuthorizedGroupWithout
 	require.Same(t, firstActive, got)
 }
 
+func TestResolveEffectiveAPIKeyGroupSelectsGeminiGroupForV1BetaModels(t *testing.T) {
+	defaultGroup := testEffectiveGroup(1, PlatformAnthropic, true, StatusActive)
+	geminiGroup := testEffectiveGroup(2, PlatformGemini, true, StatusActive)
+	apiKey := &APIKey{
+		GroupID: effectiveGroupPtrInt64(1),
+		Group:   defaultGroup,
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 2, Group: geminiGroup, Priority: 1},
+		},
+	}
+
+	got, err := ResolveEffectiveAPIKeyGroup(apiKey, EffectiveGroupResolutionRequest{
+		Method:   "GET",
+		Endpoint: "/v1beta/models",
+	})
+
+	require.NoError(t, err)
+	require.Same(t, geminiGroup, got)
+	require.Same(t, defaultGroup, apiKey.Group)
+	require.Equal(t, int64(1), *apiKey.GroupID)
+}
+
 func TestResolveEffectiveAPIKeyGroupPrefersDefaultWhenImageCapable(t *testing.T) {
 	defaultGroup := testEffectiveGroup(1, PlatformOpenAI, true, StatusActive)
 	otherImageGroup := testEffectiveGroup(2, PlatformOpenAI, true, StatusActive)

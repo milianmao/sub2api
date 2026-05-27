@@ -406,6 +406,70 @@ func googleIntPtr(v int) *int {
 	return &v
 }
 
+func TestAPIKeyAuthGoogleSelectsGeminiGroupForV1BetaModels(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	defaultGroup := &service.Group{
+		ID:       301,
+		Name:     "anthropic-default",
+		Status:   service.StatusActive,
+		Platform: service.PlatformAnthropic,
+		Hydrated: true,
+	}
+	geminiGroup := &service.Group{
+		ID:       302,
+		Name:     "gemini-authorized",
+		Status:   service.StatusActive,
+		Platform: service.PlatformGemini,
+		Hydrated: true,
+	}
+	user := &service.User{
+		ID:          7,
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     10,
+		Concurrency: 3,
+	}
+	apiKey := &service.APIKey{
+		ID:     100,
+		UserID: user.ID,
+		Key:    "test-key",
+		Status: service.StatusActive,
+		User:   user,
+		Group:  defaultGroup,
+		AuthorizedGroups: []service.APIKeyAuthorizedGroup{
+			{GroupID: geminiGroup.ID, Group: geminiGroup},
+		},
+	}
+	apiKey.GroupID = &defaultGroup.ID
+
+	apiKeyService := newTestAPIKeyService(fakeAPIKeyRepo{
+		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
+			if key != apiKey.Key {
+				return nil, service.ErrAPIKeyNotFound
+			}
+			clone := *apiKey
+			return &clone, nil
+		},
+	})
+	r := gin.New()
+	r.Use(APIKeyAuthWithSubscriptionGoogle(apiKeyService, nil, &config.Config{RunMode: config.RunModeSimple}))
+	r.GET("/v1beta/models", func(c *gin.Context) {
+		apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
+		require.True(t, ok)
+		c.JSON(http.StatusOK, gin.H{"group_id": *apiKeyFromCtx.GroupID, "platform": apiKeyFromCtx.Group.Platform})
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/v1beta/models", nil)
+	req.Header.Set("x-goog-api-key", apiKey.Key)
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"group_id":302`)
+	require.Contains(t, rec.Body.String(), `"platform":"gemini"`)
+}
+
 func TestApiKeyAuthWithSubscriptionGoogle_QueryKeyAllowedOnV1Beta(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
