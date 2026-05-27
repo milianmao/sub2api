@@ -997,11 +997,11 @@
           <button
             v-for="option in filteredGroupOptions"
             :key="option.value"
-            @click="toggleAuthorizedGroup(selectedKeyForGroup!, option.value)"
+            @click="togglePendingAuthorizedGroup(option.value)"
             :class="[
               'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors',
               'border-b border-gray-100 last:border-0 dark:border-dark-700',
-              isAuthorizedGroupSelected(selectedKeyForGroup, option.value)
+              isPendingAuthorizedGroupSelected(option.value)
                 ? 'bg-primary-50 dark:bg-primary-900/20'
                 : 'hover:bg-gray-100 dark:hover:bg-dark-700'
             ]"
@@ -1014,7 +1014,7 @@
               :rate-multiplier="option.rate"
               :user-rate-multiplier="option.userRate"
               :description="option.description"
-              :selected="isAuthorizedGroupSelected(selectedKeyForGroup, option.value)"
+              :selected="isPendingAuthorizedGroupSelected(option.value)"
             />
           </button>
           <!-- Empty state when search has no results -->
@@ -1122,6 +1122,8 @@ const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
+const pendingGroupIds = ref<number[]>([])
+const originalGroupIds = ref<number[]>([])
 const publicSettings = ref<PublicSettings | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
@@ -1406,11 +1408,52 @@ const toggleKeyStatus = async (key: ApiKey) => {
   }
 }
 
-const openGroupSelector = (key: ApiKey) => {
+const getAuthorizedGroupIds = (key: ApiKey) => {
+  return key.group_ids?.length
+    ? [...key.group_ids]
+    : key.group_id === null ? [] : [key.group_id]
+}
+
+const sameGroupIds = (left: number[], right: number[]) => {
+  if (left.length !== right.length) return false
+  return left.every((id, index) => id === right[index])
+}
+
+const commitPendingGroupSelection = async () => {
+  const key = selectedKeyForGroup.value
+  if (!key || sameGroupIds(pendingGroupIds.value, originalGroupIds.value)) return
+
+  try {
+    await keysAPI.update(key.id, {
+      group_id: pendingGroupIds.value[0] ?? null,
+      group_ids: pendingGroupIds.value
+    })
+    appStore.showSuccess(t('keys.groupChangedSuccess'))
+    loadApiKeys()
+  } catch (error) {
+    appStore.showError(t('keys.failedToChangeGroup'))
+    loadApiKeys()
+  }
+}
+
+const closePendingGroupSelector = async () => {
+  await commitPendingGroupSelection()
+  groupSelectorKeyId.value = null
+  dropdownPosition.value = null
+  pendingGroupIds.value = []
+  originalGroupIds.value = []
+}
+
+const openGroupSelector = async (key: ApiKey) => {
   if (groupSelectorKeyId.value === key.id) {
-    groupSelectorKeyId.value = null
-    dropdownPosition.value = null
+    await closePendingGroupSelector()
   } else {
+    if (groupSelectorKeyId.value !== null) {
+      await closePendingGroupSelector()
+    }
+    const groupIds = getAuthorizedGroupIds(key)
+    pendingGroupIds.value = [...groupIds]
+    originalGroupIds.value = [...groupIds]
     const buttonEl = groupButtonRefs.value.get(key.id)
     if (buttonEl) {
       const rect = buttonEl.getBoundingClientRect()
@@ -1437,40 +1480,21 @@ const openGroupSelector = (key: ApiKey) => {
   }
 }
 
-const isAuthorizedGroupSelected = (key: ApiKey | null, groupId: number) => {
-  if (!key) return false
-  const selectedGroupIds = key.group_ids?.length
-    ? key.group_ids
-    : key.group_id === null ? [] : [key.group_id]
-  return selectedGroupIds.includes(groupId)
+const isPendingAuthorizedGroupSelected = (groupId: number) => {
+  return pendingGroupIds.value.includes(groupId)
 }
 
-const toggleAuthorizedGroup = async (key: ApiKey, groupId: number) => {
-  const currentGroupIds = key.group_ids?.length
-    ? key.group_ids
-    : key.group_id === null ? [] : [key.group_id]
-  const nextGroupIds = currentGroupIds.includes(groupId)
-    ? currentGroupIds.filter((id) => id !== groupId)
-    : [...currentGroupIds, groupId]
-
-  try {
-    await keysAPI.update(key.id, {
-      group_id: nextGroupIds[0] ?? null,
-      group_ids: nextGroupIds
-    })
-    appStore.showSuccess(t('keys.groupChangedSuccess'))
-    loadApiKeys()
-  } catch (error) {
-    appStore.showError(t('keys.failedToChangeGroup'))
-  }
+const togglePendingAuthorizedGroup = (groupId: number) => {
+  pendingGroupIds.value = pendingGroupIds.value.includes(groupId)
+    ? pendingGroupIds.value.filter((id) => id !== groupId)
+    : [...pendingGroupIds.value, groupId]
 }
 
-const closeGroupSelector = (event: MouseEvent) => {
+const closeGroupSelector = async (event: MouseEvent) => {
   const target = event.target as HTMLElement
   // Check if click is inside the dropdown or the trigger button
   if (!target.closest('.group\\/dropdown') && !dropdownRef.value?.contains(target)) {
-    groupSelectorKeyId.value = null
-    dropdownPosition.value = null
+    await closePendingGroupSelector()
   }
 }
 
