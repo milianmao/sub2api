@@ -101,10 +101,9 @@
             <div class="group/dropdown relative">
               <button
                 :ref="(el) => setGroupButtonRef(row.id, el)"
-                @click="canReassignKeyGroup && openGroupSelector(row)"
+                @click="openGroupSelector(row)"
                 class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
-                :class="{ 'cursor-default hover:bg-transparent dark:hover:bg-transparent': !canReassignKeyGroup }"
-                :title="canReassignKeyGroup ? t('keys.clickToChangeGroup') : undefined"
+                :title="t('keys.clickToChangeGroup')"
               >
                 <GroupBadge
                   v-if="row.group"
@@ -117,9 +116,8 @@
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')
                 }}</span>
-                <span v-if="canReassignKeyGroup" class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
                 <svg
-                  v-if="canReassignKeyGroup"
                   class="h-3.5 w-3.5 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
                   fill="none"
                   stroke="currentColor"
@@ -406,7 +404,7 @@
           />
         </div>
 
-        <div v-if="!showEditModal || canReassignKeyGroup">
+        <div>
           <GroupSelector
             v-model="formData.group_ids"
             :groups="groups"
@@ -1026,7 +1024,6 @@
 	import { ref, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
-	import { useAuthStore } from '@/stores/auth'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
@@ -1066,10 +1063,8 @@ const formatDateTimeLocal = (isoDate: string): string => {
 }
 
 const appStore = useAppStore()
-const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
-const canReassignKeyGroup = computed(() => authStore.user?.role === 'super_admin')
 
 const columns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
@@ -1405,7 +1400,6 @@ const toggleKeyStatus = async (key: ApiKey) => {
 }
 
 const openGroupSelector = (key: ApiKey) => {
-  if (!canReassignKeyGroup.value) return
   if (groupSelectorKeyId.value === key.id) {
     groupSelectorKeyId.value = null
     dropdownPosition.value = null
@@ -1437,7 +1431,6 @@ const openGroupSelector = (key: ApiKey) => {
 }
 
 const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
-  if (!canReassignKeyGroup.value) return
   groupSelectorKeyId.value = null
   dropdownPosition.value = null
   if (key.group_id === newGroupId) return
@@ -1534,6 +1527,8 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates = {
         name: formData.value.name,
+        group_id: groupIds[0] ?? null,
+        group_ids: groupIds,
         status: formData.value.status,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
@@ -1542,9 +1537,6 @@ const handleSubmit = async () => {
         rate_limit_5h: rateLimitData.rate_limit_5h,
         rate_limit_1d: rateLimitData.rate_limit_1d,
         rate_limit_7d: rateLimitData.rate_limit_7d,
-      }
-      if (canReassignKeyGroup.value) {
-        ;(updates as typeof updates & { group_ids: number[] }).group_ids = groupIds
       }
       await keysAPI.update(selectedKey.value.id, updates)
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
