@@ -1108,6 +1108,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		DefaultMappedModel:              g.DefaultMappedModel,
 		MessagesDispatchModelConfig:     g.MessagesDispatchModelConfig,
 		OpenAIImageUpstream:             g.OpenaiImageUpstream,
+		ModelsListConfig:                g.ModelsListConfig,
 		RPMLimit:                        g.RpmLimit,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
