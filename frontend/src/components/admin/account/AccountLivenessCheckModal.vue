@@ -118,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, PropType, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import Icon from '@/components/icons/Icon.vue'
@@ -200,7 +200,10 @@ function resultBadgeClass(value: AccountLivenessCheckResult) {
   return `${base} bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300`
 }
 
-const toneClasses: Record<string, { wrap: string; icon: string }> = {
+type MetricIconName = 'chart' | 'checkCircle' | 'xCircle' | 'bolt'
+type MetricTone = 'blue' | 'green' | 'red' | 'violet'
+
+const toneClasses: Record<MetricTone, { wrap: string; icon: string }> = {
   blue: { wrap: 'bg-blue-100 dark:bg-blue-900/30', icon: 'text-blue-600 dark:text-blue-400' },
   green: { wrap: 'bg-green-100 dark:bg-green-900/30', icon: 'text-green-600 dark:text-green-400' },
   red: { wrap: 'bg-red-100 dark:bg-red-900/30', icon: 'text-red-600 dark:text-red-400' },
@@ -209,8 +212,8 @@ const toneClasses: Record<string, { wrap: string; icon: string }> = {
 
 const MetricCard = defineComponent({
   props: {
-    icon: { type: String, required: true },
-    tone: { type: String, required: true },
+    icon: { type: String as PropType<MetricIconName>, required: true },
+    tone: { type: String as PropType<MetricTone>, required: true },
     label: { type: String, required: true },
     value: { type: String, required: true },
     hint: { type: String, required: true }
