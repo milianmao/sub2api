@@ -105,8 +105,19 @@
                 class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
                 :title="t('keys.clickToChangeGroup')"
               >
+                <div v-if="row.groups?.length" class="flex flex-wrap items-center gap-1">
+                  <GroupBadge
+                    v-for="group in row.groups"
+                    :key="group.id"
+                    :name="group.name"
+                    :platform="group.platform"
+                    :subscription-type="group.subscription_type"
+                    :rate-multiplier="group.rate_multiplier"
+                    :user-rate-multiplier="userGroupRates[group.id]"
+                  />
+                </div>
                 <GroupBadge
-                  v-if="row.group"
+                  v-else-if="row.group"
                   :name="row.group.name"
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
@@ -985,13 +996,12 @@
         <div class="max-h-80 overflow-y-auto p-1.5">
           <button
             v-for="option in filteredGroupOptions"
-            :key="option.value ?? 'null'"
-            @click="changeGroup(selectedKeyForGroup!, option.value)"
+            :key="option.value"
+            @click="toggleAuthorizedGroup(selectedKeyForGroup!, option.value)"
             :class="[
               'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors',
               'border-b border-gray-100 last:border-0 dark:border-dark-700',
-              selectedKeyForGroup?.group_id === option.value ||
-              (!selectedKeyForGroup?.group_id && option.value === null)
+              isAuthorizedGroupSelected(selectedKeyForGroup, option.value)
                 ? 'bg-primary-50 dark:bg-primary-900/20'
                 : 'hover:bg-gray-100 dark:hover:bg-dark-700'
             ]"
@@ -1004,10 +1014,7 @@
               :rate-multiplier="option.rate"
               :user-rate-multiplier="option.userRate"
               :description="option.description"
-              :selected="
-                selectedKeyForGroup?.group_id === option.value ||
-                (!selectedKeyForGroup?.group_id && option.value === null)
-              "
+              :selected="isAuthorizedGroupSelected(selectedKeyForGroup, option.value)"
             />
           </button>
           <!-- Empty state when search has no results -->
@@ -1430,23 +1437,27 @@ const openGroupSelector = (key: ApiKey) => {
   }
 }
 
-const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
-  groupSelectorKeyId.value = null
-  dropdownPosition.value = null
-  if (key.group_id === newGroupId) return
+const isAuthorizedGroupSelected = (key: ApiKey | null, groupId: number) => {
+  if (!key) return false
+  const selectedGroupIds = key.group_ids?.length
+    ? key.group_ids
+    : key.group_id === null ? [] : [key.group_id]
+  return selectedGroupIds.includes(groupId)
+}
+
+const toggleAuthorizedGroup = async (key: ApiKey, groupId: number) => {
+  const currentGroupIds = key.group_ids?.length
+    ? key.group_ids
+    : key.group_id === null ? [] : [key.group_id]
+  const nextGroupIds = currentGroupIds.includes(groupId)
+    ? currentGroupIds.filter((id) => id !== groupId)
+    : [...currentGroupIds, groupId]
 
   try {
-    const currentGroupIds = key.group_ids?.length
-      ? key.group_ids
-      : key.group_id === null ? [] : [key.group_id]
-    const updates: { group_id: number | null; group_ids: number[] } = {
-      group_id: newGroupId,
-      group_ids: []
-    }
-    if (newGroupId !== null) {
-      updates.group_ids = Array.from(new Set([newGroupId, ...currentGroupIds]))
-    }
-    await keysAPI.update(key.id, updates)
+    await keysAPI.update(key.id, {
+      group_id: nextGroupIds[0] ?? null,
+      group_ids: nextGroupIds
+    })
     appStore.showSuccess(t('keys.groupChangedSuccess'))
     loadApiKeys()
   } catch (error) {

@@ -12,8 +12,11 @@ describe('KeysView API Key 分组修改', () => {
     expect(source).toContain('<div>\n          <GroupSelector')
   })
 
-  it('分页列表分组列点击时打开分组选择器', () => {
-    expect(source).toContain('@click="openGroupSelector(row)"')
+  it('分页列表分组下拉以授权分组多选方式切换', () => {
+    expect(source).toContain('@click="toggleAuthorizedGroup(selectedKeyForGroup!, option.value)"')
+    expect(source).toContain('isAuthorizedGroupSelected(selectedKeyForGroup, option.value)')
+    expect(source).toContain('group_id: nextGroupIds[0] ?? null')
+    expect(source).toContain('group_ids: nextGroupIds')
   })
 
   it('编辑提交同时发送主分组和授权分组', () => {
