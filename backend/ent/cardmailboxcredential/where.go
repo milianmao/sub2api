@@ -74,6 +74,11 @@ func MailboxURL(v string) predicate.CardMailboxCredential {
 	return predicate.CardMailboxCredential(sql.FieldEQ(FieldMailboxURL, v))
 }
 
+// RawJSON applies equality check predicate on the "raw_json" field. It's identical to RawJSONEQ.
+func RawJSON(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldEQ(FieldRawJSON, v))
+}
+
 // LastCode applies equality check predicate on the "last_code" field. It's identical to LastCodeEQ.
 func LastCode(v string) predicate.CardMailboxCredential {
 	return predicate.CardMailboxCredential(sql.FieldEQ(FieldLastCode, v))
@@ -302,6 +307,71 @@ func MailboxURLEqualFold(v string) predicate.CardMailboxCredential {
 // MailboxURLContainsFold applies the ContainsFold predicate on the "mailbox_url" field.
 func MailboxURLContainsFold(v string) predicate.CardMailboxCredential {
 	return predicate.CardMailboxCredential(sql.FieldContainsFold(FieldMailboxURL, v))
+}
+
+// RawJSONEQ applies the EQ predicate on the "raw_json" field.
+func RawJSONEQ(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldEQ(FieldRawJSON, v))
+}
+
+// RawJSONNEQ applies the NEQ predicate on the "raw_json" field.
+func RawJSONNEQ(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldNEQ(FieldRawJSON, v))
+}
+
+// RawJSONIn applies the In predicate on the "raw_json" field.
+func RawJSONIn(vs ...string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldIn(FieldRawJSON, vs...))
+}
+
+// RawJSONNotIn applies the NotIn predicate on the "raw_json" field.
+func RawJSONNotIn(vs ...string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldNotIn(FieldRawJSON, vs...))
+}
+
+// RawJSONGT applies the GT predicate on the "raw_json" field.
+func RawJSONGT(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldGT(FieldRawJSON, v))
+}
+
+// RawJSONGTE applies the GTE predicate on the "raw_json" field.
+func RawJSONGTE(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldGTE(FieldRawJSON, v))
+}
+
+// RawJSONLT applies the LT predicate on the "raw_json" field.
+func RawJSONLT(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldLT(FieldRawJSON, v))
+}
+
+// RawJSONLTE applies the LTE predicate on the "raw_json" field.
+func RawJSONLTE(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldLTE(FieldRawJSON, v))
+}
+
+// RawJSONContains applies the Contains predicate on the "raw_json" field.
+func RawJSONContains(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldContains(FieldRawJSON, v))
+}
+
+// RawJSONHasPrefix applies the HasPrefix predicate on the "raw_json" field.
+func RawJSONHasPrefix(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldHasPrefix(FieldRawJSON, v))
+}
+
+// RawJSONHasSuffix applies the HasSuffix predicate on the "raw_json" field.
+func RawJSONHasSuffix(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldHasSuffix(FieldRawJSON, v))
+}
+
+// RawJSONEqualFold applies the EqualFold predicate on the "raw_json" field.
+func RawJSONEqualFold(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldEqualFold(FieldRawJSON, v))
+}
+
+// RawJSONContainsFold applies the ContainsFold predicate on the "raw_json" field.
+func RawJSONContainsFold(v string) predicate.CardMailboxCredential {
+	return predicate.CardMailboxCredential(sql.FieldContainsFold(FieldRawJSON, v))
 }
 
 // LastCodeEQ applies the EQ predicate on the "last_code" field.

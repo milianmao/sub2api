@@ -25,6 +25,8 @@ type CardMailboxCredential struct {
 	Email string `json:"email,omitempty"`
 	// MailboxURL holds the value of the "mailbox_url" field.
 	MailboxURL string `json:"mailbox_url,omitempty"`
+	// RawJSON holds the value of the "raw_json" field.
+	RawJSON string `json:"raw_json,omitempty"`
 	// LastCode holds the value of the "last_code" field.
 	LastCode *string `json:"last_code,omitempty"`
 	// LastStatus holds the value of the "last_status" field.
@@ -43,7 +45,7 @@ func (*CardMailboxCredential) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case cardmailboxcredential.FieldID:
 			values[i] = new(sql.NullInt64)
-		case cardmailboxcredential.FieldEmail, cardmailboxcredential.FieldMailboxURL, cardmailboxcredential.FieldLastCode, cardmailboxcredential.FieldLastStatus, cardmailboxcredential.FieldLastError:
+		case cardmailboxcredential.FieldEmail, cardmailboxcredential.FieldMailboxURL, cardmailboxcredential.FieldRawJSON, cardmailboxcredential.FieldLastCode, cardmailboxcredential.FieldLastStatus, cardmailboxcredential.FieldLastError:
 			values[i] = new(sql.NullString)
 		case cardmailboxcredential.FieldCreatedAt, cardmailboxcredential.FieldUpdatedAt, cardmailboxcredential.FieldLastFetchedAt:
 			values[i] = new(sql.NullTime)
@@ -91,6 +93,12 @@ func (_m *CardMailboxCredential) assignValues(columns []string, values []any) er
 				return fmt.Errorf("unexpected type %T for field mailbox_url", values[i])
 			} else if value.Valid {
 				_m.MailboxURL = value.String
+			}
+		case cardmailboxcredential.FieldRawJSON:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field raw_json", values[i])
+			} else if value.Valid {
+				_m.RawJSON = value.String
 			}
 		case cardmailboxcredential.FieldLastCode:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -167,6 +175,9 @@ func (_m *CardMailboxCredential) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("mailbox_url=")
 	builder.WriteString(_m.MailboxURL)
+	builder.WriteString(", ")
+	builder.WriteString("raw_json=")
+	builder.WriteString(_m.RawJSON)
 	builder.WriteString(", ")
 	if v := _m.LastCode; v != nil {
 		builder.WriteString("last_code=")

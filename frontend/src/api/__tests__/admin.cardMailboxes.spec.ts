@@ -74,6 +74,18 @@ describe('admin card mailboxes api', () => {
     expect(result).toEqual(response)
   })
 
+  it('exports selected card mailboxes with full payload in one request', async () => {
+    const response = '{"items":[{"id":7,"email":"user@example.com","raw_json":"{}"}]}'
+    post.mockResolvedValueOnce({ data: response })
+
+    const result = await cardMailboxesAPI.exportSelected([7, 9])
+
+    expect(post).toHaveBeenCalledWith('/admin/card-mailboxes/export', { ids: [7, 9] }, {
+      responseType: 'text'
+    })
+    expect(result).toBe(response)
+  })
+
   it('deletes a single card mailbox', async () => {
     deleteRequest.mockResolvedValueOnce({ data: { success: true, count: 1 } })
 

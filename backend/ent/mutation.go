@@ -9326,6 +9326,7 @@ type CardMailboxCredentialMutation struct {
 	updated_at      *time.Time
 	email           *string
 	mailbox_url     *string
+	raw_json        *string
 	last_code       *string
 	last_status     *string
 	last_error      *string
@@ -9578,6 +9579,42 @@ func (m *CardMailboxCredentialMutation) ResetMailboxURL() {
 	m.mailbox_url = nil
 }
 
+// SetRawJSON sets the "raw_json" field.
+func (m *CardMailboxCredentialMutation) SetRawJSON(s string) {
+	m.raw_json = &s
+}
+
+// RawJSON returns the value of the "raw_json" field in the mutation.
+func (m *CardMailboxCredentialMutation) RawJSON() (r string, exists bool) {
+	v := m.raw_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRawJSON returns the old "raw_json" field's value of the CardMailboxCredential entity.
+// If the CardMailboxCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CardMailboxCredentialMutation) OldRawJSON(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRawJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRawJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRawJSON: %w", err)
+	}
+	return oldValue.RawJSON, nil
+}
+
+// ResetRawJSON resets all changes to the "raw_json" field.
+func (m *CardMailboxCredentialMutation) ResetRawJSON() {
+	m.raw_json = nil
+}
+
 // SetLastCode sets the "last_code" field.
 func (m *CardMailboxCredentialMutation) SetLastCode(s string) {
 	m.last_code = &s
@@ -9808,7 +9845,7 @@ func (m *CardMailboxCredentialMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CardMailboxCredentialMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.created_at != nil {
 		fields = append(fields, cardmailboxcredential.FieldCreatedAt)
 	}
@@ -9820,6 +9857,9 @@ func (m *CardMailboxCredentialMutation) Fields() []string {
 	}
 	if m.mailbox_url != nil {
 		fields = append(fields, cardmailboxcredential.FieldMailboxURL)
+	}
+	if m.raw_json != nil {
+		fields = append(fields, cardmailboxcredential.FieldRawJSON)
 	}
 	if m.last_code != nil {
 		fields = append(fields, cardmailboxcredential.FieldLastCode)
@@ -9849,6 +9889,8 @@ func (m *CardMailboxCredentialMutation) Field(name string) (ent.Value, bool) {
 		return m.Email()
 	case cardmailboxcredential.FieldMailboxURL:
 		return m.MailboxURL()
+	case cardmailboxcredential.FieldRawJSON:
+		return m.RawJSON()
 	case cardmailboxcredential.FieldLastCode:
 		return m.LastCode()
 	case cardmailboxcredential.FieldLastStatus:
@@ -9874,6 +9916,8 @@ func (m *CardMailboxCredentialMutation) OldField(ctx context.Context, name strin
 		return m.OldEmail(ctx)
 	case cardmailboxcredential.FieldMailboxURL:
 		return m.OldMailboxURL(ctx)
+	case cardmailboxcredential.FieldRawJSON:
+		return m.OldRawJSON(ctx)
 	case cardmailboxcredential.FieldLastCode:
 		return m.OldLastCode(ctx)
 	case cardmailboxcredential.FieldLastStatus:
@@ -9918,6 +9962,13 @@ func (m *CardMailboxCredentialMutation) SetField(name string, value ent.Value) e
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMailboxURL(v)
+		return nil
+	case cardmailboxcredential.FieldRawJSON:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRawJSON(v)
 		return nil
 	case cardmailboxcredential.FieldLastCode:
 		v, ok := value.(string)
@@ -10034,6 +10085,9 @@ func (m *CardMailboxCredentialMutation) ResetField(name string) error {
 		return nil
 	case cardmailboxcredential.FieldMailboxURL:
 		m.ResetMailboxURL()
+		return nil
+	case cardmailboxcredential.FieldRawJSON:
+		m.ResetRawJSON()
 		return nil
 	case cardmailboxcredential.FieldLastCode:
 		m.ResetLastCode()

@@ -62,6 +62,12 @@ func (_c *CardMailboxCredentialCreate) SetMailboxURL(v string) *CardMailboxCrede
 	return _c
 }
 
+// SetRawJSON sets the "raw_json" field.
+func (_c *CardMailboxCredentialCreate) SetRawJSON(v string) *CardMailboxCredentialCreate {
+	_c.mutation.SetRawJSON(v)
+	return _c
+}
+
 // SetLastCode sets the "last_code" field.
 func (_c *CardMailboxCredentialCreate) SetLastCode(v string) *CardMailboxCredentialCreate {
 	_c.mutation.SetLastCode(v)
@@ -187,6 +193,14 @@ func (_c *CardMailboxCredentialCreate) check() error {
 			return &ValidationError{Name: "mailbox_url", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.mailbox_url": %w`, err)}
 		}
 	}
+	if _, ok := _c.mutation.RawJSON(); !ok {
+		return &ValidationError{Name: "raw_json", err: errors.New(`ent: missing required field "CardMailboxCredential.raw_json"`)}
+	}
+	if v, ok := _c.mutation.RawJSON(); ok {
+		if err := cardmailboxcredential.RawJSONValidator(v); err != nil {
+			return &ValidationError{Name: "raw_json", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.raw_json": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.LastCode(); ok {
 		if err := cardmailboxcredential.LastCodeValidator(v); err != nil {
 			return &ValidationError{Name: "last_code", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.last_code": %w`, err)}
@@ -239,6 +253,10 @@ func (_c *CardMailboxCredentialCreate) createSpec() (*CardMailboxCredential, *sq
 	if value, ok := _c.mutation.MailboxURL(); ok {
 		_spec.SetField(cardmailboxcredential.FieldMailboxURL, field.TypeString, value)
 		_node.MailboxURL = value
+	}
+	if value, ok := _c.mutation.RawJSON(); ok {
+		_spec.SetField(cardmailboxcredential.FieldRawJSON, field.TypeString, value)
+		_node.RawJSON = value
 	}
 	if value, ok := _c.mutation.LastCode(); ok {
 		_spec.SetField(cardmailboxcredential.FieldLastCode, field.TypeString, value)
@@ -341,6 +359,18 @@ func (u *CardMailboxCredentialUpsert) SetMailboxURL(v string) *CardMailboxCreden
 // UpdateMailboxURL sets the "mailbox_url" field to the value that was provided on create.
 func (u *CardMailboxCredentialUpsert) UpdateMailboxURL() *CardMailboxCredentialUpsert {
 	u.SetExcluded(cardmailboxcredential.FieldMailboxURL)
+	return u
+}
+
+// SetRawJSON sets the "raw_json" field.
+func (u *CardMailboxCredentialUpsert) SetRawJSON(v string) *CardMailboxCredentialUpsert {
+	u.Set(cardmailboxcredential.FieldRawJSON, v)
+	return u
+}
+
+// UpdateRawJSON sets the "raw_json" field to the value that was provided on create.
+func (u *CardMailboxCredentialUpsert) UpdateRawJSON() *CardMailboxCredentialUpsert {
+	u.SetExcluded(cardmailboxcredential.FieldRawJSON)
 	return u
 }
 
@@ -500,6 +530,20 @@ func (u *CardMailboxCredentialUpsertOne) SetMailboxURL(v string) *CardMailboxCre
 func (u *CardMailboxCredentialUpsertOne) UpdateMailboxURL() *CardMailboxCredentialUpsertOne {
 	return u.Update(func(s *CardMailboxCredentialUpsert) {
 		s.UpdateMailboxURL()
+	})
+}
+
+// SetRawJSON sets the "raw_json" field.
+func (u *CardMailboxCredentialUpsertOne) SetRawJSON(v string) *CardMailboxCredentialUpsertOne {
+	return u.Update(func(s *CardMailboxCredentialUpsert) {
+		s.SetRawJSON(v)
+	})
+}
+
+// UpdateRawJSON sets the "raw_json" field to the value that was provided on create.
+func (u *CardMailboxCredentialUpsertOne) UpdateRawJSON() *CardMailboxCredentialUpsertOne {
+	return u.Update(func(s *CardMailboxCredentialUpsert) {
+		s.UpdateRawJSON()
 	})
 }
 
@@ -837,6 +881,20 @@ func (u *CardMailboxCredentialUpsertBulk) SetMailboxURL(v string) *CardMailboxCr
 func (u *CardMailboxCredentialUpsertBulk) UpdateMailboxURL() *CardMailboxCredentialUpsertBulk {
 	return u.Update(func(s *CardMailboxCredentialUpsert) {
 		s.UpdateMailboxURL()
+	})
+}
+
+// SetRawJSON sets the "raw_json" field.
+func (u *CardMailboxCredentialUpsertBulk) SetRawJSON(v string) *CardMailboxCredentialUpsertBulk {
+	return u.Update(func(s *CardMailboxCredentialUpsert) {
+		s.SetRawJSON(v)
+	})
+}
+
+// UpdateRawJSON sets the "raw_json" field to the value that was provided on create.
+func (u *CardMailboxCredentialUpsertBulk) UpdateRawJSON() *CardMailboxCredentialUpsertBulk {
+	return u.Update(func(s *CardMailboxCredentialUpsert) {
+		s.UpdateRawJSON()
 	})
 }
 
