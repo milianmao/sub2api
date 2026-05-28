@@ -60,6 +60,7 @@ func (r *cardMailboxRepository) UpsertByEmail(ctx context.Context, input service
 	id, err := client.CardMailboxCredential.Create().
 		SetEmail(email).
 		SetMailboxURL(mailboxURL).
+		SetRawJSON(strings.TrimSpace(input.RawJSON)).
 		OnConflictColumns(cardmailboxcredential.FieldEmail).
 		UpdateNewValues().
 		ID(ctx)
@@ -79,6 +80,23 @@ func (r *cardMailboxRepository) GetByID(ctx context.Context, id int64) (*service
 		return nil, translateCardMailboxPersistenceError(err)
 	}
 	return cardMailboxEntityToService(row), nil
+}
+
+func (r *cardMailboxRepository) GetByIDs(ctx context.Context, ids []int64) ([]*service.CardMailbox, error) {
+	if len(ids) == 0 {
+		return []*service.CardMailbox{}, nil
+	}
+	rows, err := clientFromContext(ctx, r.client).CardMailboxCredential.Query().
+		Where(cardmailboxcredential.IDIn(ids...)).
+		All(ctx)
+	if err != nil {
+		return nil, translateCardMailboxPersistenceError(err)
+	}
+	items := make([]*service.CardMailbox, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, cardMailboxEntityToService(row))
+	}
+	return items, nil
 }
 
 func (r *cardMailboxRepository) UpdateLatestResult(ctx context.Context, id int64, input service.CardMailboxLatestResultInput) error {
@@ -129,6 +147,7 @@ func cardMailboxEntityToService(row *dbent.CardMailboxCredential) *service.CardM
 		ID:            row.ID,
 		Email:         row.Email,
 		MailboxURL:    row.MailboxURL,
+		RawJSON:       row.RawJSON,
 		LastCode:      stringFromPtr(row.LastCode),
 		LastStatus:    stringFromPtr(row.LastStatus),
 		LastError:     stringFromPtr(row.LastError),

@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +26,10 @@ func NewCardMailboxHandler(service *service.CardMailboxService) *CardMailboxHand
 
 type cardMailboxImportRequest struct {
 	Content string `json:"content" binding:"required"`
+}
+
+type cardMailboxExportRequest struct {
+	IDs []int64 `json:"ids" binding:"required"`
 }
 
 type cardMailboxResponse struct {
@@ -112,6 +117,29 @@ func (h *CardMailboxHandler) FetchCode(c *gin.Context) {
 		return
 	}
 	response.Success(c, buildCardMailboxFetchResponse(result))
+}
+
+func (h *CardMailboxHandler) Export(c *gin.Context) {
+	if h.service == nil {
+		response.Error(c, http.StatusServiceUnavailable, "card mailbox service unavailable")
+		return
+	}
+	var req cardMailboxExportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_REQUEST", "invalid request body"))
+		return
+	}
+	items, err := h.service.ExportByIDs(c.Request.Context(), req.IDs)
+	if writeCardMailboxError(c, err) {
+		return
+	}
+	payload, err := json.MarshalIndent(gin.H{"items": items}, "", "  ")
+	if err != nil {
+		response.ErrorFrom(c, infraerrors.InternalServer("CARD_MAILBOX_EXPORT_FAILED", "failed to encode export payload"))
+		return
+	}
+	c.Header("Content-Disposition", `attachment; filename="card-mailboxes-export.json"`)
+	c.Data(http.StatusOK, "application/json; charset=utf-8", payload)
 }
 
 func (h *CardMailboxHandler) Delete(c *gin.Context) {

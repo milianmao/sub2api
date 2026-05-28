@@ -481,12 +481,16 @@ func init() {
 	cardmailboxcredentialDescMailboxURL := cardmailboxcredentialFields[1].Descriptor()
 	// cardmailboxcredential.MailboxURLValidator is a validator for the "mailbox_url" field. It is called by the builders before save.
 	cardmailboxcredential.MailboxURLValidator = cardmailboxcredentialDescMailboxURL.Validators[0].(func(string) error)
+	// cardmailboxcredentialDescRawJSON is the schema descriptor for raw_json field.
+	cardmailboxcredentialDescRawJSON := cardmailboxcredentialFields[2].Descriptor()
+	// cardmailboxcredential.RawJSONValidator is a validator for the "raw_json" field. It is called by the builders before save.
+	cardmailboxcredential.RawJSONValidator = cardmailboxcredentialDescRawJSON.Validators[0].(func(string) error)
 	// cardmailboxcredentialDescLastCode is the schema descriptor for last_code field.
-	cardmailboxcredentialDescLastCode := cardmailboxcredentialFields[2].Descriptor()
+	cardmailboxcredentialDescLastCode := cardmailboxcredentialFields[3].Descriptor()
 	// cardmailboxcredential.LastCodeValidator is a validator for the "last_code" field. It is called by the builders before save.
 	cardmailboxcredential.LastCodeValidator = cardmailboxcredentialDescLastCode.Validators[0].(func(string) error)
 	// cardmailboxcredentialDescLastStatus is the schema descriptor for last_status field.
-	cardmailboxcredentialDescLastStatus := cardmailboxcredentialFields[3].Descriptor()
+	cardmailboxcredentialDescLastStatus := cardmailboxcredentialFields[4].Descriptor()
 	// cardmailboxcredential.LastStatusValidator is a validator for the "last_status" field. It is called by the builders before save.
 	cardmailboxcredential.LastStatusValidator = cardmailboxcredentialDescLastStatus.Validators[0].(func(string) error)
 	channelmonitorMixin := schema.ChannelMonitor{}.Mixin()

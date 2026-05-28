@@ -40,6 +40,9 @@ func (CardMailboxCredential) Fields() []ent.Field {
 		field.String("mailbox_url").
 			SchemaType(map[string]string{dialect.Postgres: "text"}).
 			NotEmpty(),
+		field.String("raw_json").
+			SchemaType(map[string]string{dialect.Postgres: "text"}).
+			NotEmpty(),
 		field.String("last_code").
 			Optional().
 			Nillable().

@@ -47,6 +47,11 @@
                 <Icon name="refresh" size="sm" :class="loading ? 'animate-spin' : ''" />
                 <span>刷新</span>
               </button>
+              <button type="button" class="btn btn-secondary" :disabled="!selectedIds.length || exporting" @click="handleExportSelected">
+                <Icon name="download" size="sm" :class="exporting ? 'animate-pulse' : ''" />
+                <span>导出所选全量信息</span>
+                <span v-if="selectedIds.length" class="rounded-full bg-primary-100 px-2 py-0.5 text-xs text-primary-700 dark:bg-primary-900/40 dark:text-primary-300">{{ selectedIds.length }}</span>
+              </button>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <button type="button" class="btn btn-secondary" @click="openImportDialog">
@@ -75,6 +80,23 @@
 
       <template #table>
         <DataTable :columns="columns" :data="mailboxes" :loading="loading" row-key="id">
+          <template #header-select>
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              :checked="allVisibleSelected"
+              :disabled="!mailboxes.length"
+              @change="toggleSelectAllVisible"
+            />
+          </template>
+          <template #cell-select="{ row }">
+            <input
+              type="checkbox"
+              class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+              :checked="selectedIds.includes(row.id)"
+              @change="toggleSelection(row.id)"
+            />
+          </template>
           <template #cell-email="{ value }">
             <span class="font-medium text-gray-900 dark:text-white">{{ value }}</span>
           </template>
@@ -260,6 +282,7 @@ interface Column {
 }
 
 const columns: Column[] = [
+  { key: 'select', label: '', width: '48px' },
   { key: 'email', label: '邮箱' },
   { key: 'last_status', label: '状态' },
   { key: 'last_code', label: '验证码' },
@@ -273,8 +296,10 @@ const columns: Column[] = [
 const mailboxes = ref<CardMailboxListItem[]>([])
 const loading = ref(false)
 const importing = ref(false)
+const exporting = ref(false)
 const deleting = ref(false)
 const fetchingCodeId = ref<number | null>(null)
+const selectedIds = ref<number[]>([])
 const searchTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const copyFeedbackTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 const copyFeedback = ref<{ type: 'success' | 'error'; message: string } | null>(null)
@@ -314,6 +339,10 @@ const pageStats = computed(() => {
   )
 })
 
+const allVisibleSelected = computed(() => {
+  return mailboxes.value.length > 0 && mailboxes.value.every(mailbox => selectedIds.value.includes(mailbox.id))
+})
+
 function buildListParams(): CardMailboxListParams {
   return {
     page: pagination.page,
@@ -331,9 +360,26 @@ async function load() {
     pagination.total = result.total || 0
     pagination.page = result.page || pagination.page
     pagination.page_size = result.page_size || pagination.page_size
+    selectedIds.value = selectedIds.value.filter(id => mailboxes.value.some(mailbox => mailbox.id === id))
   } finally {
     loading.value = false
   }
+}
+
+function toggleSelection(id: number) {
+  selectedIds.value = selectedIds.value.includes(id)
+    ? selectedIds.value.filter(selectedId => selectedId !== id)
+    : [...selectedIds.value, id]
+}
+
+function toggleSelectAllVisible(event: Event) {
+  const checked = (event.target as HTMLInputElement).checked
+  const visibleIds = mailboxes.value.map(mailbox => mailbox.id)
+  if (checked) {
+    selectedIds.value = Array.from(new Set([...selectedIds.value, ...visibleIds]))
+    return
+  }
+  selectedIds.value = selectedIds.value.filter(id => !visibleIds.includes(id))
 }
 
 function reloadFirstPage() {
@@ -461,6 +507,25 @@ async function handleImport() {
     await load()
   } finally {
     importing.value = false
+  }
+}
+
+async function handleExportSelected() {
+  if (!selectedIds.value.length || exporting.value) return
+  exporting.value = true
+  try {
+    const payload = await adminAPI.cardMailboxes.exportSelected(selectedIds.value)
+    const blob = new Blob([payload], { type: 'application/json' })
+    const link = document.createElement('a')
+    const href = URL.createObjectURL(blob)
+    link.href = href
+    link.download = `card-mailboxes-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(href)
+  } finally {
+    exporting.value = false
   }
 }
 
