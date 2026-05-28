@@ -31,6 +31,76 @@ func TestResolveEffectiveAPIKeyGroupUsesDefaultForNormalRequests(t *testing.T) {
 	require.Equal(t, int64(1), *apiKey.GroupID)
 }
 
+func TestResolveEffectiveAPIKeyGroupSelectsAuthorizedGroupByModelRouting(t *testing.T) {
+	defaultGroup := testEffectiveGroup(1, PlatformAnthropic, true, StatusActive)
+	routedGroup := testEffectiveGroup(2, PlatformAnthropic, true, StatusActive)
+	routedGroup.ModelRoutingEnabled = true
+	routedGroup.ModelRouting = map[string][]int64{"claude-opus-*": {99}}
+	otherGroup := testEffectiveGroup(3, PlatformAnthropic, true, StatusActive)
+	apiKey := &APIKey{
+		GroupID: effectiveGroupPtrInt64(1),
+		Group:   defaultGroup,
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 3, Group: otherGroup, Priority: 1},
+			{GroupID: 2, Group: routedGroup, Priority: 2},
+		},
+	}
+
+	got, err := ResolveEffectiveAPIKeyGroup(apiKey, EffectiveGroupResolutionRequest{
+		Method:         "POST",
+		Endpoint:       "/v1/messages",
+		RequestedModel: "claude-opus-4-20250514",
+	})
+
+	require.NoError(t, err)
+	require.Same(t, routedGroup, got)
+	require.Same(t, defaultGroup, apiKey.Group)
+	require.Equal(t, int64(1), *apiKey.GroupID)
+}
+
+func TestResolveEffectiveAPIKeyGroupFallsBackToFirstActiveAuthorizedGroupWithoutDefault(t *testing.T) {
+	firstActive := testEffectiveGroup(2, PlatformAnthropic, true, StatusActive)
+	secondActive := testEffectiveGroup(3, PlatformOpenAI, true, StatusActive)
+	apiKey := &APIKey{
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 4, Group: testEffectiveGroup(4, PlatformAnthropic, true, StatusDisabled), Priority: 1},
+			{GroupID: 2, Group: firstActive, Priority: 2},
+			{GroupID: 3, Group: secondActive, Priority: 3},
+		},
+	}
+
+	got, err := ResolveEffectiveAPIKeyGroup(apiKey, EffectiveGroupResolutionRequest{
+		Method:         "POST",
+		Endpoint:       "/v1/messages",
+		RequestedModel: "claude-sonnet-4-20250514",
+	})
+
+	require.NoError(t, err)
+	require.Same(t, firstActive, got)
+}
+
+func TestResolveEffectiveAPIKeyGroupSelectsGeminiGroupForV1BetaModels(t *testing.T) {
+	defaultGroup := testEffectiveGroup(1, PlatformAnthropic, true, StatusActive)
+	geminiGroup := testEffectiveGroup(2, PlatformGemini, true, StatusActive)
+	apiKey := &APIKey{
+		GroupID: effectiveGroupPtrInt64(1),
+		Group:   defaultGroup,
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 2, Group: geminiGroup, Priority: 1},
+		},
+	}
+
+	got, err := ResolveEffectiveAPIKeyGroup(apiKey, EffectiveGroupResolutionRequest{
+		Method:   "GET",
+		Endpoint: "/v1beta/models",
+	})
+
+	require.NoError(t, err)
+	require.Same(t, geminiGroup, got)
+	require.Same(t, defaultGroup, apiKey.Group)
+	require.Equal(t, int64(1), *apiKey.GroupID)
+}
+
 func TestResolveEffectiveAPIKeyGroupPrefersDefaultWhenImageCapable(t *testing.T) {
 	defaultGroup := testEffectiveGroup(1, PlatformOpenAI, true, StatusActive)
 	otherImageGroup := testEffectiveGroup(2, PlatformOpenAI, true, StatusActive)

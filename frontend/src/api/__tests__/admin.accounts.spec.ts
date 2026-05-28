@@ -56,4 +56,31 @@ describe('admin accounts api', () => {
     expect(post).toHaveBeenCalledWith('/admin/accounts/42/checkout-link', undefined, { responseType: 'text' })
     expect(result).toBe('https://chatgpt.com/checkout/example')
   })
+
+  it('runs account liveness checks through the admin batch endpoint', async () => {
+    const payload = {
+      scope: 'selected' as const,
+      account_ids: [1, 2],
+      concurrency: 5
+    }
+    post.mockResolvedValueOnce({
+      data: {
+        total: 2,
+        completed: 2,
+        success: 1,
+        failed: 1,
+        skipped: 0,
+        average_latency_ms: 120,
+        by_platform: {},
+        failure_reasons: {},
+        items: []
+      }
+    })
+
+    const result = await accountsAPI.livenessCheck(payload)
+
+    expect(post).toHaveBeenCalledWith('/admin/accounts/liveness-check', payload, { timeout: 180000 })
+    expect(result.total).toBe(2)
+    expect(result.success).toBe(1)
+  })
 })

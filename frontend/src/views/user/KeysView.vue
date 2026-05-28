@@ -101,13 +101,23 @@
             <div class="group/dropdown relative">
               <button
                 :ref="(el) => setGroupButtonRef(row.id, el)"
-                @click="canReassignKeyGroup && openGroupSelector(row)"
+                @click="openGroupSelector(row)"
                 class="-mx-2 -my-1 flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 transition-all duration-200 hover:bg-gray-100 dark:hover:bg-dark-700"
-                :class="{ 'cursor-default hover:bg-transparent dark:hover:bg-transparent': !canReassignKeyGroup }"
-                :title="canReassignKeyGroup ? t('keys.clickToChangeGroup') : undefined"
+                :title="t('keys.clickToChangeGroup')"
               >
+                <div v-if="row.groups?.length" class="flex flex-wrap items-center gap-1">
+                  <GroupBadge
+                    v-for="group in row.groups"
+                    :key="group.id"
+                    :name="group.name"
+                    :platform="group.platform"
+                    :subscription-type="group.subscription_type"
+                    :rate-multiplier="group.rate_multiplier"
+                    :user-rate-multiplier="userGroupRates[group.id]"
+                  />
+                </div>
                 <GroupBadge
-                  v-if="row.group"
+                  v-else-if="row.group"
                   :name="row.group.name"
                   :platform="row.group.platform"
                   :subscription-type="row.group.subscription_type"
@@ -117,9 +127,8 @@
                 <span v-else class="text-sm text-gray-400 dark:text-dark-500">{{
                   t('keys.noGroup')
                 }}</span>
-                <span v-if="canReassignKeyGroup" class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ t('keys.selectGroup') }}</span>
                 <svg
-                  v-if="canReassignKeyGroup"
                   class="h-3.5 w-3.5 text-gray-400 opacity-60 transition-opacity group-hover/dropdown:opacity-100"
                   fill="none"
                   stroke="currentColor"
@@ -407,48 +416,12 @@
         </div>
 
         <div>
-          <label class="input-label">{{ t('keys.groupLabel') }}</label>
-          <Select
-            v-model="formData.group_id"
-            :options="groupOptions"
-            :placeholder="t('keys.selectGroup')"
-            :searchable="true"
-            :search-placeholder="t('keys.searchGroup')"
-            :disabled="showEditModal && !canReassignKeyGroup"
-            data-tour="key-form-group"
-            @update:model-value="handleDefaultGroupChange"
-          >
-            <template #selected="{ option }">
-              <GroupBadge
-                v-if="option"
-                :name="groupOption(option).label"
-                :platform="groupOption(option).platform"
-                :subscription-type="groupOption(option).subscriptionType"
-                :rate-multiplier="groupOption(option).rate"
-                :user-rate-multiplier="groupOption(option).userRate"
-              />
-              <span v-else class="text-gray-400">{{ t('keys.selectGroup') }}</span>
-            </template>
-            <template #option="{ option, selected }">
-              <GroupOptionItem
-                :name="groupOption(option).label"
-                :platform="groupOption(option).platform"
-                :subscription-type="groupOption(option).subscriptionType"
-                :rate-multiplier="groupOption(option).rate"
-                :user-rate-multiplier="groupOption(option).userRate"
-                :description="groupOption(option).description"
-                :selected="selected"
-              />
-            </template>
-          </Select>
-        </div>
-
-        <div v-if="!showEditModal || canReassignKeyGroup">
           <GroupSelector
             v-model="formData.group_ids"
             :groups="groups"
-            :label="t('keys.authorizedGroups')"
+            :label="t('keys.groupLabel')"
             :searchable="true"
+            data-tour="key-form-group"
           />
           <p class="input-hint">{{ t('keys.authorizedGroupsHint') }}</p>
         </div>
@@ -1023,13 +996,12 @@
         <div class="max-h-80 overflow-y-auto p-1.5">
           <button
             v-for="option in filteredGroupOptions"
-            :key="option.value ?? 'null'"
-            @click="changeGroup(selectedKeyForGroup!, option.value)"
+            :key="option.value"
+            @click="togglePendingAuthorizedGroup(option.value)"
             :class="[
               'flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors',
               'border-b border-gray-100 last:border-0 dark:border-dark-700',
-              selectedKeyForGroup?.group_id === option.value ||
-              (!selectedKeyForGroup?.group_id && option.value === null)
+              isPendingAuthorizedGroupSelected(option.value)
                 ? 'bg-primary-50 dark:bg-primary-900/20'
                 : 'hover:bg-gray-100 dark:hover:bg-dark-700'
             ]"
@@ -1042,10 +1014,7 @@
               :rate-multiplier="option.rate"
               :user-rate-multiplier="option.userRate"
               :description="option.description"
-              :selected="
-                selectedKeyForGroup?.group_id === option.value ||
-                (!selectedKeyForGroup?.group_id && option.value === null)
-              "
+              :selected="isPendingAuthorizedGroupSelected(option.value)"
             />
           </button>
           <!-- Empty state when search has no results -->
@@ -1062,7 +1031,6 @@
 	import { ref, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
-	import { useAuthStore } from '@/stores/auth'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
@@ -1084,7 +1052,7 @@ import EndpointPopover from '@/components/keys/EndpointPopover.vue'
 import GroupBadge from '@/components/common/GroupBadge.vue'
 import GroupSelector from '@/components/common/GroupSelector.vue'
 import GroupOptionItem from '@/components/common/GroupOptionItem.vue'
-import type { ApiKey, Group, PublicSettings, SubscriptionType, GroupPlatform } from '@/types'
+import type { ApiKey, Group, PublicSettings } from '@/types'
 import type { Column } from '@/components/common/types'
 import type { BatchApiKeyUsageStats } from '@/api/usage'
 import { formatDateTime } from '@/utils/format'
@@ -1101,23 +1069,9 @@ const formatDateTimeLocal = (isoDate: string): string => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-interface GroupOption {
-  value: number
-  label: string
-  description: string | null
-  rate: number
-  userRate: number | null
-  subscriptionType: SubscriptionType
-  platform: GroupPlatform
-}
-
-const groupOption = (option: unknown): GroupOption => option as GroupOption
-
 const appStore = useAppStore()
-const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
-const canReassignKeyGroup = computed(() => authStore.user?.role === 'super_admin')
 
 const columns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
@@ -1168,6 +1122,8 @@ const pendingCcsRow = ref<ApiKey | null>(null)
 const selectedKey = ref<ApiKey | null>(null)
 const copiedKeyId = ref<number | null>(null)
 const groupSelectorKeyId = ref<number | null>(null)
+const pendingGroupIds = ref<number[]>([])
+const originalGroupIds = ref<number[]>([])
 const publicSettings = ref<PublicSettings | null>(null)
 const dropdownRef = ref<HTMLElement | null>(null)
 const dropdownPosition = ref<{ top?: number; bottom?: number; left: number } | null>(null)
@@ -1275,18 +1231,7 @@ const groupOptions = computed(() =>
   }))
 )
 
-const ensureDefaultGroupAuthorized = () => {
-  const groupId = formData.value.group_id
-  if (groupId === null || formData.value.group_ids.includes(groupId)) return
-  formData.value.group_ids = [groupId, ...formData.value.group_ids]
-}
-
-const handleDefaultGroupChange = () => {
-  ensureDefaultGroupAuthorized()
-}
-
 const authorizedGroupIdsForSubmit = () => {
-  ensureDefaultGroupAuthorized()
   return Array.from(new Set(formData.value.group_ids))
 }
 
@@ -1429,7 +1374,7 @@ const editKey = (key: ApiKey) => {
   const hasExpiration = !!key.expires_at
   formData.value = {
     name: key.name,
-    group_id: key.group_id,
+    group_id: null,
     group_ids: key.group_ids?.length ? [...key.group_ids] : key.group_id === null ? [] : [key.group_id],
     status: key.status === 'quota_exhausted' || key.status === 'expired' ? 'inactive' : key.status,
     use_custom_key: false,
@@ -1447,9 +1392,6 @@ const editKey = (key: ApiKey) => {
     expiration_preset: 'custom',
     expiration_date: key.expires_at ? formatDateTimeLocal(key.expires_at) : ''
   }
-  if (key.group_id !== null && !formData.value.group_ids.includes(key.group_id)) {
-    formData.value.group_ids = [key.group_id, ...formData.value.group_ids]
-  }
   showEditModal.value = true
 }
 
@@ -1466,12 +1408,52 @@ const toggleKeyStatus = async (key: ApiKey) => {
   }
 }
 
-const openGroupSelector = (key: ApiKey) => {
-  if (!canReassignKeyGroup.value) return
+const getAuthorizedGroupIds = (key: ApiKey) => {
+  return key.group_ids?.length
+    ? [...key.group_ids]
+    : key.group_id === null ? [] : [key.group_id]
+}
+
+const sameGroupIds = (left: number[], right: number[]) => {
+  if (left.length !== right.length) return false
+  return left.every((id, index) => id === right[index])
+}
+
+const commitPendingGroupSelection = async () => {
+  const key = selectedKeyForGroup.value
+  if (!key || sameGroupIds(pendingGroupIds.value, originalGroupIds.value)) return
+
+  try {
+    await keysAPI.update(key.id, {
+      group_id: pendingGroupIds.value[0] ?? null,
+      group_ids: pendingGroupIds.value
+    })
+    appStore.showSuccess(t('keys.groupChangedSuccess'))
+    loadApiKeys()
+  } catch (error) {
+    appStore.showError(t('keys.failedToChangeGroup'))
+    loadApiKeys()
+  }
+}
+
+const closePendingGroupSelector = async () => {
+  await commitPendingGroupSelection()
+  groupSelectorKeyId.value = null
+  dropdownPosition.value = null
+  pendingGroupIds.value = []
+  originalGroupIds.value = []
+}
+
+const openGroupSelector = async (key: ApiKey) => {
   if (groupSelectorKeyId.value === key.id) {
-    groupSelectorKeyId.value = null
-    dropdownPosition.value = null
+    await closePendingGroupSelector()
   } else {
+    if (groupSelectorKeyId.value !== null) {
+      await closePendingGroupSelector()
+    }
+    const groupIds = getAuthorizedGroupIds(key)
+    pendingGroupIds.value = [...groupIds]
+    originalGroupIds.value = [...groupIds]
     const buttonEl = groupButtonRefs.value.get(key.id)
     if (buttonEl) {
       const rect = buttonEl.getBoundingClientRect()
@@ -1498,34 +1480,21 @@ const openGroupSelector = (key: ApiKey) => {
   }
 }
 
-const changeGroup = async (key: ApiKey, newGroupId: number | null) => {
-  if (!canReassignKeyGroup.value) return
-  groupSelectorKeyId.value = null
-  dropdownPosition.value = null
-  if (key.group_id === newGroupId) return
-
-  try {
-    const updates: { group_id: number | null; group_ids?: number[] } = { group_id: newGroupId }
-    if (newGroupId !== null) {
-      const currentGroupIds = key.group_ids?.length
-        ? key.group_ids
-        : key.group_id === null ? [] : [key.group_id]
-      updates.group_ids = Array.from(new Set([newGroupId, ...currentGroupIds]))
-    }
-    await keysAPI.update(key.id, updates)
-    appStore.showSuccess(t('keys.groupChangedSuccess'))
-    loadApiKeys()
-  } catch (error) {
-    appStore.showError(t('keys.failedToChangeGroup'))
-  }
+const isPendingAuthorizedGroupSelected = (groupId: number) => {
+  return pendingGroupIds.value.includes(groupId)
 }
 
-const closeGroupSelector = (event: MouseEvent) => {
+const togglePendingAuthorizedGroup = (groupId: number) => {
+  pendingGroupIds.value = pendingGroupIds.value.includes(groupId)
+    ? pendingGroupIds.value.filter((id) => id !== groupId)
+    : [...pendingGroupIds.value, groupId]
+}
+
+const closeGroupSelector = async (event: MouseEvent) => {
   const target = event.target as HTMLElement
   // Check if click is inside the dropdown or the trigger button
   if (!target.closest('.group\\/dropdown') && !dropdownRef.value?.contains(target)) {
-    groupSelectorKeyId.value = null
-    dropdownPosition.value = null
+    await closePendingGroupSelector()
   }
 }
 
@@ -1535,8 +1504,8 @@ const confirmDelete = (key: ApiKey) => {
 }
 
 const handleSubmit = async () => {
-  // Validate group_id is required
-  if (formData.value.group_id === null) {
+  const groupIds = authorizedGroupIdsForSubmit()
+  if (groupIds.length === 0) {
     appStore.showError(t('keys.groupRequired'))
     return
   }
@@ -1593,6 +1562,8 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates = {
         name: formData.value.name,
+        group_id: groupIds[0] ?? null,
+        group_ids: groupIds,
         status: formData.value.status,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
@@ -1602,26 +1573,22 @@ const handleSubmit = async () => {
         rate_limit_1d: rateLimitData.rate_limit_1d,
         rate_limit_7d: rateLimitData.rate_limit_7d,
       }
-      if (canReassignKeyGroup.value) {
-        const authorizedGroupIds = authorizedGroupIdsForSubmit()
-        ;(updates as typeof updates & { group_id: number | null; group_ids: number[] }).group_id = formData.value.group_id
-        ;(updates as typeof updates & { group_id: number | null; group_ids: number[] }).group_ids = authorizedGroupIds
-      }
       await keysAPI.update(selectedKey.value.id, updates)
       appStore.showSuccess(t('keys.keyUpdatedSuccess'))
     } else {
       const customKey = formData.value.use_custom_key ? formData.value.custom_key : undefined
-      await keysAPI.create(
-        formData.value.name,
-        formData.value.group_id,
-        customKey,
-        ipWhitelist,
-        ipBlacklist,
+      await keysAPI.create({
+        name: formData.value.name,
+        group_ids: groupIds,
+        custom_key: customKey,
+        ip_whitelist: ipWhitelist,
+        ip_blacklist: ipBlacklist,
         quota,
-        expiresInDays,
-        rateLimitData,
-        authorizedGroupIdsForSubmit()
-      )
+        expires_in_days: expiresInDays,
+        rate_limit_5h: rateLimitData.rate_limit_5h,
+        rate_limit_1d: rateLimitData.rate_limit_1d,
+        rate_limit_7d: rateLimitData.rate_limit_7d,
+      })
       appStore.showSuccess(t('keys.keyCreatedSuccess'))
       // Only advance tour if active, on submit step, and creation succeeded
       if (onboardingStore.isCurrentStep('[data-tour="key-form-submit"]')) {

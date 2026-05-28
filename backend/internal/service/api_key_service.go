@@ -159,13 +159,6 @@ func normalizeAPIKeyGroupIDs(defaultGroupID *int64, groupIDs []int64) ([]int64, 
 			return nil, ErrInvalidAPIKeyGroupID
 		}
 	}
-	if defaultGroupID == nil {
-		if len(groupIDs) > 0 {
-			return nil, ErrDefaultGroupNotAuthorized
-		}
-		return nil, nil
-	}
-
 	seen := make(map[int64]struct{}, len(groupIDs)+1)
 	out := make([]int64, 0, len(groupIDs)+1)
 	for _, id := range groupIDs {
@@ -175,11 +168,11 @@ func normalizeAPIKeyGroupIDs(defaultGroupID *int64, groupIDs []int64) ([]int64, 
 		seen[id] = struct{}{}
 		out = append(out, id)
 	}
-	if _, ok := seen[*defaultGroupID]; !ok {
-		if len(groupIDs) > 0 {
-			return nil, ErrDefaultGroupNotAuthorized
-		}
+	if len(out) == 0 && defaultGroupID != nil {
 		out = append(out, *defaultGroupID)
+	}
+	if len(out) == 0 {
+		return nil, ErrDefaultGroupNotAuthorized
 	}
 	slices.Sort(out)
 	return out, nil
@@ -403,23 +396,6 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	// 验证分组权限（如果指定了分组）
-	if req.GroupID != nil {
-		if *req.GroupID <= 0 {
-			return nil, ErrInvalidAPIKeyGroupID
-		}
-
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-
-		// 检查用户是否可以绑定该分组
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
-		}
-	}
-
 	var key string
 
 	// 判断是否使用自定义Key
@@ -462,13 +438,17 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 	if err := s.validateAPIKeyGroupAccess(ctx, user, groupIDs); err != nil {
 		return nil, err
 	}
+	groupID := &groupIDs[0]
+	if req.GroupID != nil && slices.Contains(groupIDs, *req.GroupID) {
+		groupID = req.GroupID
+	}
 
 	// 创建API Key记录
 	apiKey := &APIKey{
 		UserID:      userID,
 		Key:         key,
 		Name:        req.Name,
-		GroupID:     req.GroupID,
+		GroupID:     groupID,
 		GroupIDs:    groupIDs,
 		Status:      StatusActive,
 		IPWhitelist: req.IPWhitelist,
@@ -610,37 +590,19 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 		apiKey.Name = *req.Name
 	}
 
-	groupIDChanged := false
 	var user *User
 	if req.GroupID != nil {
 		if *req.GroupID <= 0 {
 			return nil, ErrInvalidAPIKeyGroupID
 		}
-
-		// 验证分组权限
-		user, err = s.userRepo.GetByID(ctx, userID)
-		if err != nil {
-			return nil, fmt.Errorf("get user: %w", err)
-		}
-
-		group, err := s.groupRepo.GetByID(ctx, *req.GroupID)
-		if err != nil {
-			return nil, fmt.Errorf("get group: %w", err)
-		}
-
-		if !s.canUserBindGroup(ctx, user, group) {
-			return nil, ErrGroupNotAllowed
-		}
-
 		apiKey.GroupID = req.GroupID
-		groupIDChanged = true
 	}
 
-	if req.GroupIDs != nil || groupIDChanged {
+	if req.GroupIDs != nil || req.GroupID != nil {
 		inputGroupIDs := []int64(nil)
 		if req.GroupIDs != nil {
 			inputGroupIDs = *req.GroupIDs
-			if len(inputGroupIDs) == 0 && apiKey.GroupID != nil {
+			if len(inputGroupIDs) == 0 {
 				return nil, ErrDefaultGroupNotAuthorized
 			}
 		}
@@ -658,6 +620,12 @@ func (s *APIKeyService) Update(ctx context.Context, id int64, userID int64, req 
 			return nil, err
 		}
 		apiKey.GroupIDs = groupIDs
+		if req.GroupIDs != nil && len(groupIDs) > 0 {
+			apiKey.GroupID = &groupIDs[0]
+			if req.GroupID != nil && slices.Contains(groupIDs, *req.GroupID) {
+				apiKey.GroupID = req.GroupID
+			}
+		}
 	}
 
 	if req.Status != nil {

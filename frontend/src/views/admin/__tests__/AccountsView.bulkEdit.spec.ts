@@ -10,6 +10,7 @@ const {
   getAllProxies,
   getAllGroups,
   generateCheckoutLink,
+  livenessCheck,
   copyToClipboard,
   showSuccess,
   showError,
@@ -21,6 +22,7 @@ const {
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
   generateCheckoutLink: vi.fn(),
+  livenessCheck: vi.fn(),
   copyToClipboard: vi.fn(),
   showSuccess: vi.fn(),
   showError: vi.fn(),
@@ -37,7 +39,8 @@ vi.mock('@/api/admin', () => ({
       batchClearError: vi.fn(),
       batchRefresh: vi.fn(),
       toggleSchedulable: vi.fn(),
-      generateCheckoutLink
+      generateCheckoutLink,
+      livenessCheck
     },
     proxies: {
       getAll: getAllProxies
@@ -82,8 +85,10 @@ const DataTableStub = {
   props: ['columns', 'data'],
   template: `
     <div data-test="data-table">
+      <span v-for="column in columns" :key="column.key" data-test="column-key">{{ column.key }}</span>
       <template v-for="row in data" :key="row.id">
         <slot name="cell-name" :row="row" :value="row.name" />
+        <slot name="cell-created_at" :value="row.created_at" :row="row" />
       </template>
     </div>
   `
@@ -125,6 +130,7 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockReset()
     getAllGroups.mockReset()
     generateCheckoutLink.mockReset()
+    livenessCheck.mockReset()
     copyToClipboard.mockReset()
     showSuccess.mockReset()
     showError.mockReset()
@@ -147,6 +153,17 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
     generateCheckoutLink.mockResolvedValue('https://chatgpt.com/checkout/example')
+    livenessCheck.mockResolvedValue({
+      total: 0,
+      completed: 0,
+      success: 0,
+      failed: 0,
+      skipped: 0,
+      average_latency_ms: 0,
+      by_platform: {},
+      failure_reasons: {},
+      items: []
+    })
     copyToClipboard.mockResolvedValue(true)
   })
 
@@ -472,6 +489,18 @@ describe('admin AccountsView bulk edit scope', () => {
             email_address: 'owner@example.com'
           },
           credentials: {}
+  it('renders the created_at column by default', async () => {
+    listAccounts.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          name: 'test-account',
+          platform: 'anthropic',
+          type: 'oauth',
+          status: 'active',
+          schedulable: true,
+          created_at: '2026-03-07T10:00:00Z',
+          updated_at: '2026-03-07T10:00:00Z'
         }
       ],
       total: 1,
@@ -492,7 +521,6 @@ describe('admin AccountsView bulk edit scope', () => {
           ConfirmDialog: true,
           AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
           AccountTableFilters: { template: '<div></div>' },
-          AccountBulkActionsBar: AccountBulkActionsBarStub,
           AccountActionMenu: AccountActionMenuStub,
           ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
           ImportDataModal: true,
@@ -525,6 +553,72 @@ describe('admin AccountsView bulk edit scope', () => {
     await flushPromises()
 
     expect(copyToClipboard).toHaveBeenCalledWith('owner@example.com', 'admin.accounts.emailCopied')
+  })
+
+  it('opens account liveness check modal from more actions and reloads after completion', async () => {
+    listAccounts.mockResolvedValueOnce({
+      items: [],
+      total: 12,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          AccountLivenessCheckModal: {
+            props: ['show', 'filteredCount'],
+            emits: ['completed'],
+            template: '<div data-test="liveness-modal" :data-show="String(show)" :data-filtered-count="String(filteredCount)"><button data-test="liveness-complete" @click="$emit(\'completed\')">complete</button></div>'
+          },
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+    await wrapper.get('button[title="admin.accounts.moreActions"]').trigger('click')
+    await wrapper.get('[data-test="open-liveness-check"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-test="liveness-modal"]').attributes('data-show')).toBe('true')
+    expect(wrapper.get('[data-test="liveness-modal"]').attributes('data-filtered-count')).toBe('12')
+
+    const callsBeforeComplete = listAccounts.mock.calls.length
+    await wrapper.get('[data-test="liveness-complete"]').trigger('click')
+    await flushPromises()
+
+    expect(listAccounts.mock.calls.length).toBeGreaterThan(callsBeforeComplete)
   })
 
   it('maps paused status filter to unschedulable when loading filtered results', async () => {
@@ -640,5 +734,12 @@ describe('admin AccountsView bulk edit scope', () => {
       }),
       expect.anything()
     )
+    const columnKeys = wrapper.findAll('[data-test="column-key"]').map(node => node.text())
+    expect(columnKeys).toContain('created_at')
+    const columns = wrapper.getComponent(DataTableStub).props('columns') as Array<{ key: string; label: string; sortable: boolean }>
+    expect(columns.find(column => column.key === 'created_at')).toMatchObject({
+      label: 'admin.accounts.columns.createdAt',
+      sortable: true
+    })
   })
 })
