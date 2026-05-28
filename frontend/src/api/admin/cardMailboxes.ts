@@ -66,6 +66,19 @@ export interface CardMailboxDeleteResult {
   count: number
 }
 
+export interface CardMailboxExportItem {
+  id: number
+  email: string
+  mailbox_url: string
+  raw_json: string
+  last_code?: string
+  last_status?: CardMailboxFetchStatus
+  last_error?: string | null
+  last_fetched_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
 /**
  * List card mailboxes with pagination and filters.
  */
@@ -93,6 +106,14 @@ export async function fetchCode(id: number): Promise<CardMailboxFetchCodeResult>
 }
 
 /**
+ * Export selected card mailboxes as one JSON file payload.
+ */
+export async function exportSelected(ids: number[]): Promise<string> {
+  const { data } = await apiClient.post<string>('/admin/card-mailboxes/export', { ids }, { responseType: 'text' })
+  return data
+}
+
+/**
  * Delete a single card mailbox.
  */
 export async function deleteCardMailbox(id: number): Promise<CardMailboxDeleteResult> {
@@ -103,6 +124,7 @@ export async function deleteCardMailbox(id: number): Promise<CardMailboxDeleteRe
 export const cardMailboxesAPI = {
   list,
   importJSONL,
+  exportSelected,
   fetchCode,
   delete: deleteCardMailbox
 }

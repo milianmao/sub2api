@@ -19,10 +19,12 @@ type cardMailboxRepoStub struct {
 	lists         []CardMailboxListFilter
 	deletes       []int64
 	upserts       []CardMailboxUpsertInput
+	getByIDs      [][]int64
 	latestUpdates []CardMailboxLatestResultInput
 	byEmail       map[string]*CardMailbox
 	upsertErr     error
 	getErr        error
+	getByIDsErr   error
 	updateErr     error
 }
 
@@ -50,6 +52,7 @@ func (s *cardMailboxRepoStub) UpsertByEmail(_ context.Context, input CardMailbox
 	}
 	item.Email = input.Email
 	item.MailboxURL = input.MailboxURL
+	item.RawJSON = input.RawJSON
 	item.UpdatedAt = time.Unix(1776790000, 0)
 	return item, nil
 }
@@ -64,6 +67,24 @@ func (s *cardMailboxRepoStub) GetByID(_ context.Context, id int64) (*CardMailbox
 		}
 	}
 	return nil, ErrCardMailboxNotFound
+}
+
+func (s *cardMailboxRepoStub) GetByIDs(_ context.Context, ids []int64) ([]*CardMailbox, error) {
+	if s.getByIDsErr != nil {
+		return nil, s.getByIDsErr
+	}
+	copied := append([]int64(nil), ids...)
+	s.getByIDs = append(s.getByIDs, copied)
+	items := make([]*CardMailbox, 0, len(ids))
+	for _, id := range ids {
+		for _, item := range s.byEmail {
+			if item.ID == id {
+				items = append(items, item)
+				break
+			}
+		}
+	}
+	return items, nil
 }
 
 func (s *cardMailboxRepoStub) Delete(_ context.Context, id int64) error {
@@ -127,9 +148,65 @@ func TestCardMailboxImportJSONLParsesAliasesAndUpsertsByEmail(t *testing.T) {
 	require.Contains(t, result.Errors[0].Message, "mailbox url is required")
 	require.NotContains(t, result.Errors[0].Message, "secret")
 	require.Len(t, repo.upserts, 3)
-	require.Equal(t, CardMailboxUpsertInput{Email: "first@example.com", MailboxURL: "https://mail.example.com/first?token=secret"}, repo.upserts[0])
-	require.Equal(t, CardMailboxUpsertInput{Email: "second@example.com", MailboxURL: "https://mail.example.com/second"}, repo.upserts[1])
-	require.Equal(t, CardMailboxUpsertInput{Email: "third@example.com", MailboxURL: "https://mail.example.com/third"}, repo.upserts[2])
+	require.Equal(t, CardMailboxUpsertInput{
+		Email:      "first@example.com",
+		MailboxURL: "https://mail.example.com/first?token=secret",
+		RawJSON:    `{"email":"first@example.com","mailbox_url":"https://mail.example.com/first?token=secret"}`,
+	}, repo.upserts[0])
+	require.Equal(t, CardMailboxUpsertInput{
+		Email:      "second@example.com",
+		MailboxURL: "https://mail.example.com/second",
+		RawJSON:    `{"mail":"second@example.com","mailboxUrl":"https://mail.example.com/second"}`,
+	}, repo.upserts[1])
+	require.Equal(t, CardMailboxUpsertInput{
+		Email:      "third@example.com",
+		MailboxURL: "https://mail.example.com/third",
+		RawJSON:    `{"address":"third@example.com","url":"https://mail.example.com/third"}`,
+	}, repo.upserts[2])
+}
+
+func TestCardMailboxExportSelectedReturnsFullEntries(t *testing.T) {
+	repo := &cardMailboxRepoStub{
+		byEmail: map[string]*CardMailbox{
+			"a@example.com": {
+				ID:            11,
+				Email:         "a@example.com",
+				MailboxURL:    "https://mail.example.com/a?token=secret",
+				RawJSON:       `{"email":"a@example.com","mailbox_url":"https://mail.example.com/a?token=secret","password":"pw1"}`,
+				LastCode:      "123456",
+				LastStatus:    CardMailboxFetchStatusSuccess,
+				LastError:     "",
+				LastFetchedAt: cardMailboxPtrTime(time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC)),
+				CreatedAt:     time.Date(2026, 5, 27, 10, 0, 0, 0, time.UTC),
+				UpdatedAt:     time.Date(2026, 5, 28, 10, 0, 0, 0, time.UTC),
+			},
+			"b@example.com": {
+				ID:         12,
+				Email:      "b@example.com",
+				MailboxURL: "https://mail.example.com/b",
+				RawJSON:    `{"email":"b@example.com","mailbox_url":"https://mail.example.com/b","custom":"x"}`,
+				CreatedAt:  time.Date(2026, 5, 27, 11, 0, 0, 0, time.UTC),
+				UpdatedAt:  time.Date(2026, 5, 28, 11, 0, 0, 0, time.UTC),
+			},
+		},
+	}
+	svc := NewCardMailboxService(repo, nil)
+
+	result, err := svc.ExportByIDs(context.Background(), []int64{12, 11})
+
+	require.NoError(t, err)
+	require.Equal(t, [][]int64{{12, 11}}, repo.getByIDs)
+	require.Len(t, result, 2)
+	require.Equal(t, int64(12), result[0].ID)
+	require.Equal(t, `{"email":"b@example.com","mailbox_url":"https://mail.example.com/b","custom":"x"}`, result[0].RawJSON)
+	require.Equal(t, "https://mail.example.com/b", result[0].MailboxURL)
+	require.Equal(t, int64(11), result[1].ID)
+	require.Equal(t, `{"email":"a@example.com","mailbox_url":"https://mail.example.com/a?token=secret","password":"pw1"}`, result[1].RawJSON)
+	require.Equal(t, "123456", result[1].LastCode)
+}
+
+func cardMailboxPtrTime(v time.Time) *time.Time {
+	return &v
 }
 
 func TestCardMailboxImportJSONLRedactsSensitiveParseErrors(t *testing.T) {

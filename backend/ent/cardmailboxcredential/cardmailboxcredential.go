@@ -21,6 +21,8 @@ const (
 	FieldEmail = "email"
 	// FieldMailboxURL holds the string denoting the mailbox_url field in the database.
 	FieldMailboxURL = "mailbox_url"
+	// FieldRawJSON holds the string denoting the raw_json field in the database.
+	FieldRawJSON = "raw_json"
 	// FieldLastCode holds the string denoting the last_code field in the database.
 	FieldLastCode = "last_code"
 	// FieldLastStatus holds the string denoting the last_status field in the database.
@@ -40,6 +42,7 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldEmail,
 	FieldMailboxURL,
+	FieldRawJSON,
 	FieldLastCode,
 	FieldLastStatus,
 	FieldLastError,
@@ -67,6 +70,8 @@ var (
 	EmailValidator func(string) error
 	// MailboxURLValidator is a validator for the "mailbox_url" field. It is called by the builders before save.
 	MailboxURLValidator func(string) error
+	// RawJSONValidator is a validator for the "raw_json" field. It is called by the builders before save.
+	RawJSONValidator func(string) error
 	// LastCodeValidator is a validator for the "last_code" field. It is called by the builders before save.
 	LastCodeValidator func(string) error
 	// LastStatusValidator is a validator for the "last_status" field. It is called by the builders before save.
@@ -99,6 +104,11 @@ func ByEmail(opts ...sql.OrderTermOption) OrderOption {
 // ByMailboxURL orders the results by the mailbox_url field.
 func ByMailboxURL(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMailboxURL, opts...).ToFunc()
+}
+
+// ByRawJSON orders the results by the raw_json field.
+func ByRawJSON(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRawJSON, opts...).ToFunc()
 }
 
 // ByLastCode orders the results by the last_code field.

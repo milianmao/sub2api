@@ -116,6 +116,49 @@ func (s *CardMailboxService) Delete(ctx context.Context, id int64) error {
 	return s.repo.Delete(ctx, id)
 }
 
+func (s *CardMailboxService) ExportByIDs(ctx context.Context, ids []int64) ([]CardMailboxExportItem, error) {
+	if s == nil || s.repo == nil {
+		return nil, ErrCardMailboxDependencyMissing
+	}
+	if len(ids) == 0 {
+		return []CardMailboxExportItem{}, nil
+	}
+
+	items, err := s.repo.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	indexByID := make(map[int64]*CardMailbox, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		indexByID[item.ID] = item
+	}
+
+	result := make([]CardMailboxExportItem, 0, len(ids))
+	for _, id := range ids {
+		item, ok := indexByID[id]
+		if !ok || item == nil {
+			continue
+		}
+		result = append(result, CardMailboxExportItem{
+			ID:            item.ID,
+			Email:         item.Email,
+			MailboxURL:    item.MailboxURL,
+			RawJSON:       item.RawJSON,
+			LastCode:      item.LastCode,
+			LastStatus:    item.LastStatus,
+			LastError:     item.LastError,
+			LastFetchedAt: item.LastFetchedAt,
+			CreatedAt:     item.CreatedAt,
+			UpdatedAt:     item.UpdatedAt,
+		})
+	}
+	return result, nil
+}
+
 func (s *CardMailboxService) FetchCode(ctx context.Context, id int64) (*CardMailboxFetchResult, error) {
 	if s != nil && s.resolver == nil {
 		s.resolver = netCardMailboxResolver{}
@@ -256,7 +299,7 @@ func parseCardMailboxJSONLLine(line []byte) (CardMailboxUpsertInput, error) {
 	if err := validateCardMailboxURL(context.Background(), mailboxURL, nil); err != nil {
 		return CardMailboxUpsertInput{}, err
 	}
-	return CardMailboxUpsertInput{Email: email, MailboxURL: mailboxURL}, nil
+	return CardMailboxUpsertInput{Email: email, MailboxURL: mailboxURL, RawJSON: string(line)}, nil
 }
 
 func validateCardMailboxURL(ctx context.Context, rawURL string, resolver cardMailboxResolver) error {
