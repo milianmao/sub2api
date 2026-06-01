@@ -472,6 +472,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime, SchemaType: map[string]string{"postgres": "timestamptz"}},
 		{Name: "email", Type: field.TypeString, Size: 255},
 		{Name: "mailbox_url", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "raw_json", Type: field.TypeString, SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "last_code", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "last_status", Type: field.TypeString, Nullable: true, Size: 20},
 		{Name: "last_error", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
@@ -491,12 +492,12 @@ var (
 			{
 				Name:    "cardmailboxcredential_last_status",
 				Unique:  false,
-				Columns: []*schema.Column{CardMailboxCredentialsColumns[6]},
+				Columns: []*schema.Column{CardMailboxCredentialsColumns[7]},
 			},
 			{
 				Name:    "cardmailboxcredential_last_fetched_at",
 				Unique:  false,
-				Columns: []*schema.Column{CardMailboxCredentialsColumns[8]},
+				Columns: []*schema.Column{CardMailboxCredentialsColumns[9]},
 			},
 		},
 	}

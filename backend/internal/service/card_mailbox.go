@@ -27,6 +27,7 @@ type CardMailbox struct {
 	ID            int64
 	Email         string
 	MailboxURL    string
+	RawJSON       string
 	LastCode      string
 	LastStatus    string
 	LastError     string
@@ -38,6 +39,7 @@ type CardMailbox struct {
 type CardMailboxUpsertInput struct {
 	Email      string
 	MailboxURL string
+	RawJSON    string
 }
 
 type CardMailboxLatestResultInput struct {
@@ -52,6 +54,19 @@ type CardMailboxListFilter struct {
 	Status string
 	Limit  int
 	Offset int
+}
+
+type CardMailboxExportItem struct {
+	ID            int64     `json:"id"`
+	Email         string    `json:"email"`
+	MailboxURL    string    `json:"mailbox_url"`
+	RawJSON       string    `json:"raw_json"`
+	LastCode      string    `json:"last_code,omitempty"`
+	LastStatus    string    `json:"last_status,omitempty"`
+	LastError     string    `json:"last_error,omitempty"`
+	LastFetchedAt *time.Time `json:"last_fetched_at,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type CardMailboxImportResult struct {
@@ -81,6 +96,7 @@ type CardMailboxRepository interface {
 	List(ctx context.Context, filter CardMailboxListFilter) ([]*CardMailbox, int, error)
 	UpsertByEmail(ctx context.Context, input CardMailboxUpsertInput) (*CardMailbox, error)
 	GetByID(ctx context.Context, id int64) (*CardMailbox, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]*CardMailbox, error)
 	UpdateLatestResult(ctx context.Context, id int64, input CardMailboxLatestResultInput) error
 	Delete(ctx context.Context, id int64) error
 }

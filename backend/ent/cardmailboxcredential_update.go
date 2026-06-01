@@ -62,6 +62,20 @@ func (_u *CardMailboxCredentialUpdate) SetNillableMailboxURL(v *string) *CardMai
 	return _u
 }
 
+// SetRawJSON sets the "raw_json" field.
+func (_u *CardMailboxCredentialUpdate) SetRawJSON(v string) *CardMailboxCredentialUpdate {
+	_u.mutation.SetRawJSON(v)
+	return _u
+}
+
+// SetNillableRawJSON sets the "raw_json" field if the given value is not nil.
+func (_u *CardMailboxCredentialUpdate) SetNillableRawJSON(v *string) *CardMailboxCredentialUpdate {
+	if v != nil {
+		_u.SetRawJSON(*v)
+	}
+	return _u
+}
+
 // SetLastCode sets the "last_code" field.
 func (_u *CardMailboxCredentialUpdate) SetLastCode(v string) *CardMailboxCredentialUpdate {
 	_u.mutation.SetLastCode(v)
@@ -195,6 +209,11 @@ func (_u *CardMailboxCredentialUpdate) check() error {
 			return &ValidationError{Name: "mailbox_url", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.mailbox_url": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RawJSON(); ok {
+		if err := cardmailboxcredential.RawJSONValidator(v); err != nil {
+			return &ValidationError{Name: "raw_json", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.raw_json": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LastCode(); ok {
 		if err := cardmailboxcredential.LastCodeValidator(v); err != nil {
 			return &ValidationError{Name: "last_code", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.last_code": %w`, err)}
@@ -228,6 +247,9 @@ func (_u *CardMailboxCredentialUpdate) sqlSave(ctx context.Context) (_node int, 
 	}
 	if value, ok := _u.mutation.MailboxURL(); ok {
 		_spec.SetField(cardmailboxcredential.FieldMailboxURL, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RawJSON(); ok {
+		_spec.SetField(cardmailboxcredential.FieldRawJSON, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.LastCode(); ok {
 		_spec.SetField(cardmailboxcredential.FieldLastCode, field.TypeString, value)
@@ -303,6 +325,20 @@ func (_u *CardMailboxCredentialUpdateOne) SetMailboxURL(v string) *CardMailboxCr
 func (_u *CardMailboxCredentialUpdateOne) SetNillableMailboxURL(v *string) *CardMailboxCredentialUpdateOne {
 	if v != nil {
 		_u.SetMailboxURL(*v)
+	}
+	return _u
+}
+
+// SetRawJSON sets the "raw_json" field.
+func (_u *CardMailboxCredentialUpdateOne) SetRawJSON(v string) *CardMailboxCredentialUpdateOne {
+	_u.mutation.SetRawJSON(v)
+	return _u
+}
+
+// SetNillableRawJSON sets the "raw_json" field if the given value is not nil.
+func (_u *CardMailboxCredentialUpdateOne) SetNillableRawJSON(v *string) *CardMailboxCredentialUpdateOne {
+	if v != nil {
+		_u.SetRawJSON(*v)
 	}
 	return _u
 }
@@ -453,6 +489,11 @@ func (_u *CardMailboxCredentialUpdateOne) check() error {
 			return &ValidationError{Name: "mailbox_url", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.mailbox_url": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RawJSON(); ok {
+		if err := cardmailboxcredential.RawJSONValidator(v); err != nil {
+			return &ValidationError{Name: "raw_json", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.raw_json": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.LastCode(); ok {
 		if err := cardmailboxcredential.LastCodeValidator(v); err != nil {
 			return &ValidationError{Name: "last_code", err: fmt.Errorf(`ent: validator failed for field "CardMailboxCredential.last_code": %w`, err)}
@@ -503,6 +544,9 @@ func (_u *CardMailboxCredentialUpdateOne) sqlSave(ctx context.Context) (_node *C
 	}
 	if value, ok := _u.mutation.MailboxURL(); ok {
 		_spec.SetField(cardmailboxcredential.FieldMailboxURL, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.RawJSON(); ok {
+		_spec.SetField(cardmailboxcredential.FieldRawJSON, field.TypeString, value)
 	}
 	if value, ok := _u.mutation.LastCode(); ok {
 		_spec.SetField(cardmailboxcredential.FieldLastCode, field.TypeString, value)

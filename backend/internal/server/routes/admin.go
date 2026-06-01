@@ -111,6 +111,7 @@ func registerCardMailboxRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		cardMailboxes.GET("", h.Admin.CardMailbox.List)
 		cardMailboxes.POST("/import", h.Admin.CardMailbox.Import)
+		cardMailboxes.POST("/export", h.Admin.CardMailbox.Export)
 		cardMailboxes.POST("/:id/fetch-code", h.Admin.CardMailbox.FetchCode)
 		cardMailboxes.DELETE("/:id", h.Admin.CardMailbox.Delete)
 	}
