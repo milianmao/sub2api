@@ -21,7 +21,7 @@ func setupGroupAuthorizationAdminRouter(adminSvc *stubAdminService, role string)
 		c.Next()
 	})
 
-	userHandler := NewUserHandler(adminSvc, nil)
+	userHandler := NewUserHandler(adminSvc, nil, nil, nil)
 	groupHandler := NewGroupHandler(adminSvc, nil, nil)
 	apiKeyHandler := NewAdminAPIKeyHandler(adminSvc)
 

@@ -166,6 +166,10 @@ func (s *stubAdminService) GetUser(ctx context.Context, id int64) (*service.User
 	return &user, nil
 }
 
+func (s *stubAdminService) GetUserIncludeDeleted(ctx context.Context, id int64) (*service.User, error) {
+	return s.GetUser(ctx, id)
+}
+
 func (s *stubAdminService) CreateUser(ctx context.Context, input *service.CreateUserInput) (*service.User, error) {
 	s.mu.Lock()
 	s.createdUsers = append(s.createdUsers, input)

@@ -54,7 +54,7 @@ type CreateUserRequest struct {
 	Username      string   `json:"username"`
 	Notes         string   `json:"notes"`
 	Role          *string  `json:"role" binding:"omitempty,oneof=super_admin admin user"`
-	Balance       float64  `json:"balance"`
+	Balance       *float64 `json:"balance"`
 	Concurrency   int      `json:"concurrency"`
 	RPMLimit      int      `json:"rpm_limit"`
 	Level         *int     `json:"level" binding:"omitempty,min=0"`
@@ -219,7 +219,12 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	user, err := h.adminService.GetUser(c.Request.Context(), userID)
+	var user *service.User
+	if c.Query("include_deleted") == "true" {
+		user, err = h.adminService.GetUserIncludeDeleted(c.Request.Context(), userID)
+	} else {
+		user, err = h.adminService.GetUser(c.Request.Context(), userID)
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -786,7 +791,7 @@ func (h *UserHandler) UpdateUserPlatformQuotas(c *gin.Context) {
 	if h.billingCache != nil {
 		for _, p := range service.AllowedQuotaPlatforms {
 			if err := h.billingCache.DeleteUserPlatformQuotaCache(ctx, userID, p); err != nil {
-				slog.Warn("quota cache invalidation failed", "user_id", userID, "platform", p, "err", err)
+				slog.Error("ALERT: quota cache invalidation failed after UpsertForUser; limit 生效可能延迟至 sentinel TTL(最长 1h),需人工确认或重试失效", "user_id", userID, "platform", p, "err", err)
 			}
 		}
 	}
@@ -870,7 +875,7 @@ func (h *UserHandler) ResetUserPlatformQuotaWindow(c *gin.Context) {
 
 	if h.billingCache != nil {
 		if err := h.billingCache.DeleteUserPlatformQuotaCache(ctx, userID, req.Platform); err != nil {
-			slog.Warn("quota cache invalidation failed", "user_id", userID, "platform", req.Platform, "err", err)
+			slog.Error("ALERT: quota cache invalidation failed after ResetExpiredWindow; 窗口重置可能延迟至 sentinel TTL(最长 1h)", "user_id", userID, "platform", req.Platform, "err", err)
 		}
 	}
 

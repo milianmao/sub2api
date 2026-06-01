@@ -4146,11 +4146,6 @@ const loadVisibleUsers = async () => {
   }
 };
 
-const openCreateModal = () => {
-  showCreateModal.value = true;
-  loadVisibleUsers();
-};
-
 const formatCost = (cost: number): string => {
   if (cost >= 1000) return cost.toFixed(0);
   if (cost >= 100) return cost.toFixed(1);
@@ -4236,6 +4231,7 @@ const handleSort = (key: string, order: 'asc' | 'desc') => {
 
 const openCreateModal = () => {
   showCreateModal.value = true;
+  loadVisibleUsers();
   loadModelsListCandidates("create", 0, createForm.platform);
 };
 

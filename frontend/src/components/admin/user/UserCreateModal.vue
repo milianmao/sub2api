@@ -48,7 +48,7 @@
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label class="input-label">{{ t('admin.users.columns.balance') }}</label>
-          <input v-model.number="form.balance" type="number" step="any" class="input" />
+          <input v-model="form.balance" type="number" step="any" class="input" />
         </div>
         <div>
           <label class="input-label">{{ t('admin.users.columns.concurrency') }}</label>
@@ -94,20 +94,31 @@ const authStore = useAuthStore()
 const canEditLevel = computed(() => authStore.user?.role === 'admin' || authStore.user?.role === 'super_admin')
 const canEditRole = computed(() => authStore.user?.role === 'super_admin')
 
-const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, level: 0, balance: 0, concurrency: 1, rpm_limit: 0 })
+const form = reactive({ email: '', password: '', username: '', notes: '', role: 'user' as UserRole, level: 0, balance: '', concurrency: 1, rpm_limit: 0 })
 
 const { loading, submit } = useForm({
   form,
   submitFn: async (data) => {
-    const payload: any = {
+    const balance = String(data.balance).trim()
+    const payload: {
+      email: string
+      password: string
+      username?: string
+      notes?: string
+      role?: UserRole
+      level?: number
+      balance?: number
+      concurrency?: number
+      rpm_limit?: number
+    } = {
       email: data.email,
       password: data.password,
       username: data.username,
       notes: data.notes,
-      balance: data.balance,
       concurrency: data.concurrency,
       rpm_limit: data.rpm_limit,
     }
+    if (balance !== '') payload.balance = Number(balance)
     if (canEditLevel.value) payload.level = data.level || 0
     if (canEditRole.value) payload.role = data.role
     await adminAPI.users.create(payload)
@@ -116,7 +127,7 @@ const { loading, submit } = useForm({
   successMsg: t('admin.users.userCreated')
 })
 
-watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', role: 'user', level: 0, balance: 0, concurrency: 1, rpm_limit: 0 }) })
+watch(() => props.show, (v) => { if(v) Object.assign(form, { email: '', password: '', username: '', notes: '', role: 'user', level: 0, balance: '', concurrency: 1, rpm_limit: 0 }) })
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%^&*'
