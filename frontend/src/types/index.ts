@@ -100,6 +100,7 @@ export interface User {
   last_active_at?: string | null
   created_at: string
   updated_at: string
+  deleted_at?: string | null
 }
 
 export interface AdminUser extends User {
@@ -564,9 +565,15 @@ export interface AdminGroup extends Group {
   // OpenAI Messages 调度配置（仅 openai 平台使用）
   default_mapped_model?: string
   messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
+  models_list_config?: ModelsListConfig
 
   // 分组排序
   sort_order: number
+}
+
+export interface ModelsListConfig {
+  enabled: boolean
+  models: string[]
 }
 
 export interface ApiKey {
@@ -657,6 +664,13 @@ export interface CreateGroupRequest {
   openai_image_upstream?: OpenAIImageUpstreamStrategy
   mcp_xml_inject?: boolean
   supported_model_scopes?: string[]
+  models_list_config?: ModelsListConfig
+  allow_messages_dispatch?: boolean
+  default_mapped_model?: string
+  messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
+  model_routing?: Record<string, number[]> | null
+  model_routing_enabled?: boolean
+  rpm_limit?: number
   require_oauth_only?: boolean
   require_privacy_set?: boolean
   // 从指定分组复制账号
@@ -690,6 +704,13 @@ export interface UpdateGroupRequest {
   openai_image_upstream?: OpenAIImageUpstreamStrategy
   mcp_xml_inject?: boolean
   supported_model_scopes?: string[]
+  models_list_config?: ModelsListConfig
+  allow_messages_dispatch?: boolean
+  default_mapped_model?: string
+  messages_dispatch_model_config?: OpenAIMessagesDispatchModelConfig
+  model_routing?: Record<string, number[]> | null
+  model_routing_enabled?: boolean
+  rpm_limit?: number
   require_oauth_only?: boolean
   require_privacy_set?: boolean
   copy_accounts_from_group_ids?: number[]
@@ -1007,6 +1028,7 @@ export interface CodexUsageSnapshot {
 
 export type OpenAICompactMode = 'auto' | 'force_on' | 'force_off'
 export type OpenAIResponsesMode = 'auto' | 'force_responses' | 'force_chat_completions'
+export type OpenAIEndpointCapability = 'chat_completions' | 'embeddings'
 
 export interface OpenAICompactState {
   openai_compact_mode?: OpenAICompactMode
@@ -1923,3 +1945,11 @@ export interface UpdateScheduledTestPlanRequest {
 
 // Payment types
 export type { SubscriptionPlan, PaymentOrder, CheckoutInfoResponse } from './payment'
+
+export type {
+  PlatformQuotaItem,
+  PlatformQuotaUpdateItem,
+  PlatformQuotaPlatform,
+  PlatformQuotaWindow,
+  PlatformQuotasResponse,
+} from '@/api/admin/users'

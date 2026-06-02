@@ -112,6 +112,17 @@ func TestMigrationsRunner_IsIdempotent_AndSchemaIsUpToDate(t *testing.T) {
 	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.user_allowed_groups')").Scan(&uagRegclass))
 	require.True(t, uagRegclass.Valid, "expected user_allowed_groups table to exist")
 
+	// card_mailbox_credentials: base table must exist before raw_json follow-up migration runs
+	var cardMailboxRegclass sql.NullString
+	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.card_mailbox_credentials')").Scan(&cardMailboxRegclass))
+	require.True(t, cardMailboxRegclass.Valid, "expected card_mailbox_credentials table to exist")
+	requireColumn(t, tx, "card_mailbox_credentials", "email", "character varying", 255, false)
+	requireColumn(t, tx, "card_mailbox_credentials", "mailbox_url", "text", 0, false)
+	requireColumn(t, tx, "card_mailbox_credentials", "raw_json", "text", 0, false)
+	requireIndex(t, tx, "card_mailbox_credentials", "cardmailboxcredential_email")
+	requireIndex(t, tx, "card_mailbox_credentials", "cardmailboxcredential_last_status")
+	requireIndex(t, tx, "card_mailbox_credentials", "cardmailboxcredential_last_fetched_at")
+
 	// user_subscriptions: deleted_at for soft delete support (migration 012)
 	requireColumn(t, tx, "user_subscriptions", "deleted_at", "timestamp with time zone", 0, true)
 

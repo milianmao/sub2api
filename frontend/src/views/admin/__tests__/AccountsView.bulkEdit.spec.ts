@@ -85,8 +85,10 @@ const DataTableStub = {
   props: ['columns', 'data'],
   template: `
     <div data-test="data-table">
+      <span v-for="column in columns" :key="column.key" data-test="column-key">{{ column.key }}</span>
       <template v-for="row in data" :key="row.id">
         <slot name="cell-name" :row="row" :value="row.name" />
+        <slot name="cell-created_at" :value="row.created_at" :row="row" />
       </template>
     </div>
   `
@@ -487,6 +489,18 @@ describe('admin AccountsView bulk edit scope', () => {
             email_address: 'owner@example.com'
           },
           credentials: {}
+  it('renders the created_at column by default', async () => {
+    listAccounts.mockResolvedValue({
+      items: [
+        {
+          id: 1,
+          name: 'test-account',
+          platform: 'anthropic',
+          type: 'oauth',
+          status: 'active',
+          schedulable: true,
+          created_at: '2026-03-07T10:00:00Z',
+          updated_at: '2026-03-07T10:00:00Z'
         }
       ],
       total: 1,
@@ -507,7 +521,6 @@ describe('admin AccountsView bulk edit scope', () => {
           ConfirmDialog: true,
           AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
           AccountTableFilters: { template: '<div></div>' },
-          AccountBulkActionsBar: AccountBulkActionsBarStub,
           AccountActionMenu: AccountActionMenuStub,
           ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
           ImportDataModal: true,
@@ -721,5 +734,12 @@ describe('admin AccountsView bulk edit scope', () => {
       }),
       expect.anything()
     )
+    const columnKeys = wrapper.findAll('[data-test="column-key"]').map(node => node.text())
+    expect(columnKeys).toContain('created_at')
+    const columns = wrapper.getComponent(DataTableStub).props('columns') as Array<{ key: string; label: string; sortable: boolean }>
+    expect(columns.find(column => column.key === 'created_at')).toMatchObject({
+      label: 'admin.accounts.columns.createdAt',
+      sortable: true
+    })
   })
 })

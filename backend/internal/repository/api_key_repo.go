@@ -1059,6 +1059,7 @@ func userEntityToService(u *dbent.User) *service.User {
 		RPMLimit:                   u.RpmLimit,
 		CreatedAt:                  u.CreatedAt,
 		UpdatedAt:                  u.UpdatedAt,
+		DeletedAt:                  u.DeletedAt,
 	}
 	// Parse extra emails JSON (supports both old []string and new []NotifyEmailEntry format)
 	if u.BalanceNotifyExtraEmails != "" && u.BalanceNotifyExtraEmails != "[]" {
@@ -1108,6 +1109,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		DefaultMappedModel:              g.DefaultMappedModel,
 		MessagesDispatchModelConfig:     g.MessagesDispatchModelConfig,
 		OpenAIImageUpstream:             g.OpenaiImageUpstream,
+		ModelsListConfig:                g.ModelsListConfig,
 		RPMLimit:                        g.RpmLimit,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,

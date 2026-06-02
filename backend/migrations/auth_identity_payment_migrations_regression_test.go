@@ -1,6 +1,8 @@
 package migrations
 
 import (
+	"io/fs"
+	"sort"
 	"strings"
 	"testing"
 
@@ -154,4 +156,36 @@ func TestMigration135AllowsGitHubAndGoogleAuthProviders(t *testing.T) {
 	require.Contains(t, sql, "pending_auth_sessions_provider_type_check")
 	require.Contains(t, sql, "'github'")
 	require.Contains(t, sql, "'google'")
+}
+
+func TestCardMailboxTableMigrationRunsBeforeRawJSONBackfill(t *testing.T) {
+	files, err := fs.Glob(FS, "*.sql")
+	require.NoError(t, err)
+
+	sort.Strings(files)
+
+	createIdx := migrationFileIndex(files, "142b_create_card_mailbox_credentials.sql")
+	rawJSONIdx := migrationFileIndex(files, "143_add_card_mailbox_raw_json.sql")
+
+	require.NotEqual(t, -1, createIdx, "expected card mailbox base-table migration to exist")
+	require.NotEqual(t, -1, rawJSONIdx, "expected raw_json follow-up migration to exist")
+	require.Less(t, createIdx, rawJSONIdx, "card mailbox base-table migration must run before raw_json backfill")
+
+	content, err := FS.ReadFile("142b_create_card_mailbox_credentials.sql")
+	require.NoError(t, err)
+
+	sql := string(content)
+	require.Contains(t, sql, "CREATE TABLE IF NOT EXISTS card_mailbox_credentials")
+	require.Contains(t, sql, "mailbox_url TEXT NOT NULL")
+	require.Contains(t, sql, "CREATE UNIQUE INDEX IF NOT EXISTS cardmailboxcredential_email")
+	require.NotContains(t, sql, "raw_json")
+}
+
+func migrationFileIndex(files []string, target string) int {
+	for i, file := range files {
+		if file == target {
+			return i
+		}
+	}
+	return -1
 }

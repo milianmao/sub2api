@@ -90,6 +90,8 @@ const (
 	FieldMessagesDispatchModelConfig = "messages_dispatch_model_config"
 	// FieldOpenaiImageUpstream holds the string denoting the openai_image_upstream field in the database.
 	FieldOpenaiImageUpstream = "openai_image_upstream"
+	// FieldModelsListConfig holds the string denoting the models_list_config field in the database.
+	FieldModelsListConfig = "models_list_config"
 	// FieldRpmLimit holds the string denoting the rpm_limit field in the database.
 	FieldRpmLimit = "rpm_limit"
 	// EdgeAPIKeys holds the string denoting the api_keys edge name in mutations.
@@ -220,6 +222,7 @@ var Columns = []string{
 	FieldDefaultMappedModel,
 	FieldMessagesDispatchModelConfig,
 	FieldOpenaiImageUpstream,
+	FieldModelsListConfig,
 	FieldRpmLimit,
 }
 
@@ -321,6 +324,8 @@ var (
 	DefaultOpenaiImageUpstream string
 	// OpenaiImageUpstreamValidator is a validator for the "openai_image_upstream" field. It is called by the builders before save.
 	OpenaiImageUpstreamValidator func(string) error
+	// DefaultModelsListConfig holds the default value on creation for the "models_list_config" field.
+	DefaultModelsListConfig domain.GroupModelsListConfig
 	// DefaultRpmLimit holds the default value on creation for the "rpm_limit" field.
 	DefaultRpmLimit int
 )
