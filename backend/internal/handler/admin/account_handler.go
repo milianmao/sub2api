@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -1034,6 +1036,17 @@ type ApplyOAuthCredentialsRequest struct {
 // 与 /refresh 的区别：/refresh 用现有 refresh_token 换 access_token（无用户交互），
 // 本接口承接前端完成完整 OAuth 流程后的落库步骤。
 //
+type checkoutLinkRequest struct {
+	AccessToken   string `json:"access_token"`
+	ProxySource   string `json:"proxy_source" binding:"required"`
+	ProxyID       *int64 `json:"proxy_id"`
+	ExtractAPIURL string `json:"extract_api_url"`
+}
+
+type checkoutLinkResponse struct {
+	URL string `json:"url"`
+}
+
 // CreateCheckoutLink generates a hosted ChatGPT Plus checkout URL for one OpenAI OAuth account.
 // POST /api/v1/admin/accounts/:id/checkout-link
 func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
@@ -1072,6 +1085,143 @@ func (h *AccountHandler) CreateCheckoutLink(c *gin.Context) {
 	}
 
 	c.String(http.StatusOK, checkoutResult.Text())
+}
+
+// CreateAdminCheckoutLink generates a hosted ChatGPT Plus checkout URL from an ephemeral access token.
+// POST /api/v1/admin/chatgpt-plus-checkout
+func (h *AccountHandler) CreateAdminCheckoutLink(c *gin.Context) {
+	if h.openaiOAuthService == nil {
+		response.InternalError(c, "OpenAI OAuth service is unavailable")
+		return
+	}
+
+	var req checkoutLinkRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+	proxyURL, err := h.resolveCheckoutProxyURL(ctx, req)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+
+	checkoutResult, err := h.openaiOAuthService.CreateCheckoutLinkResultLocalOnly(ctx, service.CreateCheckoutLinkRequest{
+		AccessToken: req.AccessToken,
+		ProxyURL:    proxyURL,
+		Country:     "ID",
+		Currency:    "IDR",
+	})
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	if strings.TrimSpace(checkoutResult.URL) == "" {
+		response.BadRequest(c, checkoutResult.Text())
+		return
+	}
+
+	response.Success(c, checkoutLinkResponse{URL: checkoutResult.URL})
+}
+
+func (h *AccountHandler) resolveCheckoutProxyURL(ctx context.Context, req checkoutLinkRequest) (string, error) {
+	source := strings.TrimSpace(req.ProxySource)
+	switch source {
+	case "direct":
+		return "", nil
+	case "pool":
+		if req.ProxyID == nil {
+			return "", infraerrors.BadRequest("ADMIN_CHECKOUT_PROXY_ID_REQUIRED", "proxy_id is required")
+		}
+		proxy, err := h.adminService.GetProxy(ctx, *req.ProxyID)
+		if err != nil {
+			return "", err
+		}
+		if proxy == nil {
+			return "", infraerrors.NotFound("ADMIN_CHECKOUT_PROXY_NOT_FOUND", "proxy not found")
+		}
+		if !proxy.IsActive() {
+			return "", infraerrors.BadRequest("ADMIN_CHECKOUT_PROXY_INACTIVE", "proxy must be active")
+		}
+		if !isSupportedCheckoutProxyProtocol(proxy.Protocol) {
+			return "", infraerrors.BadRequest("ADMIN_CHECKOUT_PROXY_PROTOCOL_UNSUPPORTED", "proxy protocol is not supported")
+		}
+		return proxy.URL(), nil
+	case "extract_api":
+		return h.fetchCheckoutProxyFromExtractAPI(ctx, req.ExtractAPIURL)
+	default:
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_PROXY_SOURCE_INVALID", "proxy_source is invalid")
+	}
+}
+
+func (h *AccountHandler) fetchCheckoutProxyFromExtractAPI(ctx context.Context, rawURL string) (string, error) {
+	extractURL := strings.TrimSpace(rawURL)
+	if extractURL == "" {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_API_URL_REQUIRED", "extract_api_url is required")
+	}
+	parsedURL, err := url.Parse(extractURL)
+	if err != nil {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_API_URL_INVALID", "extract_api_url is invalid")
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_API_URL_SCHEME_UNSUPPORTED", "extract_api_url must use http or https")
+	}
+
+	client := &http.Client{Timeout: 8 * time.Second}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, extractURL, nil)
+	if err != nil {
+		return "", infraerrors.InternalServer("ADMIN_CHECKOUT_EXTRACT_API_REQUEST_FAILED", "failed to create extract api request").WithCause(err)
+	}
+	resp, err := client.Do(request)
+	if err != nil {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_API_FAILED", "failed to fetch proxy from extract api")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_API_STATUS_INVALID", "extract api returned non-success status")
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if err != nil {
+		return "", infraerrors.InternalServer("ADMIN_CHECKOUT_EXTRACT_API_READ_FAILED", "failed to read extract api response").WithCause(err)
+	}
+	proxyURL, err := normalizeExtractedProxyURL(string(body))
+	if err != nil {
+		return "", err
+	}
+	return proxyURL, nil
+}
+
+func normalizeExtractedProxyURL(raw string) (string, error) {
+	candidate := strings.TrimSpace(raw)
+	if candidate == "" {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_PROXY_INVALID", "extract api did not return a valid proxy")
+	}
+	candidate = strings.Fields(candidate)[0]
+	if !strings.Contains(candidate, "://") {
+		candidate = "http://" + candidate
+	}
+	parsedURL, err := url.Parse(candidate)
+	if err != nil {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_PROXY_INVALID", "extract api did not return a valid proxy")
+	}
+	if !isSupportedCheckoutProxyProtocol(parsedURL.Scheme) {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_PROXY_PROTOCOL_UNSUPPORTED", "proxy protocol is not supported")
+	}
+	if strings.TrimSpace(parsedURL.Host) == "" || strings.TrimSpace(parsedURL.Port()) == "" {
+		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_PROXY_INVALID", "extract api did not return a valid proxy")
+	}
+	return parsedURL.String(), nil
+}
+
+func isSupportedCheckoutProxyProtocol(protocol string) bool {
+	switch strings.ToLower(strings.TrimSpace(protocol)) {
+	case "http", "https", "socks5", "socks5h":
+		return true
+	default:
+		return false
+	}
 }
 
 func checkoutCredential(account *service.Account, keys ...string) string {

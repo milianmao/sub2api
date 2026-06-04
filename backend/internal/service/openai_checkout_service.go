@@ -114,6 +114,15 @@ func (s *OpenAIOAuthService) CreateCheckoutLink(ctx context.Context, checkoutReq
 
 // CreateCheckoutLinkResult creates a ChatGPT Plus checkout result using an OpenAI OAuth access token.
 func (s *OpenAIOAuthService) CreateCheckoutLinkResult(ctx context.Context, checkoutReq CreateCheckoutLinkRequest) (CreateCheckoutLinkResult, error) {
+	return s.createCheckoutLinkResult(ctx, checkoutReq, true)
+}
+
+// CreateCheckoutLinkResultLocalOnly creates a checkout result using only the fixed ChatGPT checkout endpoint.
+func (s *OpenAIOAuthService) CreateCheckoutLinkResultLocalOnly(ctx context.Context, checkoutReq CreateCheckoutLinkRequest) (CreateCheckoutLinkResult, error) {
+	return s.createCheckoutLinkResult(ctx, checkoutReq, false)
+}
+
+func (s *OpenAIOAuthService) createCheckoutLinkResult(ctx context.Context, checkoutReq CreateCheckoutLinkRequest, allowCloud bool) (CreateCheckoutLinkResult, error) {
 	accessToken := strings.TrimSpace(checkoutReq.AccessToken)
 	if accessToken == "" {
 		return CreateCheckoutLinkResult{}, infraerrors.BadRequest("OPENAI_CHECKOUT_ACCESS_TOKEN_REQUIRED", "access token is required")
@@ -131,17 +140,19 @@ func (s *OpenAIOAuthService) CreateCheckoutLinkResult(ctx context.Context, check
 	}
 
 	billingDetails := resolveCheckoutBillingDetails(checkoutReq.Country, checkoutReq.Currency)
-	if cloudResult, cloudErr := s.createCheckoutLinkViaCloud(ctx, client, accessToken, billingDetails); cloudErr == nil {
-		return cloudResult, nil
-	} else {
-		slog.Warn("openai_checkout_cloud_failed_fallback_local",
-			"cloud_url_configured", strings.TrimSpace(s.checkoutCloudURL) != "",
-			"cloud_api_key_configured", strings.TrimSpace(s.checkoutCloudAPIKey) != "",
-			"proxy_configured", strings.TrimSpace(checkoutReq.ProxyURL) != "",
-			"country", billingDetails["country"],
-			"currency", billingDetails["currency"],
-			"error", cloudErr.Error(),
-		)
+	if allowCloud {
+		if cloudResult, cloudErr := s.createCheckoutLinkViaCloud(ctx, client, accessToken, billingDetails); cloudErr == nil {
+			return cloudResult, nil
+		} else {
+			slog.Warn("openai_checkout_cloud_failed_fallback_local",
+				"cloud_url_configured", strings.TrimSpace(s.checkoutCloudURL) != "",
+				"cloud_api_key_configured", strings.TrimSpace(s.checkoutCloudAPIKey) != "",
+				"proxy_configured", strings.TrimSpace(checkoutReq.ProxyURL) != "",
+				"country", billingDetails["country"],
+				"currency", billingDetails["currency"],
+				"error", cloudErr.Error(),
+			)
+		}
 	}
 	payloadBytes, err := json.Marshal(chatGPTCheckoutPayload{
 		EntryPoint:     "all_plans_pricing_modal",
