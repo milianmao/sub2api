@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
@@ -206,10 +207,10 @@ func TestAccountHandlerCreateCheckoutLink_ReturnsTrialEligibilityMessage(t *test
 	adminSvc := &checkoutLinkAdminService{
 		stubAdminService: newStubAdminService(),
 		account: service.Account{
-			ID:       43,
-			Platform: service.PlatformOpenAI,
-			Type:     service.AccountTypeOAuth,
-			Status:   service.StatusActive,
+			ID:          43,
+			Platform:    service.PlatformOpenAI,
+			Type:        service.AccountTypeOAuth,
+			Status:      service.StatusActive,
 			Credentials: map[string]any{"access_token": "access-token-1"},
 		},
 	}
@@ -240,10 +241,10 @@ func TestAccountHandlerCreateCheckoutLink_ReturnsAlreadySubscribedMessage(t *tes
 	adminSvc := &checkoutLinkAdminService{
 		stubAdminService: newStubAdminService(),
 		account: service.Account{
-			ID:       43,
-			Platform: service.PlatformOpenAI,
-			Type:     service.AccountTypeOAuth,
-			Status:   service.StatusActive,
+			ID:          43,
+			Platform:    service.PlatformOpenAI,
+			Type:        service.AccountTypeOAuth,
+			Status:      service.StatusActive,
 			Credentials: map[string]any{"access_token": "access-token-1"},
 		},
 	}
@@ -335,4 +336,20 @@ func (r *checkoutLinkProxyRepo) CountAccountsByProxyID(context.Context, int64) (
 
 func (r *checkoutLinkProxyRepo) ListAccountSummariesByProxyID(context.Context, int64) ([]service.ProxyAccountSummary, error) {
 	return nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) SweepExpiredProxies(context.Context, time.Time) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) ListAllForFallback(context.Context) ([]service.Proxy, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) CountExpired(context.Context) (int64, error) {
+	return 0, errors.New("not implemented")
+}
+
+func (r *checkoutLinkProxyRepo) CountExpiringSoon(context.Context, time.Time) (int64, error) {
+	return 0, errors.New("not implemented")
 }

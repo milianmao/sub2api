@@ -213,10 +213,24 @@ func TestAPIContracts(t *testing.T) {
 			}`,
 		},
 		{
-			name:   "POST /api/v1/keys",
+			name: "POST /api/v1/keys",
+			setup: func(t *testing.T, deps *contractDeps) {
+				t.Helper()
+				deps.groupRepo.SetActive([]service.Group{
+					{
+						ID:               10,
+						Name:             "Group One",
+						Platform:         service.PlatformOpenAI,
+						Status:           service.StatusActive,
+						SubscriptionType: service.SubscriptionTypeStandard,
+						CreatedAt:        deps.now,
+						UpdatedAt:        deps.now,
+					},
+				})
+			},
 			method: http.MethodPost,
 			path:   "/api/v1/keys",
-			body:   `{"name":"Key One","custom_key":"sk_custom_1234567890"}`,
+			body:   `{"name":"Key One","group_id":10,"custom_key":"sk_custom_1234567890"}`,
 			headers: map[string]string{
 				"Content-Type": "application/json",
 			},
@@ -229,7 +243,8 @@ func TestAPIContracts(t *testing.T) {
 					"user_id": 1,
 					"key": "sk_custom_1234567890",
 					"name": "Key One",
-					"group_id": null,
+					"group_id": 10,
+					"group_ids": [10],
 					"status": "active",
 					"ip_whitelist": null,
 					"ip_blacklist": null,
@@ -366,6 +381,7 @@ func TestAPIContracts(t *testing.T) {
 						"fallback_group_id_on_invalid_request": null,
 						"require_oauth_only": false,
 						"require_privacy_set": false,
+						"openai_image_upstream": "",
 						"rpm_limit": 0,
 						"created_at": "2025-01-02T03:04:05Z",
 						"updated_at": "2025-01-02T03:04:05Z"
@@ -1560,12 +1576,18 @@ func (stubGroupRepo) Create(ctx context.Context, group *service.Group) error {
 	return errors.New("not implemented")
 }
 
-func (stubGroupRepo) GetByID(ctx context.Context, id int64) (*service.Group, error) {
+func (r *stubGroupRepo) GetByID(ctx context.Context, id int64) (*service.Group, error) {
+	for i := range r.active {
+		if r.active[i].ID == id {
+			group := r.active[i]
+			return &group, nil
+		}
+	}
 	return nil, service.ErrGroupNotFound
 }
 
-func (stubGroupRepo) GetByIDLite(ctx context.Context, id int64) (*service.Group, error) {
-	return nil, service.ErrGroupNotFound
+func (r *stubGroupRepo) GetByIDLite(ctx context.Context, id int64) (*service.Group, error) {
+	return r.GetByID(ctx, id)
 }
 
 func (stubGroupRepo) Update(ctx context.Context, group *service.Group) error {
