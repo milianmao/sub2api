@@ -502,13 +502,13 @@ func appendJSONStrings(b *strings.Builder, value any) {
 		_, _ = b.WriteString(v)
 	case float64:
 		_ = b.WriteByte(' ')
-		_, _ = b.WriteString(fmt.Sprintf("%.0f", v))
+		_, _ = fmt.Fprintf(b, "%.0f", v)
 	case json.Number:
 		_ = b.WriteByte(' ')
 		_, _ = b.WriteString(v.String())
 	case bool:
 		_ = b.WriteByte(' ')
-		_, _ = b.WriteString(fmt.Sprintf("%t", v))
+		_, _ = fmt.Fprintf(b, "%t", v)
 	case []any:
 		for _, item := range v {
 			appendJSONStrings(b, item)
@@ -520,8 +520,8 @@ func appendJSONStrings(b *strings.Builder, value any) {
 		}
 		sort.Strings(keys)
 		for _, key := range keys {
-			b.WriteByte(' ')
-			b.WriteString(key)
+			_ = b.WriteByte(' ')
+			_, _ = b.WriteString(key)
 			appendJSONStrings(b, v[key])
 		}
 	}

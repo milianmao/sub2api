@@ -57,16 +57,16 @@ type CardMailboxListFilter struct {
 }
 
 type CardMailboxExportItem struct {
-	ID            int64     `json:"id"`
-	Email         string    `json:"email"`
-	MailboxURL    string    `json:"mailbox_url"`
-	RawJSON       string    `json:"raw_json"`
-	LastCode      string    `json:"last_code,omitempty"`
-	LastStatus    string    `json:"last_status,omitempty"`
-	LastError     string    `json:"last_error,omitempty"`
+	ID            int64      `json:"id"`
+	Email         string     `json:"email"`
+	MailboxURL    string     `json:"mailbox_url"`
+	RawJSON       string     `json:"raw_json"`
+	LastCode      string     `json:"last_code,omitempty"`
+	LastStatus    string     `json:"last_status,omitempty"`
+	LastError     string     `json:"last_error,omitempty"`
 	LastFetchedAt *time.Time `json:"last_fetched_at,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 type CardMailboxImportResult struct {

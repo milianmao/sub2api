@@ -1177,7 +1177,9 @@ func (h *AccountHandler) fetchCheckoutProxyFromExtractAPI(ctx context.Context, r
 	if err != nil {
 		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_API_FAILED", "failed to fetch proxy from extract api")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", infraerrors.BadRequest("ADMIN_CHECKOUT_EXTRACT_API_STATUS_INVALID", "extract api returned non-success status")
 	}
