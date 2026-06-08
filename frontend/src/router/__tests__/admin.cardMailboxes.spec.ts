@@ -9,7 +9,7 @@ const routerSource = readFileSync(routerPath, 'utf8')
 
 describe('admin card mailbox route', () => {
   it('registers a protected admin route that lazy-loads the card mailboxes view', () => {
-    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/card-mailboxes',[\s\S]*?\n  \}/)
+    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/card-mailboxes',[\s\S]*?\n {2}\}/)
 
     expect(routeBlockMatch).not.toBeNull()
     const routeBlock = routeBlockMatch?.[0] ?? ''

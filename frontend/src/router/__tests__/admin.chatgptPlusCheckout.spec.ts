@@ -9,7 +9,7 @@ const routerSource = readFileSync(routerPath, 'utf8')
 
 describe('admin chatgpt plus checkout route', () => {
   it('registers a protected admin route that lazy-loads the checkout view', () => {
-    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/chatgpt-plus-checkout',[\s\S]*?\n  \}/)
+    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/chatgpt-plus-checkout',[\s\S]*?\n {2}\}/)
 
     expect(routeBlockMatch).not.toBeNull()
     const routeBlock = routeBlockMatch?.[0] ?? ''

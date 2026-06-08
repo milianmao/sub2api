@@ -489,6 +489,61 @@ describe('admin AccountsView bulk edit scope', () => {
             email_address: 'owner@example.com'
           },
           credentials: {}
+        }
+      ],
+      total: 1,
+      page: 1,
+      page_size: 20,
+      pages: 1
+    })
+
+    const wrapper = mount(AccountsView, {
+      global: {
+        stubs: {
+          AppLayout: { template: '<div><slot /></div>' },
+          TablePageLayout: {
+            template: '<div><slot name="filters" /><slot name="table" /><slot name="pagination" /></div>'
+          },
+          DataTable: DataTableStub,
+          Pagination: true,
+          ConfirmDialog: true,
+          AccountTableActions: { template: '<div><slot name="beforeCreate" /><slot name="after" /></div>' },
+          AccountTableFilters: { template: '<div></div>' },
+          AccountBulkActionsBar: AccountBulkActionsBarStub,
+          AccountActionMenu: AccountActionMenuStub,
+          ImportChatGPTSessionModal: ImportChatGPTSessionModalStub,
+          ImportDataModal: true,
+          ReAuthAccountModal: true,
+          AccountTestModal: true,
+          AccountStatsModal: true,
+          ScheduledTestsPanel: true,
+          SyncFromCrsModal: true,
+          TempUnschedStatusModal: true,
+          ErrorPassthroughRulesModal: true,
+          TLSFingerprintProfilesModal: true,
+          CreateAccountModal: true,
+          EditAccountModal: true,
+          BulkEditAccountModal: BulkEditAccountModalStub,
+          PlatformTypeBadge: true,
+          AccountCapacityCell: true,
+          AccountStatusIndicator: true,
+          AccountTodayStatsCell: true,
+          AccountGroupsCell: true,
+          AccountUsageCell: true,
+          Icon: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    const emailButton = wrapper.get('[data-test="account-email-copy"]')
+    await emailButton.trigger('click')
+    await flushPromises()
+
+    expect(copyToClipboard).toHaveBeenCalledWith('owner@example.com', 'admin.accounts.emailCopied')
+  })
+
   it('renders the created_at column by default', async () => {
     listAccounts.mockResolvedValue({
       items: [
@@ -548,11 +603,13 @@ describe('admin AccountsView bulk edit scope', () => {
 
     await flushPromises()
 
-    const emailButton = wrapper.get('[data-test="account-email-copy"]')
-    await emailButton.trigger('click')
-    await flushPromises()
-
-    expect(copyToClipboard).toHaveBeenCalledWith('owner@example.com', 'admin.accounts.emailCopied')
+    const columnKeys = wrapper.findAll('[data-test="column-key"]').map(node => node.text())
+    expect(columnKeys).toContain('created_at')
+    const columns = wrapper.getComponent(DataTableStub).props('columns') as Array<{ key: string; label: string; sortable: boolean }>
+    expect(columns.find(column => column.key === 'created_at')).toMatchObject({
+      label: 'admin.accounts.columns.createdAt',
+      sortable: true
+    })
   })
 
   it('opens account liveness check modal from more actions and reloads after completion', async () => {
