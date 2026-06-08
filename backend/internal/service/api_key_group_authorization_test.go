@@ -532,6 +532,9 @@ func (s *stubAPIKeyRepoForGroupAuth) Update(_ context.Context, key *APIKey) erro
 func (s *stubAPIKeyRepoForGroupAuth) Delete(context.Context, int64) error {
 	panic("unexpected Delete call")
 }
+func (s *stubAPIKeyRepoForGroupAuth) DeleteWithAudit(context.Context, int64) error {
+	panic("unexpected DeleteWithAudit call")
+}
 func (s *stubAPIKeyRepoForGroupAuth) ListByUserID(context.Context, int64, pagination.PaginationParams, APIKeyListFilters) ([]APIKey, *pagination.PaginationResult, error) {
 	panic("unexpected ListByUserID call")
 }
@@ -595,6 +598,9 @@ func (s *stubUserRepoForGroupAuth) GetByID(_ context.Context, id int64) (*User, 
 		return &clone, nil
 	}
 	return nil, ErrUserNotFound
+}
+func (s *stubUserRepoForGroupAuth) GetByIDIncludeDeleted(context.Context, int64) (*User, error) {
+	panic("unexpected GetByIDIncludeDeleted call")
 }
 func (s *stubUserRepoForGroupAuth) GetByEmail(context.Context, string) (*User, error) {
 	panic("unexpected GetByEmail call")
