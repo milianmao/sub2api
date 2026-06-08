@@ -24,6 +24,7 @@ import (
 type apiKeyRepository struct {
 	client *dbent.Client
 	sql    sqlExecutor
+	tx     *dbent.Tx
 }
 
 func NewAPIKeyRepository(client *dbent.Client, sqlDB *sql.DB) service.APIKeyRepository {
@@ -31,7 +32,11 @@ func NewAPIKeyRepository(client *dbent.Client, sqlDB *sql.DB) service.APIKeyRepo
 }
 
 func newAPIKeyRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *apiKeyRepository {
-	return &apiKeyRepository{client: client, sql: sqlq}
+	repo := &apiKeyRepository{client: client, sql: sqlq}
+	if tx, ok := sqlq.(*dbent.Tx); ok {
+		repo.tx = tx
+	}
+	return repo
 }
 
 func (r *apiKeyRepository) activeQuery() *dbent.APIKeyQuery {
@@ -738,6 +743,10 @@ func (r *apiKeyRepository) withTx(ctx context.Context, fn func(txCtx context.Con
 	if tx := dbent.TxFromContext(ctx); tx != nil {
 		return fn(ctx, tx.Client())
 	}
+	if r.tx != nil {
+		txCtx := dbent.NewTxContext(ctx, r.tx)
+		return fn(txCtx, r.tx.Client())
+	}
 
 	tx, err := r.client.Tx(ctx)
 	if err != nil {
@@ -1103,7 +1112,14 @@ func apiKeyEntityToService(m *dbent.APIKey) *service.APIKey {
 	if m.Edges.Group != nil {
 		out.Group = groupEntityToService(m.Edges.Group)
 	}
-	for _, keyGroup := range m.Edges.APIKeyGroups {
+	keyGroups, err := m.Edges.APIKeyGroupsOrErr()
+	if err != nil {
+		return out
+	}
+	out.GroupIDs = make([]int64, 0, len(keyGroups))
+	out.Groups = make([]*service.Group, 0, len(keyGroups))
+	out.AuthorizedGroups = make([]service.APIKeyAuthorizedGroup, 0, len(keyGroups))
+	for _, keyGroup := range keyGroups {
 		if keyGroup == nil {
 			continue
 		}
