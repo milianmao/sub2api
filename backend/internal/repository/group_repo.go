@@ -36,6 +36,14 @@ func newGroupRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *groupRep
 	return &groupRepository{client: client, sql: sqlq}
 }
 
+func normalizeGroupOpenAIImageUpstream(value string) string {
+	normalized, err := service.NormalizeOpenAIImageUpstreamStrategy(value)
+	if err != nil {
+		return value
+	}
+	return normalized
+}
+
 func (r *groupRepository) Create(ctx context.Context, groupIn *service.Group) error {
 	builder := r.client.Group.Create().
 		SetName(groupIn.Name).
@@ -67,7 +75,7 @@ func (r *groupRepository) Create(ctx context.Context, groupIn *service.Group) er
 		SetRequirePrivacySet(groupIn.RequirePrivacySet).
 		SetDefaultMappedModel(groupIn.DefaultMappedModel).
 		SetMessagesDispatchModelConfig(groupIn.MessagesDispatchModelConfig).
-		SetOpenaiImageUpstream(groupIn.OpenAIImageUpstream).
+		SetOpenaiImageUpstream(normalizeGroupOpenAIImageUpstream(groupIn.OpenAIImageUpstream)).
 		SetModelsListConfig(groupIn.ModelsListConfig).
 		SetRpmLimit(groupIn.RPMLimit)
 
@@ -153,7 +161,7 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetRequirePrivacySet(groupIn.RequirePrivacySet).
 		SetDefaultMappedModel(groupIn.DefaultMappedModel).
 		SetMessagesDispatchModelConfig(groupIn.MessagesDispatchModelConfig).
-		SetOpenaiImageUpstream(groupIn.OpenAIImageUpstream).
+		SetOpenaiImageUpstream(normalizeGroupOpenAIImageUpstream(groupIn.OpenAIImageUpstream)).
 		SetModelsListConfig(groupIn.ModelsListConfig).
 		SetRpmLimit(groupIn.RPMLimit)
 

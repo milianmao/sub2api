@@ -82,6 +82,7 @@ func (s *GroupRepoSuite) TestCreate() {
 	s.Require().Equal("test-create", got.Name)
 	s.Require().Equal(service.GroupAccessModeRestricted, got.AccessMode)
 	s.Require().Equal(2, got.MinUserLevel)
+	s.Require().Equal("auto", got.OpenAIImageUpstream)
 }
 
 func (s *GroupRepoSuite) TestGetByID_NotFound() {
