@@ -202,6 +202,12 @@ func (s *httpUpstreamService) Do(req *http.Request, proxyURL string, accountID i
 // profile 为 nil 时不启用 TLS 指纹，行为与 Do 方法相同。
 // profile 非 nil 时使用指定的 Profile 进行 TLS 指纹伪装。
 func (s *httpUpstreamService) DoWithTLS(req *http.Request, proxyURL string, accountID int64, accountConcurrency int, profile *tlsfingerprint.Profile) (*http.Response, error) {
+	if profile == nil && req != nil && req.URL != nil {
+		hostname := strings.ToLower(strings.TrimSpace(req.URL.Hostname()))
+		if strings.Contains(hostname, "chatgpt.com") || strings.Contains(hostname, "chatgpt") {
+			profile = tlsfingerprint.ChromeProfile()
+		}
+	}
 	if profile == nil {
 		return s.Do(req, proxyURL, accountID, accountConcurrency)
 	}
