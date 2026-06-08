@@ -158,7 +158,7 @@ func sanitizeMicrosoftGraphErrorBody(body []byte) string {
 		return "empty response"
 	}
 	var payload struct {
-		Error interface{} `json:"error"`
+		Error any `json:"error"`
 	}
 	if err := json.Unmarshal(body, &payload); err == nil && payload.Error != nil {
 		sanitized, err := json.Marshal(payload.Error)
