@@ -207,7 +207,9 @@ func (s *CardMailboxService) FetchCode(ctx context.Context, id int64) (*CardMail
 	if err != nil {
 		return fail(ErrCardMailboxFetchFailed, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxCardMailboxResponseBytes))
 	if err != nil {
@@ -251,7 +253,11 @@ func newCardMailboxHTTPClient(resolver cardMailboxResolver) *http.Client {
 }
 
 func newCardMailboxHTTPClientWithDialer(resolver cardMailboxResolver, dialContext cardMailboxDialContext) *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	defaultTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		defaultTransport = &http.Transport{}
+	}
+	transport := defaultTransport.Clone()
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {
@@ -492,17 +498,17 @@ func trimSafeCardMailboxMetadata(value string, limit int) string {
 func appendJSONStrings(b *strings.Builder, value any) {
 	switch v := value.(type) {
 	case string:
-		b.WriteByte(' ')
-		b.WriteString(v)
+		_ = b.WriteByte(' ')
+		_, _ = b.WriteString(v)
 	case float64:
-		b.WriteByte(' ')
-		b.WriteString(fmt.Sprintf("%.0f", v))
+		_ = b.WriteByte(' ')
+		_, _ = b.WriteString(fmt.Sprintf("%.0f", v))
 	case json.Number:
-		b.WriteByte(' ')
-		b.WriteString(v.String())
+		_ = b.WriteByte(' ')
+		_, _ = b.WriteString(v.String())
 	case bool:
-		b.WriteByte(' ')
-		b.WriteString(fmt.Sprintf("%t", v))
+		_ = b.WriteByte(' ')
+		_, _ = b.WriteString(fmt.Sprintf("%t", v))
 	case []any:
 		for _, item := range v {
 			appendJSONStrings(b, item)

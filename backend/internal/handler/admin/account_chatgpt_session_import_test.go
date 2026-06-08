@@ -229,7 +229,7 @@ func TestImportChatGPTSessionRouteReturnsPerItemFailuresWithoutStoppingBatch(t *
 	require.Equal(t, http.StatusOK, rec.Code)
 
 	var resp struct {
-		Code int                         `json:"code"`
+		Code int                        `json:"code"`
 		Data ChatGPTSessionImportResult `json:"data"`
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))

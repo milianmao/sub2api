@@ -88,7 +88,7 @@ func TestAccountHandlerCreateAdminCheckoutLink_PoolUsesActiveProxy(t *testing.T)
 
 	adminSvc := &checkoutLinkProxyAdminService{
 		stubAdminService: newStubAdminService(),
-		proxy: &service.Proxy{ID: 7, Protocol: "http", Host: "127.0.0.1", Port: 8080, Status: service.StatusActive},
+		proxy:            &service.Proxy{ID: 7, Protocol: "http", Host: "127.0.0.1", Port: 8080, Status: service.StatusActive},
 	}
 	oauthSvc := service.NewOpenAIOAuthService(nil, &checkoutLinkOAuthClient{})
 	oauthSvc.SetCheckoutCloudConfigForTest("", "")
@@ -110,7 +110,7 @@ func TestAccountHandlerCreateAdminCheckoutLink_PoolUsesActiveProxy(t *testing.T)
 func TestAccountHandlerCreateAdminCheckoutLink_RejectsInactiveProxy(t *testing.T) {
 	adminSvc := &checkoutLinkProxyAdminService{
 		stubAdminService: newStubAdminService(),
-		proxy: &service.Proxy{ID: 7, Protocol: "http", Host: "127.0.0.1", Port: 8080, Status: "inactive"},
+		proxy:            &service.Proxy{ID: 7, Protocol: "http", Host: "127.0.0.1", Port: 8080, Status: "inactive"},
 	}
 	router := setupAdminCheckoutLinkRouter(adminSvc, service.NewOpenAIOAuthService(nil, &checkoutLinkOAuthClient{}))
 

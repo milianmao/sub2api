@@ -1035,7 +1035,6 @@ type ApplyOAuthCredentialsRequest struct {
 //
 // 与 /refresh 的区别：/refresh 用现有 refresh_token 换 access_token（无用户交互），
 // 本接口承接前端完成完整 OAuth 流程后的落库步骤。
-//
 type checkoutLinkRequest struct {
 	AccessToken   string `json:"access_token"`
 	ProxySource   string `json:"proxy_source" binding:"required"`
