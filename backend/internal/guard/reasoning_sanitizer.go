@@ -28,10 +28,6 @@ func SanitizeReasoning(provider string, body []byte) []byte {
 		return body
 	}
 
-	if strings.TrimSpace(provider) == "" {
-		provider = "codex"
-	}
-
 	updated := body
 	for index, item := range input.Array() {
 		if strings.TrimSpace(item.Get("type").String()) != "reasoning" {

@@ -275,13 +275,14 @@ func InsertCodexReasoningReplayItems(body []byte, replayItems [][]byte) ([]byte,
 	}
 
 	insertIndex := -1
+findInsertIndex:
 	for i, item := range inputItems {
 		switch strings.TrimSpace(item.Get("type").String()) {
 		case "reasoning", "function_call", "custom_tool_call":
 			continue
 		default:
 			insertIndex = i
-			break
+			break findInsertIndex
 		}
 	}
 	if insertIndex < 0 {
