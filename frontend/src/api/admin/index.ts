@@ -34,6 +34,7 @@ import riskControlAPI from './riskControl'
 import microsoftEmailsAPI from './microsoftEmails'
 import cardMailboxesAPI from './cardMailboxes'
 import chatgptPlusCheckoutAPI from './chatgptPlusCheckout'
+import adminComplianceAPI from './compliance'
 
 /**
  * Unified admin API object for convenient access
@@ -69,7 +70,8 @@ export const adminAPI = {
   riskControl: riskControlAPI,
   microsoftEmails: microsoftEmailsAPI,
   cardMailboxes: cardMailboxesAPI,
-  chatgptPlusCheckout: chatgptPlusCheckoutAPI
+  chatgptPlusCheckout: chatgptPlusCheckoutAPI,
+  compliance: adminComplianceAPI
 }
 
 export {
@@ -103,7 +105,8 @@ export {
   riskControlAPI,
   microsoftEmailsAPI,
   cardMailboxesAPI,
-  chatgptPlusCheckoutAPI
+  chatgptPlusCheckoutAPI,
+  adminComplianceAPI
 }
 
 export default adminAPI

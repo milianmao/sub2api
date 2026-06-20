@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 import type { AdminUser } from '@/types'
+import { useAuthStore } from '@/stores/auth'
 import UsersView from '../UsersView.vue'
 
 const {
@@ -92,6 +94,24 @@ const DataTableStub = {
 describe('admin UsersView', () => {
   beforeEach(() => {
     localStorage.clear()
+    setActivePinia(createPinia())
+    const authStore = useAuthStore()
+    authStore.user = {
+      id: 1,
+      email: 'admin@example.com',
+      username: 'super-admin',
+      role: 'super_admin',
+      status: 'active',
+      balance: 0,
+      concurrency: 1,
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+      balance_notify_enabled: false,
+      balance_notify_threshold: null,
+      balance_notify_extra_emails: [],
+      enabled_attributes: [],
+      oauth_providers: []
+    } as never
 
     listUsers.mockReset()
     getAllGroups.mockReset()
@@ -128,8 +148,12 @@ describe('admin UsersView', () => {
           Select: true,
           UserAttributesConfigModal: true,
           UserConcurrencyCell: true,
+          PlatformUsageBreakdown: true,
+          PlatformCostCell: true,
+          UserPlatformQuotaCell: true,
           UserCreateModal: true,
           UserEditModal: true,
+          UserPlatformQuotaModal: true,
           UserApiKeysModal: true,
           UserAllowedGroupsModal: true,
           UserBalanceModal: true,

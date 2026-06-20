@@ -38,6 +38,7 @@ type AdminHandlers struct {
 	Affiliate              *admin.AffiliateHandler
 	MicrosoftEmail         *admin.MicrosoftEmailHandler
 	CardMailbox            *admin.CardMailboxHandler
+	Compliance             *admin.ComplianceHandler
 }
 
 // Handlers contains all HTTP handlers
