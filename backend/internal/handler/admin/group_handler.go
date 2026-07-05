@@ -84,7 +84,7 @@ func NewGroupHandler(adminService service.AdminService, dashboardService *servic
 type CreateGroupRequest struct {
 	Name             string             `json:"name" binding:"required"`
 	Description      string             `json:"description"`
-	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity"`
+	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok"`
 	RateMultiplier   float64            `json:"rate_multiplier"`
 	IsExclusive      bool               `json:"is_exclusive"`
 	AccessMode       *string            `json:"access_mode" binding:"omitempty,oneof=public restricted"`
@@ -98,6 +98,10 @@ type CreateGroupRequest struct {
 	AllowImageGeneration            bool     `json:"allow_image_generation"`
 	ImageRateIndependent            bool     `json:"image_rate_independent"`
 	ImageRateMultiplier             *float64 `json:"image_rate_multiplier"`
+	PeakRateEnabled                 bool     `json:"peak_rate_enabled"`
+	PeakStart                       string   `json:"peak_start"`
+	PeakEnd                         string   `json:"peak_end"`
+	PeakRateMultiplier              *float64 `json:"peak_rate_multiplier"`
 	ImagePrice1K                    *float64 `json:"image_price_1k"`
 	ImagePrice2K                    *float64 `json:"image_price_2k"`
 	ImagePrice4K                    *float64 `json:"image_price_4k"`
@@ -128,8 +132,8 @@ type CreateGroupRequest struct {
 // UpdateGroupRequest represents update group request
 type UpdateGroupRequest struct {
 	Name             string             `json:"name"`
-	Description      string             `json:"description"`
-	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity"`
+	Description      *string            `json:"description"`
+	Platform         string             `json:"platform" binding:"omitempty,oneof=anthropic openai gemini antigravity grok"`
 	RateMultiplier   *float64           `json:"rate_multiplier"`
 	IsExclusive      *bool              `json:"is_exclusive"`
 	AccessMode       *string            `json:"access_mode" binding:"omitempty,oneof=public restricted"`
@@ -144,6 +148,10 @@ type UpdateGroupRequest struct {
 	AllowImageGeneration            *bool    `json:"allow_image_generation"`
 	ImageRateIndependent            *bool    `json:"image_rate_independent"`
 	ImageRateMultiplier             *float64 `json:"image_rate_multiplier"`
+	PeakRateEnabled                 *bool    `json:"peak_rate_enabled"`
+	PeakStart                       *string  `json:"peak_start"`
+	PeakEnd                         *string  `json:"peak_end"`
+	PeakRateMultiplier              *float64 `json:"peak_rate_multiplier"`
 	ImagePrice1K                    *float64 `json:"image_price_1k"`
 	ImagePrice2K                    *float64 `json:"image_price_2k"`
 	ImagePrice4K                    *float64 `json:"image_price_4k"`
@@ -206,15 +214,21 @@ func (h *GroupHandler) List(c *gin.Context) {
 	response.Paginated(c, outGroups, total, page, pageSize)
 }
 
-// GetAll handles getting all active groups without pagination
+// GetAll handles getting all active groups without pagination.
+// Pass ?include_inactive=true to also include disabled groups (used by the
+// API Key group filter, which needs to surface groups that still have API keys
+// bound to them even after the group is disabled).
 // GET /api/v1/admin/groups/all
 func (h *GroupHandler) GetAll(c *gin.Context) {
 	platform := c.Query("platform")
+	includeInactive := c.Query("include_inactive") == "true"
 
 	var groups []service.Group
 	var err error
 
-	if platform != "" {
+	if includeInactive {
+		groups, err = h.adminService.GetAllGroupsIncludingInactive(c.Request.Context())
+	} else if platform != "" {
 		groups, err = h.adminService.GetAllGroupsByPlatform(c.Request.Context(), platform)
 	} else {
 		groups, err = h.adminService.GetAllGroups(c.Request.Context())
@@ -297,6 +311,11 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		visibleUserIDs = *req.VisibleUserIDs
 	}
 
+	if err := service.ValidatePeakRateConfig(req.SubscriptionType, req.PeakRateEnabled, req.PeakStart, req.PeakEnd, float64ValueOrDefault(req.PeakRateMultiplier, 1.0)); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
 	group, err := h.adminService.CreateGroup(c.Request.Context(), &service.CreateGroupInput{
 		Name:                            req.Name,
 		Description:                     req.Description,
@@ -313,6 +332,10 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		AllowImageGeneration:            req.AllowImageGeneration,
 		ImageRateIndependent:            req.ImageRateIndependent,
 		ImageRateMultiplier:             req.ImageRateMultiplier,
+		PeakRateEnabled:                 req.PeakRateEnabled,
+		PeakStart:                       req.PeakStart,
+		PeakEnd:                         req.PeakEnd,
+		PeakRateMultiplier:              req.PeakRateMultiplier,
 		ImagePrice1K:                    req.ImagePrice1K,
 		ImagePrice2K:                    req.ImagePrice2K,
 		ImagePrice4K:                    req.ImagePrice4K,
@@ -377,6 +400,10 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		AllowImageGeneration:            req.AllowImageGeneration,
 		ImageRateIndependent:            req.ImageRateIndependent,
 		ImageRateMultiplier:             req.ImageRateMultiplier,
+		PeakRateEnabled:                 req.PeakRateEnabled,
+		PeakStart:                       req.PeakStart,
+		PeakEnd:                         req.PeakEnd,
+		PeakRateMultiplier:              req.PeakRateMultiplier,
 		ImagePrice1K:                    req.ImagePrice1K,
 		ImagePrice2K:                    req.ImagePrice2K,
 		ImagePrice4K:                    req.ImagePrice4K,

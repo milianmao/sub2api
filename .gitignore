@@ -121,6 +121,8 @@ CLAUDE.md
 .claudeignore.md
 .superpowers/
 scripts
+!backend/scripts/
+!backend/scripts/resolve-version.sh
 .code-review-state
 #openspec/
 code-reviews/
@@ -134,6 +136,8 @@ docs/*
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
 .worktrees/
+!docs/legal/
+!docs/legal/*.md
 .serena/
 .codex/
 frontend/coverage/

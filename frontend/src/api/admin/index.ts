@@ -17,6 +17,7 @@ import subscriptionsAPI from './subscriptions'
 import usageAPI from './usage'
 import geminiAPI from './gemini'
 import antigravityAPI from './antigravity'
+import grokAPI from './grok'
 import userAttributesAPI from './userAttributes'
 import opsAPI from './ops'
 import errorPassthroughAPI from './errorPassthrough'
@@ -33,6 +34,7 @@ import affiliatesAPI from './affiliates'
 import riskControlAPI from './riskControl'
 import microsoftEmailsAPI from './microsoftEmails'
 import cardMailboxesAPI from './cardMailboxes'
+import adminComplianceAPI from './compliance'
 
 /**
  * Unified admin API object for convenient access
@@ -52,6 +54,7 @@ export const adminAPI = {
   usage: usageAPI,
   gemini: geminiAPI,
   antigravity: antigravityAPI,
+  grok: grokAPI,
   userAttributes: userAttributesAPI,
   ops: opsAPI,
   errorPassthrough: errorPassthroughAPI,
@@ -67,7 +70,8 @@ export const adminAPI = {
   affiliates: affiliatesAPI,
   riskControl: riskControlAPI,
   microsoftEmails: microsoftEmailsAPI,
-  cardMailboxes: cardMailboxesAPI
+  cardMailboxes: cardMailboxesAPI,
+  compliance: adminComplianceAPI
 }
 
 export {
@@ -85,6 +89,7 @@ export {
   usageAPI,
   geminiAPI,
   antigravityAPI,
+  grokAPI,
   userAttributesAPI,
   opsAPI,
   errorPassthroughAPI,
@@ -100,7 +105,8 @@ export {
   affiliatesAPI,
   riskControlAPI,
   microsoftEmailsAPI,
-  cardMailboxesAPI
+  cardMailboxesAPI,
+  adminComplianceAPI
 }
 
 export default adminAPI

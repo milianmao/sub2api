@@ -37,9 +37,9 @@ type APIKeyAuthUserSnapshot struct {
 	Status        string  `json:"status"`
 	Role          string  `json:"role"`
 	Level         int     `json:"level"`
-	AllowedGroups []int64 `json:"allowed_groups,omitempty"`
 	Balance       float64 `json:"balance"`
 	Concurrency   int     `json:"concurrency"`
+	AllowedGroups []int64 `json:"allowed_groups,omitempty"`
 
 	// Balance notification fields (required for CheckBalanceAfterDeduction)
 	Email                      string             `json:"email"`
@@ -63,6 +63,7 @@ type APIKeyAuthGroupSnapshot struct {
 	ID                              int64    `json:"id"`
 	Name                            string   `json:"name"`
 	Platform                        string   `json:"platform"`
+	IsExclusive                     bool     `json:"is_exclusive"`
 	Status                          string   `json:"status"`
 	SubscriptionType                string   `json:"subscription_type"`
 	RateMultiplier                  float64  `json:"rate_multiplier"`
@@ -101,6 +102,14 @@ type APIKeyAuthGroupSnapshot struct {
 
 	// RPMLimit 分组级每分钟请求数上限（0 = 不限制）；用于 billing_cache_service.checkRPM 级联判断。
 	RPMLimit int `json:"rpm_limit"`
+
+	// 高峰时段倍率：PeakRateEnabled 为 true 且请求时刻处于 [PeakStart, PeakEnd) 时，
+	// token 计费倍率额外乘以 PeakRateMultiplier（详见 Group.PeakMultiplierAt）。
+	// 必须随快照缓存，否则扣费路径拿到的 apiKey.Group 缺字段、高峰倍率失效。
+	PeakRateEnabled    bool    `json:"peak_rate_enabled"`
+	PeakStart          string  `json:"peak_start"`
+	PeakEnd            string  `json:"peak_end"`
+	PeakRateMultiplier float64 `json:"peak_rate_multiplier"`
 }
 
 // APIKeyAuthorizedGroupAuthSnapshot API Key 授权分组快照，保留优先级顺序。

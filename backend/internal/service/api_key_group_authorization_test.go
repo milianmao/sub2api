@@ -532,6 +532,9 @@ func (s *stubAPIKeyRepoForGroupAuth) Update(_ context.Context, key *APIKey) erro
 func (s *stubAPIKeyRepoForGroupAuth) Delete(context.Context, int64) error {
 	panic("unexpected Delete call")
 }
+func (s *stubAPIKeyRepoForGroupAuth) DeleteWithAudit(context.Context, int64) error {
+	panic("unexpected DeleteWithAudit call")
+}
 func (s *stubAPIKeyRepoForGroupAuth) ListByUserID(context.Context, int64, pagination.PaginationParams, APIKeyListFilters) ([]APIKey, *pagination.PaginationResult, error) {
 	panic("unexpected ListByUserID call")
 }
@@ -595,6 +598,9 @@ func (s *stubUserRepoForGroupAuth) GetByID(_ context.Context, id int64) (*User, 
 		return &clone, nil
 	}
 	return nil, ErrUserNotFound
+}
+func (s *stubUserRepoForGroupAuth) GetByIDIncludeDeleted(ctx context.Context, id int64) (*User, error) {
+	return s.GetByID(ctx, id)
 }
 func (s *stubUserRepoForGroupAuth) GetByEmail(context.Context, string) (*User, error) {
 	panic("unexpected GetByEmail call")
@@ -746,6 +752,10 @@ func (s *stubUserSubscriptionRepoForGroupAuth) GetByID(context.Context, int64) (
 	panic("unexpected GetByID call")
 }
 
+func (s *stubUserSubscriptionRepoForGroupAuth) GetByIDIncludeDeleted(context.Context, int64) (*UserSubscription, error) {
+	panic("unexpected GetByIDIncludeDeleted call")
+}
+
 func (s *stubUserSubscriptionRepoForGroupAuth) GetByUserIDAndGroupID(context.Context, int64, int64) (*UserSubscription, error) {
 	panic("unexpected GetByUserIDAndGroupID call")
 }
@@ -785,8 +795,16 @@ func (s *stubUserSubscriptionRepoForGroupAuth) Delete(context.Context, int64) er
 	panic("unexpected Delete call")
 }
 
+func (s *stubUserSubscriptionRepoForGroupAuth) Restore(context.Context, int64, string) (*UserSubscription, error) {
+	panic("unexpected Restore call")
+}
+
 func (s *stubUserSubscriptionRepoForGroupAuth) ExistsByUserIDAndGroupID(context.Context, int64, int64) (bool, error) {
 	panic("unexpected ExistsByUserIDAndGroupID call")
+}
+
+func (s *stubUserSubscriptionRepoForGroupAuth) ExistsActiveByUserIDAndGroupID(_ context.Context, _ int64, groupID int64) (bool, error) {
+	return s.activeByGroup[groupID], nil
 }
 
 func (s *stubUserSubscriptionRepoForGroupAuth) ExtendExpiry(context.Context, int64, time.Time) error {
