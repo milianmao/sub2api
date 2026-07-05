@@ -512,6 +512,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/chatgpt-plus-checkout',
+    name: 'AdminChatGPTPlusCheckout',
+    component: () => import('@/views/admin/ChatGPTPlusCheckoutView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'ChatGPT Plus Checkout',
+      titleKey: 'admin.chatgptPlusCheckout.title'
+    }
+  },
+  {
     path: '/admin/announcements',
     name: 'AdminAnnouncements',
     component: () => import('@/views/admin/AnnouncementsView.vue'),

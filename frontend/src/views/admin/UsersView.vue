@@ -1060,7 +1060,7 @@ const loadAllGroups = async () => {
   }
 }
 
-// Groups for the API Key group filter — includes disabled groups so admins can
+// Groups for the API Key group filter - includes disabled groups so admins can
 // filter users whose keys are still bound to a now-disabled group.
 const allGroupsForApiKeyFilter = ref<AdminGroup[]>([])
 const loadAllGroupsForApiKeyFilter = async () => {

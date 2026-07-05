@@ -805,11 +805,13 @@ func TestOpenAIGatewayService_Forward_WSv2_HeaderSessionFallbackFromPromptCacheK
 	require.NotNil(t, result)
 	require.Equal(t, "resp_prompt_cache_key", result.RequestID)
 
-	// OAuth 账号的 session_id 应被 isolateOpenAISessionID 隔离（apiKeyID=0，未在 context 设置）。
-	require.Equal(t, isolateOpenAISessionID(0, "pcache_123"), captureDialer.lastHeaders.Get("session_id"))
-	require.Empty(t, captureDialer.lastHeaders.Get("conversation_id"))
 	require.NotNil(t, captureConn.lastWrite)
-	require.True(t, gjson.Get(requestToJSONString(captureConn.lastWrite), "stream").Exists())
+	requestJSON := requestToJSONString(captureConn.lastWrite)
+	require.True(t, gjson.Get(requestJSON, "stream").Exists())
+	promptCacheKey := strings.TrimSpace(gjson.Get(requestJSON, "prompt_cache_key").String())
+	require.NotEmpty(t, promptCacheKey)
+	require.Equal(t, isolateOpenAISessionID(0, promptCacheKey), captureDialer.lastHeaders.Get("session_id"))
+	require.Empty(t, captureDialer.lastHeaders.Get("conversation_id"))
 }
 
 func TestOpenAIGatewayService_Forward_WSv2_ResponseDoneUsageParsed(t *testing.T) {

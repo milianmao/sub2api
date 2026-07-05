@@ -7,15 +7,15 @@ import { describe, expect, it } from 'vitest'
 const routerPath = resolve(dirname(fileURLToPath(import.meta.url)), '../index.ts')
 const routerSource = readFileSync(routerPath, 'utf8')
 
-describe('admin card mailbox route', () => {
-  it('registers a protected admin route that lazy-loads the card mailboxes view', () => {
-    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/card-mailboxes',[\s\S]*?\n {2}\}/)
+describe('admin chatgpt plus checkout route', () => {
+  it('registers a protected admin route that lazy-loads the checkout view', () => {
+    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/chatgpt-plus-checkout',[\s\S]*?\n {2}\}/)
 
     expect(routeBlockMatch).not.toBeNull()
     const routeBlock = routeBlockMatch?.[0] ?? ''
 
-    expect(routeBlock).toContain("name: 'AdminCardMailboxes'")
-    expect(routeBlock).toContain("component: () => import('@/views/admin/CardMailboxesView.vue')")
+    expect(routeBlock).toContain("name: 'AdminChatGPTPlusCheckout'")
+    expect(routeBlock).toContain("component: () => import('@/views/admin/ChatGPTPlusCheckoutView.vue')")
     expect(routeBlock).toContain('requiresAuth: true')
     expect(routeBlock).toContain('requiresAdmin: true')
   })

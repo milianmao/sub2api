@@ -339,6 +339,7 @@ func registerAccountRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		accounts.POST("/:id/test", h.Admin.Account.Test)
 		accounts.POST("/:id/recover-state", h.Admin.Account.RecoverState)
 		accounts.POST("/:id/refresh", h.Admin.Account.Refresh)
+		admin.POST("/chatgpt-plus-checkout", h.Admin.Account.CreateAdminCheckoutLink)
 		accounts.POST("/:id/checkout-link", h.Admin.Account.CreateCheckoutLink)
 		accounts.POST("/:id/apply-oauth-credentials", h.Admin.Account.ApplyOAuthCredentials)
 		accounts.POST("/:id/set-privacy", h.Admin.Account.SetPrivacy)

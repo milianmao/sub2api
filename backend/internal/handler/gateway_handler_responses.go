@@ -89,9 +89,6 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		requestCtx = service.WithOpenAIImageGenerationIntent(requestCtx)
 	}
 
-	// 解析渠道级模型映射
-	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(requestCtx, apiKey.GroupID, reqModel)
-
 	// Claude Code only restriction:
 	// /v1/responses is never a Claude Code endpoint.
 	// When claude_code_only is enabled, this endpoint is rejected.
@@ -108,6 +105,9 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 			"This group has not enabled OpenAI compatibility")
 		return
 	}
+
+	// 解析渠道级模型映射
+	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(requestCtx, apiKey.GroupID, reqModel)
 
 	if decision := h.checkContentModeration(c, reqLog, apiKey, subject, service.ContentModerationProtocolOpenAIResponses, reqModel, body); decision != nil && decision.Blocked {
 		h.responsesErrorResponse(c, contentModerationStatus(decision), contentModerationErrorCode(decision), decision.Message)

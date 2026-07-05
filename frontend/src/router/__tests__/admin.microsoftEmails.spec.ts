@@ -9,7 +9,7 @@ const routerSource = readFileSync(routerPath, 'utf8')
 
 describe('admin microsoft email route', () => {
   it('registers a protected admin route that lazy-loads the microsoft emails view', () => {
-    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/microsoft-emails',[\s\S]*?\n  \}/)
+    const routeBlockMatch = routerSource.match(/\{\s*path: '\/admin\/microsoft-emails',[\s\S]*?\n {2}\}/)
 
     expect(routeBlockMatch).not.toBeNull()
     const routeBlock = routeBlockMatch?.[0] ?? ''

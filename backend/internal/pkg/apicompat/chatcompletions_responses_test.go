@@ -958,7 +958,7 @@ func TestChatCompletionsResponseToResponses_ReasoningContentExcludedFromOutputTe
 		},
 	}
 
-	out := ChatCompletionsResponseToResponses(resp)
+	out := ChatCompletionsResponseToResponses(resp, resp.Model)
 	require.Len(t, out.Output, 2)
 	assert.Equal(t, "reasoning", out.Output[0].Type)
 	require.Len(t, out.Output[0].Summary, 1)
@@ -975,7 +975,8 @@ func TestChatCompletionChunkToResponsesEvents_ReasoningContentIsNotOutputTextDel
 	reasoning := "private delta"
 	content := "visible delta"
 
-	reasoningEvents := ChatCompletionChunkToResponsesEvents(&ChatCompletionsChunk{
+	state := NewChatCompletionsToResponsesStreamState("deepseek-reasoner")
+	reasoningEvents := ChatCompletionsChunkToResponsesEvents(&ChatCompletionsChunk{
 		ID:    "chatcmpl_deepseek",
 		Model: "deepseek-reasoner",
 		Choices: []ChatChunkChoice{
@@ -984,12 +985,12 @@ func TestChatCompletionChunkToResponsesEvents_ReasoningContentIsNotOutputTextDel
 				Delta: ChatDelta{ReasoningContent: &reasoning},
 			},
 		},
-	})
-	require.Len(t, reasoningEvents, 1)
-	assert.Equal(t, "response.reasoning_summary_text.delta", reasoningEvents[0].Type)
-	assert.Equal(t, "private delta", reasoningEvents[0].Delta)
+	}, state)
+	reasoningDelta := findResponseEventByType(reasoningEvents, "response.reasoning_summary_text.delta")
+	require.NotNil(t, reasoningDelta)
+	assert.Equal(t, "private delta", reasoningDelta.Delta)
 
-	contentEvents := ChatCompletionChunkToResponsesEvents(&ChatCompletionsChunk{
+	contentEvents := ChatCompletionsChunkToResponsesEvents(&ChatCompletionsChunk{
 		ID:    "chatcmpl_deepseek",
 		Model: "deepseek-reasoner",
 		Choices: []ChatChunkChoice{
@@ -998,10 +999,20 @@ func TestChatCompletionChunkToResponsesEvents_ReasoningContentIsNotOutputTextDel
 				Delta: ChatDelta{Content: &content},
 			},
 		},
-	})
-	require.Len(t, contentEvents, 1)
-	assert.Equal(t, "response.output_text.delta", contentEvents[0].Type)
-	assert.Equal(t, "visible delta", contentEvents[0].Delta)
+	}, state)
+	contentDelta := findResponseEventByType(contentEvents, "response.output_text.delta")
+	require.NotNil(t, contentDelta)
+	assert.Equal(t, "visible delta", contentDelta.Delta)
+	assert.NotEqual(t, reasoningDelta.Delta, contentDelta.Delta)
+}
+
+func findResponseEventByType(events []ResponsesStreamEvent, typ string) *ResponsesStreamEvent {
+	for i := range events {
+		if events[i].Type == typ {
+			return &events[i]
+		}
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

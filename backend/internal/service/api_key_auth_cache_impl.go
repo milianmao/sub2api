@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 14 // v14: include authorized groups, user level, and group peak rate fields
+const apiKeyAuthSnapshotVersion = 14 // v14: authorized groups, user level, exclusive auth, and group peak rate fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -275,6 +275,7 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		ID:                              group.ID,
 		Name:                            group.Name,
 		Platform:                        group.Platform,
+		IsExclusive:                     group.IsExclusive,
 		Status:                          group.Status,
 		SubscriptionType:                group.SubscriptionType,
 		RateMultiplier:                  group.RateMultiplier,
@@ -304,6 +305,10 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		OpenAIImageUpstream:             group.OpenAIImageUpstream,
 		ModelsListConfig:                group.ModelsListConfig,
 		RPMLimit:                        group.RPMLimit,
+		PeakRateEnabled:                 group.PeakRateEnabled,
+		PeakStart:                       group.PeakStart,
+		PeakEnd:                         group.PeakEnd,
+		PeakRateMultiplier:              group.PeakRateMultiplier,
 	}
 }
 
@@ -315,6 +320,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		ID:                              snapshot.ID,
 		Name:                            snapshot.Name,
 		Platform:                        snapshot.Platform,
+		IsExclusive:                     snapshot.IsExclusive,
 		Status:                          snapshot.Status,
 		Hydrated:                        true,
 		SubscriptionType:                snapshot.SubscriptionType,
@@ -345,6 +351,10 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		OpenAIImageUpstream:             snapshot.OpenAIImageUpstream,
 		ModelsListConfig:                snapshot.ModelsListConfig,
 		RPMLimit:                        snapshot.RPMLimit,
+		PeakRateEnabled:                 snapshot.PeakRateEnabled,
+		PeakStart:                       snapshot.PeakStart,
+		PeakEnd:                         snapshot.PeakEnd,
+		PeakRateMultiplier:              snapshot.PeakRateMultiplier,
 	}
 }
 
@@ -450,44 +460,6 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 		}
 		// 查询失败或无 override 时留 nil，checkRPM 会回退到 DB 查询
 	}
-	if apiKey.Group != nil {
-		snapshot.Group = &APIKeyAuthGroupSnapshot{
-			ID:                              apiKey.Group.ID,
-			Name:                            apiKey.Group.Name,
-			Platform:                        apiKey.Group.Platform,
-			IsExclusive:                     apiKey.Group.IsExclusive,
-			Status:                          apiKey.Group.Status,
-			SubscriptionType:                apiKey.Group.SubscriptionType,
-			RateMultiplier:                  apiKey.Group.RateMultiplier,
-			DailyLimitUSD:                   apiKey.Group.DailyLimitUSD,
-			WeeklyLimitUSD:                  apiKey.Group.WeeklyLimitUSD,
-			MonthlyLimitUSD:                 apiKey.Group.MonthlyLimitUSD,
-			AllowImageGeneration:            apiKey.Group.AllowImageGeneration,
-			ImageRateIndependent:            apiKey.Group.ImageRateIndependent,
-			ImageRateMultiplier:             apiKey.Group.ImageRateMultiplier,
-			ImagePrice1K:                    apiKey.Group.ImagePrice1K,
-			ImagePrice2K:                    apiKey.Group.ImagePrice2K,
-			ImagePrice4K:                    apiKey.Group.ImagePrice4K,
-			ClaudeCodeOnly:                  apiKey.Group.ClaudeCodeOnly,
-			FallbackGroupID:                 apiKey.Group.FallbackGroupID,
-			FallbackGroupIDOnInvalidRequest: apiKey.Group.FallbackGroupIDOnInvalidRequest,
-			ModelRouting:                    apiKey.Group.ModelRouting,
-			ModelRoutingEnabled:             apiKey.Group.ModelRoutingEnabled,
-			MCPXMLInject:                    apiKey.Group.MCPXMLInject,
-			SupportedModelScopes:            apiKey.Group.SupportedModelScopes,
-			AllowMessagesDispatch:           apiKey.Group.AllowMessagesDispatch,
-			AllowOpenAICompat:               apiKey.Group.AllowOpenAICompat,
-			DefaultMappedModel:              apiKey.Group.DefaultMappedModel,
-			MessagesDispatchModelConfig:     apiKey.Group.MessagesDispatchModelConfig,
-			OpenAIImageUpstream:             apiKey.Group.OpenAIImageUpstream,
-			ModelsListConfig:                apiKey.Group.ModelsListConfig,
-			RPMLimit:                        apiKey.Group.RPMLimit,
-			PeakRateEnabled:                 apiKey.Group.PeakRateEnabled,
-			PeakStart:                       apiKey.Group.PeakStart,
-			PeakEnd:                         apiKey.Group.PeakEnd,
-			PeakRateMultiplier:              apiKey.Group.PeakRateMultiplier,
-		}
-	}
 	return snapshot
 }
 
@@ -532,45 +504,6 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			RPMLimit:                   snapshot.User.RPMLimit,
 			UserGroupRPMOverride:       cloneAPIKeyAuthIntPtr(snapshot.User.UserGroupRPMOverride),
 		},
-	}
-	if snapshot.Group != nil {
-		apiKey.Group = &Group{
-			ID:                              snapshot.Group.ID,
-			Name:                            snapshot.Group.Name,
-			Platform:                        snapshot.Group.Platform,
-			IsExclusive:                     snapshot.Group.IsExclusive,
-			Status:                          snapshot.Group.Status,
-			Hydrated:                        true,
-			SubscriptionType:                snapshot.Group.SubscriptionType,
-			RateMultiplier:                  snapshot.Group.RateMultiplier,
-			DailyLimitUSD:                   snapshot.Group.DailyLimitUSD,
-			WeeklyLimitUSD:                  snapshot.Group.WeeklyLimitUSD,
-			MonthlyLimitUSD:                 snapshot.Group.MonthlyLimitUSD,
-			AllowImageGeneration:            snapshot.Group.AllowImageGeneration,
-			ImageRateIndependent:            snapshot.Group.ImageRateIndependent,
-			ImageRateMultiplier:             snapshot.Group.ImageRateMultiplier,
-			ImagePrice1K:                    snapshot.Group.ImagePrice1K,
-			ImagePrice2K:                    snapshot.Group.ImagePrice2K,
-			ImagePrice4K:                    snapshot.Group.ImagePrice4K,
-			ClaudeCodeOnly:                  snapshot.Group.ClaudeCodeOnly,
-			FallbackGroupID:                 snapshot.Group.FallbackGroupID,
-			FallbackGroupIDOnInvalidRequest: snapshot.Group.FallbackGroupIDOnInvalidRequest,
-			ModelRouting:                    snapshot.Group.ModelRouting,
-			ModelRoutingEnabled:             snapshot.Group.ModelRoutingEnabled,
-			MCPXMLInject:                    snapshot.Group.MCPXMLInject,
-			SupportedModelScopes:            snapshot.Group.SupportedModelScopes,
-			AllowMessagesDispatch:           snapshot.Group.AllowMessagesDispatch,
-			AllowOpenAICompat:               snapshot.Group.AllowOpenAICompat,
-			DefaultMappedModel:              snapshot.Group.DefaultMappedModel,
-			MessagesDispatchModelConfig:     snapshot.Group.MessagesDispatchModelConfig,
-			OpenAIImageUpstream:             snapshot.Group.OpenAIImageUpstream,
-			ModelsListConfig:                snapshot.Group.ModelsListConfig,
-			RPMLimit:                        snapshot.Group.RPMLimit,
-			PeakRateEnabled:                 snapshot.Group.PeakRateEnabled,
-			PeakStart:                       snapshot.Group.PeakStart,
-			PeakEnd:                         snapshot.Group.PeakEnd,
-			PeakRateMultiplier:              snapshot.Group.PeakRateMultiplier,
-		}
 	}
 	s.compileAPIKeyIPRules(apiKey)
 	return apiKey

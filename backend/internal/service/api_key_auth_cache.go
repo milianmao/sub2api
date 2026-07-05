@@ -37,9 +37,9 @@ type APIKeyAuthUserSnapshot struct {
 	Status        string  `json:"status"`
 	Role          string  `json:"role"`
 	Level         int     `json:"level"`
+	AllowedGroups []int64 `json:"allowed_groups,omitempty"`
 	Balance       float64 `json:"balance"`
 	Concurrency   int     `json:"concurrency"`
-	AllowedGroups []int64 `json:"allowed_groups,omitempty"`
 
 	// Balance notification fields (required for CheckBalanceAfterDeduction)
 	Email                      string             `json:"email"`

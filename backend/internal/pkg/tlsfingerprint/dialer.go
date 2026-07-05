@@ -456,6 +456,48 @@ func buildClientHelloSpecFromProfile(profile *Profile) *utls.ClientHelloSpec {
 	}
 }
 
+// ChromeProfile returns a TLS fingerprint profile mimicking Chrome browser.
+// Use this for chatgpt.com requests when no explicit account profile is set.
+func ChromeProfile() *Profile {
+	return &Profile{
+		Name:                "chrome_default",
+		EnableGREASE:        true,
+		CipherSuites:        chromeCipherSuites,
+		Curves:              chromeCurves,
+		PointFormats:        []uint16{0},
+		SignatureAlgorithms: chromeSignatureAlgorithms,
+		ALPNProtocols:       []string{"http/1.1"},
+		SupportedVersions:   []uint16{0x0304, 0x0303},
+		KeyShareGroups:      []uint16{0x001d, 0x0017},
+		PSKModes:            []uint16{1},
+	}
+}
+
+var (
+	chromeCipherSuites = []uint16{
+		0x1301, 0x1302, 0x1303,
+		0xc02b, 0xc02f, 0xc02c, 0xc030, 0xcca9, 0xcca8,
+		0xc013, 0xc014,
+		0x009c, 0x009d, 0x002f, 0x0035,
+	}
+
+	chromeCurves = []uint16{
+		0x001d,
+		0x0017,
+		0x0018,
+	}
+
+	chromeSignatureAlgorithms = []uint16{
+		0x0403,
+		0x0804,
+		0x0401,
+		0x0503,
+		0x0805,
+		0x0806,
+		0x0201,
+	}
+)
+
 // toUint8s converts []uint16 to []uint8 (for utls fields that require []uint8).
 func toUint8s(vals []uint16) []uint8 {
 	out := make([]uint8, len(vals))

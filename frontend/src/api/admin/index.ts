@@ -34,6 +34,7 @@ import affiliatesAPI from './affiliates'
 import riskControlAPI from './riskControl'
 import microsoftEmailsAPI from './microsoftEmails'
 import cardMailboxesAPI from './cardMailboxes'
+import chatgptPlusCheckoutAPI from './chatgptPlusCheckout'
 import adminComplianceAPI from './compliance'
 
 /**
@@ -71,6 +72,7 @@ export const adminAPI = {
   riskControl: riskControlAPI,
   microsoftEmails: microsoftEmailsAPI,
   cardMailboxes: cardMailboxesAPI,
+  chatgptPlusCheckout: chatgptPlusCheckoutAPI,
   compliance: adminComplianceAPI
 }
 
@@ -106,6 +108,7 @@ export {
   riskControlAPI,
   microsoftEmailsAPI,
   cardMailboxesAPI,
+  chatgptPlusCheckoutAPI,
   adminComplianceAPI
 }
 

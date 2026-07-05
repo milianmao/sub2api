@@ -20,7 +20,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/cache"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/Wei-Shaw/sub2api/internal/guard"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
@@ -3024,6 +3026,23 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		imageInputSize = imageCfg.InputSize
 	}
 
+	var openAIConfuseState *guard.ConfuseState
+	if account.Type == AccountTypeOAuth && len(body) > 0 && !compatMessagesBridge {
+		body = guard.SanitizeReasoning("codex", body)
+		body, openAIConfuseState = guard.ConfuseBody(body, account.ID)
+		if c != nil {
+			if openAIConfuseState != nil {
+				c.Set("openai_guard_confuse_state", openAIConfuseState)
+			}
+			if promptCacheKey != "" {
+				c.Set("openai_guard_prompt_cache_key_orig", promptCacheKey)
+			}
+		}
+		requestView = newOpenAIRequestView(body)
+		promptCacheKey = requestView.PromptCacheKey
+		reqBody = nil
+	}
+
 	// Get access token
 	token, _, err := s.GetAccessToken(ctx, account)
 	if err != nil {
@@ -3247,6 +3266,21 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 		return nil, wsErr
 	}
 
+	if account != nil && account.Type == AccountTypeOAuth && !compatMessagesBridge {
+		origPcKey := promptCacheKey
+		if c != nil {
+			if v, ok := c.Get("openai_guard_prompt_cache_key_orig"); ok {
+				if s, ok := v.(string); ok && s != "" {
+					origPcKey = s
+				}
+			}
+		}
+		body = s.applyCodexReasoningReplayCache(originalModel, origPcKey, body)
+		requestView = newOpenAIRequestView(body)
+		promptCacheKey = requestView.PromptCacheKey
+		reqBody = nil
+	}
+
 	httpInvalidEncryptedContentRetryTried := false
 	for {
 		// Build upstream request
@@ -3295,6 +3329,13 @@ func (s *OpenAIGatewayService) Forward(ctx context.Context, c *gin.Context, acco
 					}
 					httpInvalidEncryptedContentRetryTried = true
 					logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Retrying non-WSv2 request once after invalid_encrypted_content (account: %s)", account.Name)
+					origPcKeyForClear := ""
+					if c != nil {
+						if v, ok := c.Get("openai_guard_prompt_cache_key_orig"); ok {
+							origPcKeyForClear, _ = v.(string)
+						}
+					}
+					s.clearCodexReasoningReplayOnInvalidSig(ctx, originalModel, origPcKeyForClear)
 					continue
 				}
 				logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Skip non-WSv2 invalid_encrypted_content retry because encrypted reasoning items are missing (account: %s)", account.Name)
@@ -4513,6 +4554,7 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 			}
 		}
 	}
+	applyGuardSessionHeaders := account != nil && account.Type == AccountTypeOAuth
 	if account.Type == AccountTypeOAuth {
 		compatMessagesBridge := isOpenAICompatMessagesBridgeContext(c) || isOpenAICompatMessagesBridgeBody(body)
 		// 清除客户端透传的 session 头，后续用隔离后的值重新设置，防止跨用户会话碰撞。
@@ -4545,6 +4587,9 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 				req.Header.Set("conversation_id", isolated)
 			}
 		}
+		if compatMessagesBridge {
+			applyGuardSessionHeaders = false
+		}
 	}
 
 	// Apply custom User-Agent if configured
@@ -4566,6 +4611,17 @@ func (s *OpenAIGatewayService) buildUpstreamRequest(ctx context.Context, c *gin.
 	// Ensure required headers exist
 	if req.Header.Get("content-type") == "" {
 		req.Header.Set("content-type", "application/json")
+	}
+
+	if applyGuardSessionHeaders {
+		guard.ApplySessionGovernance(req.Header, promptCacheKey)
+		var confuseState *guard.ConfuseState
+		if c != nil {
+			if v, ok := c.Get("openai_guard_confuse_state"); ok {
+				confuseState, _ = v.(*guard.ConfuseState)
+			}
+		}
+		guard.ConfuseHeaders(req.Header, account.ID, confuseState, promptCacheKey)
 	}
 
 	return req, nil
@@ -4593,6 +4649,60 @@ func (s *OpenAIGatewayService) overrideBrowserUserAgent(ctx context.Context, acc
 		}
 	}
 	req.Header.Set("user-agent", codexUA)
+}
+
+func (s *OpenAIGatewayService) applyCodexReasoningReplayCache(originalModel, promptCacheKey string, body []byte) []byte {
+	if originalModel == "" || promptCacheKey == "" || len(body) == 0 {
+		return body
+	}
+	items, ok := cache.GetCodexReasoningReplayItems(originalModel, promptCacheKey)
+	if !ok || len(items) == 0 {
+		return body
+	}
+	items = cache.FilterCodexReasoningReplayItemsForInput(body, items)
+	if len(items) == 0 {
+		return body
+	}
+	updated, ok := cache.InsertCodexReasoningReplayItems(body, items)
+	if !ok {
+		return body
+	}
+	logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Injected %d reasoning replay items for model=%s session=%s", len(items), originalModel, promptCacheKey[:min(16, len(promptCacheKey))])
+	return updated
+}
+
+func (s *OpenAIGatewayService) cacheCodexReasoningReplayFromCompleted(originalModel, promptCacheKey string, completedData []byte) {
+	if s == nil || originalModel == "" || promptCacheKey == "" || len(completedData) == 0 {
+		return
+	}
+	items := cache.ExtractCodexReasoningReplayFromCompleted(completedData)
+	if len(items) == 0 {
+		return
+	}
+	cache.CacheCodexReasoningReplayItems(originalModel, promptCacheKey, items)
+}
+
+func (s *OpenAIGatewayService) clearCodexReasoningReplayOnInvalidSig(ctx context.Context, originalModel, promptCacheKey string) {
+	if s == nil || originalModel == "" || promptCacheKey == "" {
+		return
+	}
+	logger.LegacyPrintf("service.openai_gateway", "[OpenAI] Clearing reasoning replay cache for model=%s session=%s due to signature invalidation", originalModel, promptCacheKey[:min(16, len(promptCacheKey))])
+	cache.DeleteCodexReasoningReplayItem(originalModel, promptCacheKey)
+}
+
+func (s *OpenAIGatewayService) restoreOpenAIConfuseStreamData(c *gin.Context, data []byte) []byte {
+	if c == nil || len(data) == 0 {
+		return data
+	}
+	v, ok := c.Get("openai_guard_confuse_state")
+	if !ok {
+		return data
+	}
+	state, ok := v.(*guard.ConfuseState)
+	if !ok || state == nil {
+		return data
+	}
+	return guard.RestoreResponseRestorer(state)(data)
 }
 
 func (s *OpenAIGatewayService) handleErrorResponse(
@@ -5186,6 +5296,14 @@ func (s *OpenAIGatewayService) handleStreamingResponse(ctx context.Context, resp
 				line = "data: " + data
 				eventType = strings.TrimSpace(gjson.GetBytes(dataBytes, "type").String())
 			}
+			if account != nil && account.Type == AccountTypeOAuth {
+				if restored := s.restoreOpenAIConfuseStreamData(c, dataBytes); !bytes.Equal(restored, dataBytes) {
+					dataBytes = restored
+					data = string(restored)
+					line = "data: " + data
+					eventType = strings.TrimSpace(gjson.GetBytes(dataBytes, "type").String())
+				}
+			}
 			if sanitizedData, sanitized := sanitizeOpenAIResponseFailedEventForClient(dataBytes, eventType); sanitized {
 				dataBytes = sanitizedData
 				data = string(sanitizedData)
@@ -5687,6 +5805,14 @@ func (s *OpenAIGatewayService) handleNonStreamingResponse(ctx context.Context, r
 		body = s.replaceModelInResponseBody(body, mappedModel, originalModel)
 	}
 
+	if account != nil && account.Type == AccountTypeOAuth {
+		if v, ok := c.Get("openai_guard_confuse_state"); ok {
+			if state, ok := v.(*guard.ConfuseState); ok && state != nil {
+				body = guard.RestoreResponseRestorer(state)(body)
+			}
+		}
+	}
+
 	responseheaders.WriteFilteredHeaders(c.Writer.Header(), resp.Header, s.responseHeaderFilter)
 
 	contentType := "application/json"
@@ -5737,6 +5863,11 @@ func (s *OpenAIGatewayService) handleSSEToJSON(resp *http.Response, c *gin.Conte
 		}
 		// Correct tool calls in final response
 		body = s.correctToolCallsInResponseBody(body)
+		if v, ok := c.Get("openai_guard_prompt_cache_key_orig"); ok {
+			if pcKey, ok := v.(string); ok && pcKey != "" {
+				s.cacheCodexReasoningReplayFromCompleted(originalModel, pcKey, body)
+			}
+		}
 	} else {
 		terminalType, terminalPayload, terminalOK := extractOpenAISSETerminalEvent(bodyText)
 		if terminalOK && terminalType == "response.failed" {

@@ -715,7 +715,10 @@ func (s *UsageLogRepoSuite) TestDashboardStats_TodayTotalsAndPerformance() {
 	accNormal := mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-normal", Schedulable: true})
 	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-error", Status: service.StatusError, Schedulable: true})
 	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-disabled", Status: service.StatusDisabled, Schedulable: false})
-	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-manual-unsched", Schedulable: false})
+	_, err = s.tx.ExecContext(s.ctx,
+		"INSERT INTO accounts (name, platform, type, status, schedulable) VALUES ($1, $2, $3, $4, $5)",
+		"a-manual-unsched", service.PlatformAnthropic, service.AccountTypeOAuth, service.StatusActive, false)
+	s.Require().NoError(err, "create a-manual-unsched")
 	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-rl", RateLimitedAt: &now, RateLimitResetAt: &resetAt, Schedulable: true})
 	mustCreateAccount(s.T(), s.client, &service.Account{Name: "a-ov", OverloadUntil: &resetAt, Schedulable: true})
 

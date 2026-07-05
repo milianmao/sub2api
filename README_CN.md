@@ -538,7 +538,7 @@ gateway:
   sora_media_signed_url_ttl_seconds: 900
 ```
 
-> 若未配置签名密钥，`/sora/media-signed` 将返回 503。  
+> 若未配置签名密钥，`/sora/media-signed` 将返回 503。
 > 如需更严格的访问控制，可将 `sora_media_require_api_key` 设为 true，仅允许携带 API Key 的 `/sora/media` 访问。
 
 访问策略说明：
@@ -711,6 +711,10 @@ Antigravity 账户支持可选的**混合调度**功能。开启后，通用端�
 
 > **⚠️ 注意**：Anthropic Claude 和 Antigravity Claude **不能在同一上下文中混合使用**，请通过分组功能做好隔离。
 
+
+### 已知问题
+在 Claude Code 中，无法自动退出Plan Mode。（正常使用原生Claude Api时，Plan 完成后，Claude Code会弹出弹出选项让用户同意或拒绝Plan。）
+解决办法：shift + Tab，手动退出Plan mode，然后输入内容 告诉 Claude Code 同意或拒绝 Plan
 ---
 
 ## 项目结构

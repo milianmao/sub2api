@@ -39,7 +39,7 @@ func TestRegisterAdminRoutes_RegistersChatGPTSessionImportRoute(t *testing.T) {
 
 	RegisterAdminRoutes(v1, h, middleware.AdminAuthMiddleware(func(c *gin.Context) {
 		c.Next()
-	}))
+	}), nil)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/accounts/import/chatgpt-session", nil)
 	rec := httptest.NewRecorder()

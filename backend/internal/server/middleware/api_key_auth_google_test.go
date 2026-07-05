@@ -390,10 +390,7 @@ func TestApiKeyAuthWithSubscriptionGoogleEffectiveGroupResolution(t *testing.T) 
 		apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
 		require.True(t, ok)
 		groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-		overrideCleared := false
-		if apiKeyFromCtx.User != nil && apiKeyFromCtx.User.UserGroupRPMOverride == nil {
-			overrideCleared = true
-		}
+		overrideCleared := apiKeyFromCtx.User != nil && apiKeyFromCtx.User.UserGroupRPMOverride == nil
 		c.JSON(http.StatusOK, gin.H{
 			"api_key_group_id":     apiKeyFromCtx.Group.ID,
 			"api_key_group_ptr":    *apiKeyFromCtx.GroupID,
