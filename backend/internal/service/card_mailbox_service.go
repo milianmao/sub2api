@@ -258,6 +258,7 @@ func newCardMailboxHTTPClientWithDialer(resolver cardMailboxResolver, dialContex
 		defaultTransport = &http.Transport{}
 	}
 	transport := defaultTransport.Clone()
+	transport.Proxy = nil
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {

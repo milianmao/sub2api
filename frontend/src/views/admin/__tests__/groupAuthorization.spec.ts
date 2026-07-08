@@ -32,6 +32,7 @@ const {
   updateGroupRequest,
   getGroupUsageSummary,
   getGroupCapacitySummary,
+  getModelsListCandidates,
 } = vi.hoisted(() => ({
   listUsers: vi.fn(),
   getAllGroups: vi.fn(),
@@ -50,6 +51,7 @@ const {
   updateGroupRequest: vi.fn(),
   getGroupUsageSummary: vi.fn(),
   getGroupCapacitySummary: vi.fn(),
+  getModelsListCandidates: vi.fn(),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -85,6 +87,7 @@ vi.mock('@/api/admin', () => ({
       update: updateGroupRequest,
       getUsageSummary: getGroupUsageSummary,
       getCapacitySummary: getGroupCapacitySummary,
+      getModelsListCandidates,
     },
     dashboard: {
       getBatchUsersUsage,
@@ -453,6 +456,7 @@ describe('group authorization frontend behavior', () => {
     getGroupCapacitySummary.mockReset().mockResolvedValue([])
     createGroupRequest.mockReset().mockResolvedValue(createGroup())
     updateGroupRequest.mockReset().mockResolvedValue(createGroup())
+    getModelsListCandidates.mockReset().mockResolvedValue([])
 
     listKeys.mockReset().mockResolvedValue({
       items: [createKey()],

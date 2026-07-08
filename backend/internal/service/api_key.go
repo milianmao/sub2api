@@ -53,6 +53,7 @@ type APIKey struct {
 	Group               *Group
 	Groups              []*Group
 	AuthorizedGroups    []APIKeyAuthorizedGroup
+	CurrentConcurrency  int
 
 	// Quota fields
 	Quota     float64    // Quota limit in USD (0 = unlimited)

@@ -181,6 +181,19 @@
             </div>
           </template>
 
+          <template #cell-current_concurrency="{ value }">
+            <span
+              :class="[
+                'inline-flex min-w-8 items-center justify-center rounded px-2 py-1 text-sm font-semibold tabular-nums',
+                (value ?? 0) > 0
+                  ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/25 dark:text-emerald-300 dark:ring-emerald-800'
+                  : 'bg-gray-100 text-gray-500 dark:bg-dark-700 dark:text-dark-400'
+              ]"
+            >
+              {{ value ?? 0 }}
+            </span>
+          </template>
+
           <template #cell-usage="{ row }">
             <div class="text-sm">
               <div class="flex items-center gap-1.5">
@@ -1071,6 +1084,7 @@
 	import { ref, reactive, computed, onMounted, onUnmounted, type ComponentPublicInstance } from 'vue'
 	import { useI18n } from 'vue-i18n'
 	import { useAppStore } from '@/stores/app'
+	import { useAuthStore } from '@/stores/auth'
 	import { useOnboardingStore } from '@/stores/onboarding'
 	import { useClipboard } from '@/composables/useClipboard'
 import { getPersistedPageSize } from '@/composables/usePersistedPageSize'
@@ -1124,6 +1138,7 @@ interface GroupOption {
 }
 
 const appStore = useAppStore()
+const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
 const { copyToClipboard: clipboardCopy } = useClipboard()
 
@@ -1131,6 +1146,7 @@ const allColumns = computed<Column[]>(() => [
   { key: 'name', label: t('common.name'), sortable: true },
   { key: 'key', label: t('keys.apiKey'), sortable: false },
   { key: 'group', label: t('keys.group'), sortable: false },
+  { key: 'current_concurrency', label: t('keys.currentConcurrency'), sortable: false },
   { key: 'usage', label: t('keys.usage'), sortable: false },
   { key: 'rate_limit', label: t('keys.rateLimitColumn'), sortable: false },
   { key: 'expires_at', label: t('keys.expiresAt'), sortable: true },
@@ -1311,6 +1327,8 @@ const shouldSubmitEditStatus = (key: ApiKey, status: 'active' | 'inactive') => {
   }
   return true
 }
+
+const canSubmitEditGroupAuthorization = computed(() => authStore.user?.role !== 'admin')
 
 // Filter dropdown options
 const groupFilterOptions = computed(() => [
@@ -1636,7 +1654,8 @@ const confirmDelete = (key: ApiKey) => {
 
 const handleSubmit = async () => {
   const groupIds = authorizedGroupIdsForSubmit()
-  if (groupIds.length === 0) {
+  const shouldSubmitGroupAuthorization = !showEditModal.value || canSubmitEditGroupAuthorization.value
+  if (shouldSubmitGroupAuthorization && groupIds.length === 0) {
     appStore.showError(t('keys.groupRequired'))
     return
   }
@@ -1693,8 +1712,6 @@ const handleSubmit = async () => {
     if (showEditModal.value && selectedKey.value) {
       const updates: UpdateApiKeyRequest = {
         name: formData.value.name,
-        group_id: groupIds[0] ?? null,
-        group_ids: groupIds,
         ip_whitelist: ipWhitelist,
         ip_blacklist: ipBlacklist,
         quota: quota,
@@ -1702,6 +1719,10 @@ const handleSubmit = async () => {
         rate_limit_5h: rateLimitData.rate_limit_5h,
         rate_limit_1d: rateLimitData.rate_limit_1d,
         rate_limit_7d: rateLimitData.rate_limit_7d,
+        ...(canSubmitEditGroupAuthorization.value ? {
+          group_id: groupIds[0] ?? null,
+          group_ids: groupIds,
+        } : {}),
       }
       if (shouldSubmitEditStatus(selectedKey.value, formData.value.status)) {
         updates.status = formData.value.status

@@ -119,7 +119,7 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 				}
 			}
 		} else if !skipBilling {
-			if apiKey.User.Balance <= 0 {
+			if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 				abortWithGoogleError(c, 403, "Insufficient account balance")
 				return
 			}
@@ -181,6 +181,10 @@ func abortIfEffectiveAPIKeyGroupUnavailableGoogle(c *gin.Context, apiKey *servic
 	if err != nil {
 		if errors.Is(err, service.ErrImageGroupNotAuthorized) {
 			abortWithGoogleError(c, 403, service.ImageGenerationPermissionMessage())
+			return true
+		}
+		if errors.Is(err, service.ErrBatchImageGroupDisabled) {
+			abortWithGoogleError(c, 403, "batch image API is disabled for this group")
 			return true
 		}
 		abortWithGoogleError(c, 500, "Failed to resolve API key group")

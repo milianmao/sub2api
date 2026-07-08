@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 14 // v14: authorized groups, user level, exclusive auth, and group peak rate fields
+const apiKeyAuthSnapshotVersion = 15 // v15: authorized groups, user level, exclusive auth, group peak rate, and batch image gate fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -286,6 +286,7 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		WeeklyLimitUSD:                  cloneAPIKeyAuthFloat64Ptr(group.WeeklyLimitUSD),
 		MonthlyLimitUSD:                 cloneAPIKeyAuthFloat64Ptr(group.MonthlyLimitUSD),
 		AllowImageGeneration:            group.AllowImageGeneration,
+		AllowBatchImageGeneration:       group.AllowBatchImageGeneration,
 		ImageRateIndependent:            group.ImageRateIndependent,
 		ImageRateMultiplier:             group.ImageRateMultiplier,
 		ImagePrice1K:                    cloneAPIKeyAuthFloat64Ptr(group.ImagePrice1K),
@@ -332,6 +333,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		WeeklyLimitUSD:                  cloneAPIKeyAuthFloat64Ptr(snapshot.WeeklyLimitUSD),
 		MonthlyLimitUSD:                 cloneAPIKeyAuthFloat64Ptr(snapshot.MonthlyLimitUSD),
 		AllowImageGeneration:            snapshot.AllowImageGeneration,
+		AllowBatchImageGeneration:       snapshot.AllowBatchImageGeneration,
 		ImageRateIndependent:            snapshot.ImageRateIndependent,
 		ImageRateMultiplier:             snapshot.ImageRateMultiplier,
 		ImagePrice1K:                    cloneAPIKeyAuthFloat64Ptr(snapshot.ImagePrice1K),

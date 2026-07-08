@@ -219,7 +219,7 @@ func apiKeyAuthWithSubscription(apiKeyService *service.APIKeyService, subscripti
 				}
 			} else {
 				// 非订阅模式 或 订阅模式但 subscriptionService 未注入：回退到余额检查
-				if apiKey.User.Balance <= 0 {
+				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
 					AbortWithError(c, 403, "INSUFFICIENT_BALANCE", "Insufficient account balance")
 					return
 				}
@@ -302,6 +302,10 @@ func abortIfEffectiveAPIKeyGroupUnavailable(c *gin.Context, apiKey *service.APIK
 			AbortWithError(c, 403, "IMAGE_GROUP_NOT_AUTHORIZED", service.ImageGenerationPermissionMessage())
 			return true
 		}
+		if errors.Is(err, service.ErrBatchImageGroupDisabled) {
+			AbortWithError(c, 403, "BATCH_IMAGE_GROUP_DISABLED", "batch image API is disabled for this group")
+			return true
+		}
 		AbortWithError(c, 500, "INTERNAL_ERROR", "Failed to resolve API key group")
 		return true
 	}
@@ -351,6 +355,13 @@ func applyEffectiveAPIKeyGroup(apiKey *service.APIKey, group *service.Group) {
 	if originalGroupID != nil && *originalGroupID != group.ID && apiKey.User != nil {
 		apiKey.User.UserGroupRPMOverride = nil
 	}
+}
+
+// apiKeyBalanceBelowAuthThreshold keeps auth-layer historical semantics:
+// only an exhausted balance is rejected. MinimumBalanceReserve belongs to
+// billing-cache prechecks and must not become a hard auth gate.
+func apiKeyBalanceBelowAuthThreshold(balance float64, _ *config.Config) bool {
+	return balance <= 0
 }
 
 func abortIfAPIKeyGroupUnavailable(c *gin.Context, apiKey *service.APIKey) bool {

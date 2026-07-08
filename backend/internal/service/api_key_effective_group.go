@@ -20,6 +20,17 @@ func ResolveEffectiveAPIKeyGroup(apiKey *APIKey, req EffectiveGroupResolutionReq
 		return nil, nil
 	}
 	candidates := effectiveAPIKeyGroupCandidates(apiKey)
+	if isEffectiveBatchImageEndpoint(req) {
+		if isAuthorizedBatchImageGroup(apiKey.Group) {
+			return apiKey.Group, nil
+		}
+		for _, group := range candidates {
+			if isAuthorizedBatchImageGroup(group) {
+				return group, nil
+			}
+		}
+		return nil, ErrBatchImageGroupDisabled
+	}
 	if isEffectiveImageGenerationIntent(req) {
 		if isAuthorizedOpenAIImageGroup(apiKey.Group) {
 			return apiKey.Group, nil
@@ -74,6 +85,11 @@ func isEffectiveImageGenerationIntent(req EffectiveGroupResolutionRequest) bool 
 	return IsImageGenerationIntent(req.Endpoint, req.RequestedModel, req.Body)
 }
 
+func isEffectiveBatchImageEndpoint(req EffectiveGroupResolutionRequest) bool {
+	endpoint := strings.TrimRight(strings.TrimSpace(req.Endpoint), "/")
+	return endpoint == "/v1/images/batches" || strings.HasPrefix(endpoint, "/v1/images/batches/")
+}
+
 func effectiveGroupRequestedPlatform(req EffectiveGroupResolutionRequest) string {
 	if !strings.EqualFold(strings.TrimSpace(req.Method), "GET") {
 		return ""
@@ -87,6 +103,10 @@ func effectiveGroupRequestedPlatform(req EffectiveGroupResolutionRequest) string
 
 func isAuthorizedOpenAIImageGroup(group *Group) bool {
 	return group != nil && group.Status == StatusActive && group.Platform == PlatformOpenAI && group.AllowImageGeneration
+}
+
+func isAuthorizedBatchImageGroup(group *Group) bool {
+	return group != nil && group.Status == StatusActive && group.Platform == PlatformGemini && group.AllowBatchImageGeneration
 }
 
 func effectiveAPIKeyGroupCandidates(apiKey *APIKey) []*Group {

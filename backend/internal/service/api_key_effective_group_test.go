@@ -101,6 +101,50 @@ func TestResolveEffectiveAPIKeyGroupSelectsGeminiGroupForV1BetaModels(t *testing
 	require.Equal(t, int64(1), *apiKey.GroupID)
 }
 
+func TestResolveEffectiveAPIKeyGroupSelectsBatchImageGroup(t *testing.T) {
+	defaultGroup := testEffectiveGroup(1, PlatformAnthropic, false, StatusActive)
+	nonBatchGeminiGroup := testEffectiveGroup(2, PlatformGemini, false, StatusActive)
+	batchGroup := testEffectiveGroup(3, PlatformGemini, false, StatusActive)
+	batchGroup.AllowBatchImageGeneration = true
+	apiKey := &APIKey{
+		GroupID: effectiveGroupPtrInt64(1),
+		Group:   defaultGroup,
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 2, Group: nonBatchGeminiGroup, Priority: 1},
+			{GroupID: 3, Group: batchGroup, Priority: 2},
+		},
+	}
+
+	got, err := ResolveEffectiveAPIKeyGroup(apiKey, EffectiveGroupResolutionRequest{
+		Method:   "POST",
+		Endpoint: "/v1/images/batches",
+	})
+
+	require.NoError(t, err)
+	require.Same(t, batchGroup, got)
+	require.Same(t, defaultGroup, apiKey.Group)
+	require.Equal(t, int64(1), *apiKey.GroupID)
+}
+
+func TestResolveEffectiveAPIKeyGroupRejectsBatchImageWithoutAuthorizedGroup(t *testing.T) {
+	apiKey := &APIKey{
+		AuthorizedGroups: []APIKeyAuthorizedGroup{
+			{GroupID: 2, Group: testEffectiveGroup(2, PlatformGemini, false, StatusActive), Priority: 1},
+		},
+	}
+
+	got, err := ResolveEffectiveAPIKeyGroup(apiKey, EffectiveGroupResolutionRequest{
+		Method:   "GET",
+		Endpoint: "/v1/images/batches/models",
+	})
+
+	require.Nil(t, got)
+	require.True(t, errors.Is(err, ErrBatchImageGroupDisabled))
+	if apiKey.GroupID != nil {
+		require.Fail(t, "api key group id should stay nil")
+	}
+}
+
 func TestResolveEffectiveAPIKeyGroupPrefersDefaultWhenImageCapable(t *testing.T) {
 	defaultGroup := testEffectiveGroup(1, PlatformOpenAI, true, StatusActive)
 	otherImageGroup := testEffectiveGroup(2, PlatformOpenAI, true, StatusActive)
