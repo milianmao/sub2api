@@ -38,7 +38,7 @@ const ProxySelectorStub = {
   props: ['modelValue', 'proxies'],
   emits: ['update:modelValue'],
   template: `
-    <select data-test="proxy-selector" :value="modelValue ?? ''" @change="$emit('update:modelValue', Number(($event.target as HTMLSelectElement).value))">
+    <select data-test="proxy-selector" :value="modelValue ?? ''" @change="$emit('update:modelValue', Number($event.target.value))">
       <option v-for="proxy in proxies" :key="proxy.id" :value="proxy.id">{{ proxy.name }}</option>
     </select>
   `

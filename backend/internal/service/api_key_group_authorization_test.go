@@ -823,15 +823,19 @@ func (s *stubUserSubscriptionRepoForGroupAuth) ActivateWindows(context.Context, 
 	panic("unexpected ActivateWindows call")
 }
 
-func (s *stubUserSubscriptionRepoForGroupAuth) ResetDailyUsage(context.Context, int64, time.Time) error {
+func (s *stubUserSubscriptionRepoForGroupAuth) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time) error {
+	panic("unexpected ResetUsageWindows call")
+}
+
+func (s *stubUserSubscriptionRepoForGroupAuth) ResetDailyUsage(context.Context, int64, *time.Time, time.Time) error {
 	panic("unexpected ResetDailyUsage call")
 }
 
-func (s *stubUserSubscriptionRepoForGroupAuth) ResetWeeklyUsage(context.Context, int64, time.Time) error {
+func (s *stubUserSubscriptionRepoForGroupAuth) ResetWeeklyUsage(context.Context, int64, *time.Time, time.Time) error {
 	panic("unexpected ResetWeeklyUsage call")
 }
 
-func (s *stubUserSubscriptionRepoForGroupAuth) ResetMonthlyUsage(context.Context, int64, time.Time) error {
+func (s *stubUserSubscriptionRepoForGroupAuth) ResetMonthlyUsage(context.Context, int64, *time.Time, time.Time) error {
 	panic("unexpected ResetMonthlyUsage call")
 }
 

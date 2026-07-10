@@ -311,6 +311,7 @@ func (h *UserHandler) Create(c *gin.Context) {
 		RPMLimit:      req.RPMLimit,
 		Level:         level,
 		AllowedGroups: allowedGroups,
+		ActorAdminID:  getAdminIDFromContext(c),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -337,6 +338,10 @@ func (h *UserHandler) Update(c *gin.Context) {
 	if !requireSuperAdminForAuthorizationFields(c, req.Role != nil || req.AllowedGroups != nil) {
 		return
 	}
+	if req.Role != nil && *req.Role == service.RoleUser && userID == getAdminIDFromContext(c) {
+		response.BadRequest(c, "cannot demote yourself from admin")
+		return
+	}
 
 	// 使用指针类型直接传递，nil 表示未提供该字段
 	user, err := h.adminService.UpdateUser(c.Request.Context(), userID, &service.UpdateUserInput{
@@ -352,6 +357,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 		Status:        req.Status,
 		AllowedGroups: req.AllowedGroups,
 		GroupRates:    req.GroupRates,
+		ActorAdminID:  getAdminIDFromContext(c),
 	})
 	if err != nil {
 		response.ErrorFrom(c, err)

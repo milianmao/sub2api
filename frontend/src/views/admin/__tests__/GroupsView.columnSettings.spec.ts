@@ -68,6 +68,12 @@ vi.mock('@/stores/app', () => ({
   }),
 }))
 
+vi.mock('@/stores/auth', () => ({
+  useAuthStore: () => ({
+    user: { role: 'super_admin' },
+  }),
+}))
+
 vi.mock('@/stores/onboarding', () => ({
   useOnboardingStore: () => ({
     isCurrentStep,
@@ -260,6 +266,7 @@ describe('admin GroupsView column settings', () => {
       'billing_type',
       'rate_multiplier',
       'is_exclusive',
+      'access',
       'account_count',
       'capacity',
       'usage',
@@ -282,6 +289,7 @@ describe('admin GroupsView column settings', () => {
       'billing_type',
       'rate_multiplier',
       'is_exclusive',
+      'access',
       'account_count',
       'status',
       'actions',
@@ -300,6 +308,7 @@ describe('admin GroupsView column settings', () => {
       'billing_type',
       'rate_multiplier',
       'is_exclusive',
+      'access',
       'account_count',
       'capacity',
       'status',
@@ -308,8 +317,11 @@ describe('admin GroupsView column settings', () => {
     expect(localStorage.getItem('group-hidden-columns')).toBe(JSON.stringify(['usage']))
   })
 
-  it('skips hidden usage and capacity fetches until those columns are shown', async () => {
-    localStorage.setItem('group-hidden-columns', JSON.stringify(['usage', 'capacity']))
+  it('skips usage and capacity fetches until consuming columns are shown', async () => {
+    localStorage.setItem(
+      'group-hidden-columns',
+      JSON.stringify(['billing_type', 'usage', 'capacity']),
+    )
 
     const wrapper = await mountView()
 

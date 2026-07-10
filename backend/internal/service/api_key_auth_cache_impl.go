@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 15 // v15: authorized groups, user level, exclusive auth, group peak rate, and batch image gate fields
+const apiKeyAuthSnapshotVersion = 16 // v16: authorized groups plus batch image, video pricing, and account eligibility fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -292,6 +292,13 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		ImagePrice1K:                    cloneAPIKeyAuthFloat64Ptr(group.ImagePrice1K),
 		ImagePrice2K:                    cloneAPIKeyAuthFloat64Ptr(group.ImagePrice2K),
 		ImagePrice4K:                    cloneAPIKeyAuthFloat64Ptr(group.ImagePrice4K),
+		BatchImageDiscountMultiplier:    group.BatchImageDiscountMultiplier,
+		BatchImageHoldMultiplier:        group.BatchImageHoldMultiplier,
+		VideoRateIndependent:            group.VideoRateIndependent,
+		VideoRateMultiplier:             group.VideoRateMultiplier,
+		VideoPrice480P:                  cloneAPIKeyAuthFloat64Ptr(group.VideoPrice480P),
+		VideoPrice720P:                  cloneAPIKeyAuthFloat64Ptr(group.VideoPrice720P),
+		VideoPrice1080P:                 cloneAPIKeyAuthFloat64Ptr(group.VideoPrice1080P),
 		ClaudeCodeOnly:                  group.ClaudeCodeOnly,
 		FallbackGroupID:                 cloneAPIKeyAuthInt64Ptr(group.FallbackGroupID),
 		FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(group.FallbackGroupIDOnInvalidRequest),
@@ -301,6 +308,8 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		SupportedModelScopes:            cloneAPIKeyAuthStringSlice(group.SupportedModelScopes),
 		AllowMessagesDispatch:           group.AllowMessagesDispatch,
 		AllowOpenAICompat:               group.AllowOpenAICompat,
+		RequireOAuthOnly:                group.RequireOAuthOnly,
+		RequirePrivacySet:               group.RequirePrivacySet,
 		DefaultMappedModel:              group.DefaultMappedModel,
 		MessagesDispatchModelConfig:     cloneAPIKeyAuthMessagesDispatchModelConfig(group.MessagesDispatchModelConfig),
 		OpenAIImageUpstream:             group.OpenAIImageUpstream,
@@ -339,6 +348,13 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		ImagePrice1K:                    cloneAPIKeyAuthFloat64Ptr(snapshot.ImagePrice1K),
 		ImagePrice2K:                    cloneAPIKeyAuthFloat64Ptr(snapshot.ImagePrice2K),
 		ImagePrice4K:                    cloneAPIKeyAuthFloat64Ptr(snapshot.ImagePrice4K),
+		BatchImageDiscountMultiplier:    snapshot.BatchImageDiscountMultiplier,
+		BatchImageHoldMultiplier:        snapshot.BatchImageHoldMultiplier,
+		VideoRateIndependent:            snapshot.VideoRateIndependent,
+		VideoRateMultiplier:             snapshot.VideoRateMultiplier,
+		VideoPrice480P:                  cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice480P),
+		VideoPrice720P:                  cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice720P),
+		VideoPrice1080P:                 cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice1080P),
 		ClaudeCodeOnly:                  snapshot.ClaudeCodeOnly,
 		FallbackGroupID:                 cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupID),
 		FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupIDOnInvalidRequest),
@@ -348,6 +364,8 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		SupportedModelScopes:            cloneAPIKeyAuthStringSlice(snapshot.SupportedModelScopes),
 		AllowMessagesDispatch:           snapshot.AllowMessagesDispatch,
 		AllowOpenAICompat:               snapshot.AllowOpenAICompat,
+		RequireOAuthOnly:                snapshot.RequireOAuthOnly,
+		RequirePrivacySet:               snapshot.RequirePrivacySet,
 		DefaultMappedModel:              snapshot.DefaultMappedModel,
 		MessagesDispatchModelConfig:     cloneAPIKeyAuthMessagesDispatchModelConfig(snapshot.MessagesDispatchModelConfig),
 		OpenAIImageUpstream:             snapshot.OpenAIImageUpstream,

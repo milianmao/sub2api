@@ -2,10 +2,12 @@ package middleware
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/googleapi"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/ip"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -46,10 +48,32 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		// user/group/platform。
 		SetOpsFallbackAPIKey(c, apiKey)
 
-		if !apiKey.IsActive() {
+		// disabled / 未知状态 → 无条件拦截（expired 和 quota_exhausted 留给计费阶段，
+		// 与主中间件 api_key_auth.go 保持一致）。
+		if !apiKey.IsActive() &&
+			apiKey.Status != service.StatusAPIKeyExpired &&
+			apiKey.Status != service.StatusAPIKeyQuotaExhausted {
 			abortWithGoogleError(c, 401, "API key is disabled")
 			return
 		}
+
+		// 检查 IP 限制（白名单/黑名单）。与主中间件保持一致，避免 Gemini 端点绕过 Key 的 IP ACL。
+		if len(apiKey.IPWhitelist) > 0 || len(apiKey.IPBlacklist) > 0 {
+			clientIP := ip.GetTrustedClientIP(c)
+			if cfg.TrustForwardedIPForAPIKeyACL() {
+				clientIP = ip.GetClientIP(c)
+			}
+			allowed, _ := ip.CheckIPRestrictionWithCompiledRules(clientIP, apiKey.CompiledIPWhitelist, apiKey.CompiledIPBlacklist)
+			if !allowed {
+				if clientIP == "" {
+					clientIP = "unknown"
+				}
+				service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonIPRestriction)
+				abortWithGoogleError(c, 403, fmt.Sprintf("Access denied. Your IP is %s", clientIP))
+				return
+			}
+		}
+
 		if apiKey.User == nil {
 			abortWithGoogleError(c, 401, "User associated with API key not found")
 			return
@@ -58,12 +82,17 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 			abortWithGoogleError(c, 401, "User account is not active")
 			return
 		}
+		if abortIfEffectiveAPIKeyGroupUnavailableGoogle(c, apiKey) {
+			return
+		}
 		if _, message, ok := validateAPIKeyGroupAvailable(apiKey); !ok {
 			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
 			abortWithGoogleError(c, 403, message)
 			return
 		}
-		if abortIfEffectiveAPIKeyGroupUnavailableGoogle(c, apiKey) {
+		if !validateAPIKeyGroupAllowed(apiKey) {
+			service.MarkOpsClientBusinessLimited(c, service.OpsClientBusinessLimitedReasonAPIKeyGroupUnavailable)
+			abortWithGoogleError(c, 403, "API Key 所属专属分组不再允许当前用户使用")
 			return
 		}
 
@@ -82,9 +111,11 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 		}
 
 		skipBilling := shouldSkipAPIKeyBilling(c)
+		var subscription *service.UserSubscription
 		isSubscriptionType := apiKey.Group != nil && apiKey.Group.IsSubscriptionType()
 		if isSubscriptionType && subscriptionService != nil {
-			subscription, err := subscriptionService.GetActiveSubscription(
+			var err error
+			subscription, err = subscriptionService.GetActiveSubscription(
 				c.Request.Context(),
 				apiKey.User.ID,
 				apiKey.Group.ID,
@@ -95,13 +126,37 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 					return
 				}
 			}
+		}
 
-			if subscription != nil {
-				c.Set(string(ContextKeySubscription), subscription)
+		if !skipBilling {
+			switch apiKey.Status {
+			case service.StatusAPIKeyQuotaExhausted:
+				abortWithGoogleError(c, 429, "API key 额度已用完")
+				return
+			case service.StatusAPIKeyExpired:
+				abortWithGoogleError(c, 403, "API key 已过期")
+				return
+			}
+			if apiKey.IsExpired() {
+				abortWithGoogleError(c, 403, "API key 已过期")
+				return
+			}
+			if apiKey.IsQuotaExhausted() {
+				abortWithGoogleError(c, 429, "API key 额度已用完")
+				return
 			}
 
-			if !skipBilling && subscription != nil {
+			if subscription != nil {
 				needsMaintenance, err := subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+				if needsMaintenance {
+					refreshed, maintenanceErr := subscriptionService.EnsureWindowMaintenance(c.Request.Context(), subscription)
+					if maintenanceErr != nil {
+						abortWithGoogleError(c, 500, "Failed to maintain subscription usage windows")
+						return
+					}
+					subscription = refreshed
+					_, err = subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+				}
 				if err != nil {
 					status := 403
 					if errors.Is(err, service.ErrDailyLimitExceeded) ||
@@ -112,17 +167,15 @@ func APIKeyAuthWithSubscriptionGoogle(apiKeyService *service.APIKeyService, subs
 					abortWithGoogleError(c, status, err.Error())
 					return
 				}
-
-				if needsMaintenance {
-					maintenanceCopy := *subscription
-					subscriptionService.DoWindowMaintenance(&maintenanceCopy)
+			} else {
+				if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
+					abortWithGoogleError(c, 403, "Insufficient account balance")
+					return
 				}
 			}
-		} else if !skipBilling {
-			if apiKeyBalanceBelowAuthThreshold(apiKey.User.Balance, cfg) {
-				abortWithGoogleError(c, 403, "Insufficient account balance")
-				return
-			}
+		}
+		if subscription != nil {
+			c.Set(string(ContextKeySubscription), subscription)
 		}
 
 		c.Set(string(ContextKeyAPIKey), apiKey)

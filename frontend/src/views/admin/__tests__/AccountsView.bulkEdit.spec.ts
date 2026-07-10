@@ -10,6 +10,7 @@ const {
   getAllProxies,
   getAllGroups,
   generateCheckoutLink,
+  getAccessToken,
   livenessCheck,
   copyToClipboard,
   showSuccess,
@@ -22,6 +23,7 @@ const {
   getAllProxies: vi.fn(),
   getAllGroups: vi.fn(),
   generateCheckoutLink: vi.fn(),
+  getAccessToken: vi.fn(),
   livenessCheck: vi.fn(),
   copyToClipboard: vi.fn(),
   showSuccess: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock('@/api/admin', () => ({
       batchRefresh: vi.fn(),
       toggleSchedulable: vi.fn(),
       generateCheckoutLink,
+      getAccessToken,
       livenessCheck
     },
     proxies: {
@@ -130,6 +133,7 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockReset()
     getAllGroups.mockReset()
     generateCheckoutLink.mockReset()
+    getAccessToken.mockReset()
     livenessCheck.mockReset()
     copyToClipboard.mockReset()
     showSuccess.mockReset()
@@ -153,6 +157,7 @@ describe('admin AccountsView bulk edit scope', () => {
     getAllProxies.mockResolvedValue([])
     getAllGroups.mockResolvedValue([])
     generateCheckoutLink.mockResolvedValue('https://chatgpt.com/checkout/example')
+    getAccessToken.mockResolvedValue('account-access-token')
     livenessCheck.mockResolvedValue({
       total: 0,
       completed: 0,
@@ -424,6 +429,7 @@ describe('admin AccountsView bulk edit scope', () => {
   })
 
   it('shows a clear error when the account has no access token to copy', async () => {
+    getAccessToken.mockResolvedValueOnce('')
     const AccountActionMenuWithoutTokenStub = {
       emits: ['copy-access-token'],
       template: '<button data-test="copy-access-token" @click="$emit(\'copy-access-token\', { id: 42, credentials: {} })">copy</button>'
