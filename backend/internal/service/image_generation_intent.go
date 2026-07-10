@@ -249,35 +249,6 @@ func isImageGenNamespaceTool(tool gjson.Result) bool {
 		openAIJSONString(tool.Get("name")) == "image_gen"
 }
 
-// openAIJSONInputContainsImageGenTool scans Responses input items for
-// additional_tools entries that declare the image_gen namespace. This covers
-// the "Responses Lite" format where tools are embedded inside input items
-// rather than top-level tools.
-func openAIJSONInputContainsImageGenTool(input gjson.Result) bool {
-	if !input.IsArray() {
-		return false
-	}
-	found := false
-	input.ForEach(func(_, item gjson.Result) bool {
-		if openAIJSONString(item.Get("type")) != "additional_tools" {
-			return true
-		}
-		tools := item.Get("tools")
-		if !tools.IsArray() {
-			return true
-		}
-		tools.ForEach(func(_, tool gjson.Result) bool {
-			if isImageGenNamespaceTool(tool) {
-				found = true
-				return false
-			}
-			return true
-		})
-		return !found
-	})
-	return found
-}
-
 func openAIRequestBodyHasImageGenerationTool(body []byte) bool {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return false
