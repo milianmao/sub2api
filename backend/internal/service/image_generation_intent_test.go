@@ -79,6 +79,20 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			want:     true,
 		},
 		{
+			name:     "namespace image_gen tool choice",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.5",
+			body:     []byte(`{"model":"gpt-5.5","tool_choice":{"type":"namespace","name":"image_gen"}}`),
+			want:     true,
+		},
+		{
+			name:     "custom imagegen function tool choice is not image intent",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.5",
+			body:     []byte(`{"model":"gpt-5.5","tool_choice":{"function":{"name":"imagegen"}}}`),
+			want:     false,
+		},
+		{
 			name:     "required tool choice alone is text",
 			endpoint: "/v1/responses",
 			model:    "gpt-5.4",
@@ -100,7 +114,14 @@ func TestIsImageGenerationIntent(t *testing.T) {
 			want:     true,
 		},
 		{
-			name:     "namespace image_gen in input additional_tools",
+			name:     "custom namespace with nested imagegen function is not image intent",
+			endpoint: "/v1/responses",
+			model:    "gpt-5.5",
+			body:     []byte(`{"model":"gpt-5.5","tools":[{"type":"namespace","name":"media_tools","tools":[{"type":"function","name":"imagegen"}]}]}`),
+			want:     false,
+		},
+		{
+			name:     "namespace image_gen in input additional_tools (Responses Lite)",
 			endpoint: "/v1/responses",
 			model:    "gpt-5.5",
 			body:     []byte(`{"model":"gpt-5.5","input":[{"type":"additional_tools","role":"developer","tools":[{"type":"namespace","name":"image_gen","tools":[{"type":"function","name":"imagegen"}]}]}]}`),
@@ -185,6 +206,40 @@ func TestIsImageGenerationIntentMapNamespaceImageGen(t *testing.T) {
 				},
 			},
 			want: true,
+		},
+		{
+			name: "custom namespace with nested imagegen function is not image intent",
+			reqBody: map[string]any{
+				"model": "gpt-5.5",
+				"tools": []any{
+					map[string]any{
+						"type": "namespace",
+						"name": "media_tools",
+						"tools": []any{
+							map[string]any{"type": "function", "name": "imagegen"},
+						},
+					},
+				},
+			},
+			want: false,
+		},
+		{
+			name: "namespace image_gen tool choice",
+			reqBody: map[string]any{
+				"model":       "gpt-5.5",
+				"tool_choice": map[string]any{"type": "namespace", "name": "image_gen"},
+			},
+			want: true,
+		},
+		{
+			name: "custom imagegen function tool choice is not image intent",
+			reqBody: map[string]any{
+				"model": "gpt-5.5",
+				"tool_choice": map[string]any{
+					"function": map[string]any{"name": "imagegen"},
+				},
+			},
+			want: false,
 		},
 		{
 			name: "non-image namespace not flagged",

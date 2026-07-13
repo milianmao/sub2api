@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 16 // v16: authorized groups plus batch image, video pricing, and account eligibility fields
+const apiKeyAuthSnapshotVersion = 17 // v17: preserve web search pricing in single and authorized group snapshots
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -299,6 +299,7 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		VideoPrice480P:                  cloneAPIKeyAuthFloat64Ptr(group.VideoPrice480P),
 		VideoPrice720P:                  cloneAPIKeyAuthFloat64Ptr(group.VideoPrice720P),
 		VideoPrice1080P:                 cloneAPIKeyAuthFloat64Ptr(group.VideoPrice1080P),
+		WebSearchPricePerCall:           cloneAPIKeyAuthFloat64Ptr(group.WebSearchPricePerCall),
 		ClaudeCodeOnly:                  group.ClaudeCodeOnly,
 		FallbackGroupID:                 cloneAPIKeyAuthInt64Ptr(group.FallbackGroupID),
 		FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(group.FallbackGroupIDOnInvalidRequest),
@@ -355,6 +356,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		VideoPrice480P:                  cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice480P),
 		VideoPrice720P:                  cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice720P),
 		VideoPrice1080P:                 cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice1080P),
+		WebSearchPricePerCall:           cloneAPIKeyAuthFloat64Ptr(snapshot.WebSearchPricePerCall),
 		ClaudeCodeOnly:                  snapshot.ClaudeCodeOnly,
 		FallbackGroupID:                 cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupID),
 		FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupIDOnInvalidRequest),
