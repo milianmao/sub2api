@@ -176,16 +176,35 @@ func openAIResponsesBodyHasImageGenerationIntent(body []byte) bool {
 	if len(body) == 0 || !gjson.ValidBytes(body) {
 		return false
 	}
-	if model := strings.TrimSpace(gjson.GetBytes(body, "model").String()); isOpenAIImageGenerationModel(model) {
-		return true
-	}
-	if openAIJSONToolsContainImageGeneration(gjson.GetBytes(body, "tools")) {
-		return true
-	}
-	if openAIJSONToolChoiceSelectsImageGeneration(gjson.GetBytes(body, "tool_choice")) {
-		return true
-	}
-	return openAIJSONValueHasImageGenerationIntent(gjson.ParseBytes(body))
+
+	seen := make(map[string]struct{}, 8)
+	imageIntent := false
+	parseRawJSONView(body).ForEach(func(key, value gjson.Result) bool {
+		if _, alreadySeen := seen[key.Str]; alreadySeen {
+			return true
+		}
+		seen[key.Str] = struct{}{}
+
+		switch key.Str {
+		case "model":
+			imageIntent = isOpenAIImageGenerationModel(strings.TrimSpace(value.String()))
+		case "tools":
+			imageIntent = openAIJSONToolsContainImageGeneration(value) || openAIJSONValueHasImageGenerationIntent(value)
+		case "input":
+			imageIntent = openAIJSONInputContainsImageGenTool(value) || openAIJSONValueHasImageGenerationIntent(value)
+		case "tool_choice":
+			imageIntent = openAIJSONToolChoiceSelectsImageGeneration(value) || openAIJSONValueHasImageGenerationIntent(value)
+		case "type", "recipient", "name":
+			imageIntent = isOpenAIImageIntentToken(openAIJSONString(value))
+		case "modalities", "output_modalities", "response_modalities":
+			imageIntent = openAIJSONModalitiesContainImage(value)
+		default:
+			// Scan unrelated values without revisiting duplicate top-level fields.
+			imageIntent = openAIJSONValueHasImageGenerationIntent(value)
+		}
+		return !imageIntent
+	})
+	return imageIntent
 }
 
 func openAIResponsesMapHasImageGenerationIntent(reqBody map[string]any) bool {
