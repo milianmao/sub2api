@@ -36,6 +36,7 @@ import microsoftEmailsAPI from './microsoftEmails'
 import cardMailboxesAPI from './cardMailboxes'
 import chatgptPlusCheckoutAPI from './chatgptPlusCheckout'
 import adminComplianceAPI from './compliance'
+import auditAPI from './audit'
 
 /**
  * Unified admin API object for convenient access
@@ -73,7 +74,8 @@ export const adminAPI = {
   microsoftEmails: microsoftEmailsAPI,
   cardMailboxes: cardMailboxesAPI,
   chatgptPlusCheckout: chatgptPlusCheckoutAPI,
-  compliance: adminComplianceAPI
+  compliance: adminComplianceAPI,
+  audit: auditAPI
 }
 
 export {
@@ -109,12 +111,14 @@ export {
   microsoftEmailsAPI,
   cardMailboxesAPI,
   chatgptPlusCheckoutAPI,
-  adminComplianceAPI
+  adminComplianceAPI,
+  auditAPI
 }
 
 export default adminAPI
 
 // Re-export types used by components
+export type { AuditLog, AuditLogQuery, AuditLogListResponse } from './audit'
 export type { BalanceHistoryItem } from './users'
 export type { ErrorPassthroughRule, CreateRuleRequest, UpdateRuleRequest } from './errorPassthrough'
 export type { BackupAgentHealth, DataManagementConfig } from './dataManagement'

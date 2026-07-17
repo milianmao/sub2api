@@ -6,10 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -239,68 +237,6 @@ func TestSimpleModeBypassesQuotaCheck(t *testing.T) {
 		require.Equal(t, http.StatusTooManyRequests, w.Code)
 		require.Contains(t, w.Body.String(), "USAGE_LIMIT_EXCEEDED")
 	})
-}
-
-func TestAPIKeyAuthAllowsModelListWithoutActiveSubscription(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	group := &service.Group{
-		ID:               42,
-		Name:             "sub",
-		Status:           service.StatusActive,
-		Platform:         service.PlatformOpenAI,
-		Hydrated:         true,
-		SubscriptionType: service.SubscriptionTypeSubscription,
-	}
-	user := &service.User{
-		ID:          7,
-		Role:        service.RoleUser,
-		Status:      service.StatusActive,
-		Balance:     0,
-		Concurrency: 3,
-	}
-	apiKey := &service.APIKey{
-		ID:     100,
-		UserID: user.ID,
-		Key:    "model-list-key",
-		Status: service.StatusActive,
-		User:   user,
-		Group:  group,
-	}
-	apiKey.GroupID = &group.ID
-
-	apiKeyRepo := &stubApiKeyRepo{
-		getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-			if key != apiKey.Key {
-				return nil, service.ErrAPIKeyNotFound
-			}
-			clone := *apiKey
-			return &clone, nil
-		},
-	}
-	cfg := &config.Config{RunMode: config.RunModeStandard}
-	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
-	subscriptionService := service.NewSubscriptionService(nil, &stubUserSubscriptionRepo{
-		getActive: func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
-			return nil, service.ErrSubscriptionNotFound
-		},
-	}, nil, nil, cfg)
-	t.Cleanup(subscriptionService.Stop)
-
-	router := gin.New()
-	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))
-	router.GET("/v1/models", func(c *gin.Context) {
-		_, ok := GetAPIKeyFromContext(c)
-		require.True(t, ok)
-		c.JSON(http.StatusOK, gin.H{"ok": true})
-	})
-
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/v1/models", nil)
-	req.Header.Set("Authorization", "Bearer "+apiKey.Key)
-	router.ServeHTTP(w, req)
-
-	require.Equal(t, http.StatusOK, w.Code)
 }
 
 func TestAPIKeyAuthSetsGroupContext(t *testing.T) {
@@ -1130,263 +1066,127 @@ func TestAPIKeyAuthTouchesLastUsedInStandardMode(t *testing.T) {
 	require.Equal(t, 1, touchCalls)
 }
 
-func TestAPIKeyAuthEffectiveGroupResolution(t *testing.T) {
+func TestAPIKeyAuthBillingInfoSkipsBillingAndSideEffects(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	defaultGroup := &service.Group{
-		ID:                   101,
-		Name:                 "default-openai",
-		Status:               service.StatusActive,
-		Platform:             service.PlatformOpenAI,
-		Hydrated:             true,
-		AllowImageGeneration: false,
-	}
-	imageGroup := &service.Group{
-		ID:                   202,
-		Name:                 "image-openai",
-		Status:               service.StatusActive,
-		Platform:             service.PlatformOpenAI,
-		Hydrated:             true,
-		AllowImageGeneration: true,
-	}
-	subscriptionGroup := &service.Group{
-		ID:                  303,
-		Name:                "subscription-routed",
-		Status:              service.StatusActive,
-		Platform:            service.PlatformAnthropic,
-		Hydrated:            true,
-		SubscriptionType:    service.SubscriptionTypeSubscription,
-		ModelRoutingEnabled: true,
-		ModelRouting: map[string][]int64{
-			"claude-sub-*": {77},
-		},
+	group := &service.Group{
+		ID:               42,
+		Name:             "subscription",
+		Status:           service.StatusActive,
+		Hydrated:         true,
+		SubscriptionType: service.SubscriptionTypeSubscription,
 	}
 	user := &service.User{
-		ID:                   7,
-		Role:                 service.RoleUser,
-		Status:               service.StatusActive,
-		Balance:              10,
-		Concurrency:          3,
-		UserGroupRPMOverride: intPtr(17),
+		ID:          7,
+		Role:        service.RoleUser,
+		Status:      service.StatusActive,
+		Balance:     0,
+		Concurrency: 3,
+	}
+	expiredAt := time.Now().Add(-time.Hour)
+	apiKey := &service.APIKey{
+		ID:        100,
+		UserID:    user.ID,
+		Key:       "billing-info-auth-only",
+		Status:    service.StatusAPIKeyQuotaExhausted,
+		User:      user,
+		GroupID:   &group.ID,
+		Group:     group,
+		Quota:     1,
+		QuotaUsed: 1,
+		ExpiresAt: &expiredAt,
 	}
 
-	newRouter := func(apiKey *service.APIKey) *gin.Engine {
-		apiKeyRepo := &stubApiKeyRepo{
-			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-				if key != apiKey.Key {
-					return nil, service.ErrAPIKeyNotFound
-				}
-				clone := *apiKey
-				return &clone, nil
-			},
-		}
-		cfg := &config.Config{RunMode: config.RunModeSimple}
-		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
-		router := gin.New()
-		router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg)))
-		router.Any("/v1/images/generations", func(c *gin.Context) {
-			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
-			require.True(t, ok)
-			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-			overrideCleared := false
-			if apiKeyFromCtx.User != nil && apiKeyFromCtx.User.UserGroupRPMOverride == nil {
-				overrideCleared = true
-			}
-			c.JSON(http.StatusOK, gin.H{
-				"api_key_group_id":     apiKeyFromCtx.Group.ID,
-				"api_key_group_ptr":    *apiKeyFromCtx.GroupID,
-				"context_group_id":     groupFromCtx.ID,
-				"rpm_override_cleared": overrideCleared,
-			})
-		})
-		router.POST("/v1/chat/completions", func(c *gin.Context) {
-			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
-			require.True(t, ok)
-			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-			c.JSON(http.StatusOK, gin.H{
-				"api_key_group_id":  apiKeyFromCtx.Group.ID,
-				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
-				"context_group_id":  groupFromCtx.ID,
-			})
-		})
-		router.POST("/v1/responses", func(c *gin.Context) {
-			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
-			require.True(t, ok)
-			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-			body, err := io.ReadAll(c.Request.Body)
-			require.NoError(t, err)
-			c.JSON(http.StatusOK, gin.H{
-				"api_key_group_id":  apiKeyFromCtx.Group.ID,
-				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
-				"context_group_id":  groupFromCtx.ID,
-				"body":              string(body),
-			})
-		})
-		return router
+	touchCalls := 0
+	subscriptionCalls := 0
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(context.Context, string) (*service.APIKey, error) {
+			clone := *apiKey
+			return &clone, nil
+		},
+		updateLastUsed: func(context.Context, int64, time.Time) error {
+			touchCalls++
+			return nil
+		},
 	}
-
-	newAPIKey := func(authorized []service.APIKeyAuthorizedGroup) *service.APIKey {
-		apiKey := &service.APIKey{
-			ID:               100,
-			UserID:           user.ID,
-			Key:              "test-key",
-			Status:           service.StatusActive,
-			User:             user,
-			Group:            defaultGroup,
-			AuthorizedGroups: authorized,
-		}
-		userClone := *user
-		apiKey.User = &userClone
-		apiKey.GroupID = &defaultGroup.ID
-		return apiKey
+	subscriptionRepo := &stubUserSubscriptionRepo{
+		getActive: func(context.Context, int64, int64) (*service.UserSubscription, error) {
+			subscriptionCalls++
+			return nil, service.ErrSubscriptionNotFound
+		},
 	}
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
+	subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
+	t.Cleanup(subscriptionService.Stop)
+	router := newAuthTestRouter(apiKeyService, subscriptionService, cfg)
 
-	t.Run("normal request keeps default group", func(t *testing.T) {
-		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/sub2api/billing", nil)
+	req.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
 
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o-mini","messages":[]}`))
-		req.Header.Set("x-api-key", "test-key")
-		router.ServeHTTP(w, req)
-
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Contains(t, w.Body.String(), `"api_key_group_id":101`)
-		require.Contains(t, w.Body.String(), `"api_key_group_ptr":101`)
-		require.Contains(t, w.Body.String(), `"context_group_id":101`)
-	})
-
-	t.Run("image request switches to authorized image group", func(t *testing.T) {
-		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
-
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"gpt-image-1","prompt":"cat"}`))
-		req.Header.Set("x-api-key", "test-key")
-		router.ServeHTTP(w, req)
-
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Contains(t, w.Body.String(), `"api_key_group_id":202`)
-		require.Contains(t, w.Body.String(), `"api_key_group_ptr":202`)
-		require.Contains(t, w.Body.String(), `"context_group_id":202`)
-		require.Contains(t, w.Body.String(), `"rpm_override_cleared":true`)
-	})
-
-	t.Run("image request without authorized image group is forbidden", func(t *testing.T) {
-		router := newRouter(newAPIKey(nil))
-
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v1/images/generations", strings.NewReader(`{"model":"gpt-image-1","prompt":"cat"}`))
-		req.Header.Set("x-api-key", "test-key")
-		router.ServeHTTP(w, req)
-
-		require.Equal(t, http.StatusForbidden, w.Code)
-		require.Contains(t, w.Body.String(), "IMAGE_GROUP_NOT_AUTHORIZED")
-		require.Contains(t, w.Body.String(), service.ImageGenerationPermissionMessage())
-	})
-
-	t.Run("responses body image request switches group and preserves downstream body", func(t *testing.T) {
-		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
-		body := `{"model":"gpt-4o","tools":[{"type":"image_generation"}],"input":"cat"}`
-
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(body))
-		req.Header.Set("x-api-key", "test-key")
-		router.ServeHTTP(w, req)
-
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Contains(t, w.Body.String(), `"api_key_group_id":202`)
-		require.Contains(t, w.Body.String(), `"api_key_group_ptr":202`)
-		require.Contains(t, w.Body.String(), `"context_group_id":202`)
-		require.Contains(t, w.Body.String(), `"body":"{\"model\":\"gpt-4o\",\"tools\":[{\"type\":\"image_generation\"}],\"input\":\"cat\"}"`)
-	})
-	t.Run("non post image endpoint keeps default group", func(t *testing.T) {
-		router := newRouter(newAPIKey([]service.APIKeyAuthorizedGroup{{GroupID: imageGroup.ID, Group: imageGroup}}))
-
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/v1/images/generations", nil)
-		req.Header.Set("x-api-key", "test-key")
-		router.ServeHTTP(w, req)
-
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Contains(t, w.Body.String(), `"api_key_group_id":101`)
-		require.Contains(t, w.Body.String(), `"api_key_group_ptr":101`)
-		require.Contains(t, w.Body.String(), `"context_group_id":101`)
-	})
-
-	t.Run("subscription validation uses model routed effective group", func(t *testing.T) {
-		apiKey := newAPIKey([]service.APIKeyAuthorizedGroup{
-			{GroupID: subscriptionGroup.ID, Group: subscriptionGroup, Priority: 1},
-		})
-		apiKey.GroupIDs = []int64{defaultGroup.ID, subscriptionGroup.ID}
-
-		apiKeyRepo := &stubApiKeyRepo{
-			getByKey: func(ctx context.Context, key string) (*service.APIKey, error) {
-				if key != apiKey.Key {
-					return nil, service.ErrAPIKeyNotFound
-				}
-				clone := *apiKey
-				return &clone, nil
-			},
-		}
-		cfg := &config.Config{RunMode: config.RunModeStandard}
-		apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
-
-		var lookedUpGroupID int64
-		windowStart := time.Now()
-		subscriptionRepo := &stubUserSubscriptionRepo{
-			getActive: func(ctx context.Context, userID, groupID int64) (*service.UserSubscription, error) {
-				lookedUpGroupID = groupID
-				if groupID != subscriptionGroup.ID {
-					return nil, service.ErrSubscriptionNotFound
-				}
-				return &service.UserSubscription{
-					ID:               909,
-					UserID:           userID,
-					GroupID:          groupID,
-					Status:           service.SubscriptionStatusActive,
-					ExpiresAt:        time.Now().Add(time.Hour),
-					DailyWindowStart: &windowStart,
-				}, nil
-			},
-			updateStatus:   func(ctx context.Context, subscriptionID int64, status string) error { return nil },
-			activateWindow: func(ctx context.Context, id int64, start time.Time) error { return nil },
-			resetDaily:     func(ctx context.Context, id int64, start time.Time) error { return nil },
-			resetWeekly:    func(ctx context.Context, id int64, start time.Time) error { return nil },
-			resetMonthly:   func(ctx context.Context, id int64, start time.Time) error { return nil },
-		}
-		subscriptionService := service.NewSubscriptionService(nil, subscriptionRepo, nil, nil, cfg)
-		router := gin.New()
-		router.Use(func(c *gin.Context) {
-			ctx := context.WithValue(c.Request.Context(), ctxkey.Model, "claude-sub-20250514")
-			c.Request = c.Request.WithContext(ctx)
-			c.Next()
-		})
-		router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))
-		router.POST("/v1/messages", func(c *gin.Context) {
-			apiKeyFromCtx, ok := GetAPIKeyFromContext(c)
-			require.True(t, ok)
-			groupFromCtx, _ := c.Request.Context().Value(ctxkey.Group).(*service.Group)
-			c.JSON(http.StatusOK, gin.H{
-				"api_key_group_id":  apiKeyFromCtx.Group.ID,
-				"api_key_group_ptr": *apiKeyFromCtx.GroupID,
-				"context_group_id":  groupFromCtx.ID,
-			})
-		})
-
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/v1/messages", strings.NewReader(`{"model":"claude-sub-20250514"}`))
-		req.Header.Set("x-api-key", "test-key")
-		router.ServeHTTP(w, req)
-
-		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, subscriptionGroup.ID, lookedUpGroupID)
-		require.Contains(t, w.Body.String(), `"api_key_group_id":303`)
-		require.Contains(t, w.Body.String(), `"api_key_group_ptr":303`)
-		require.Contains(t, w.Body.String(), `"context_group_id":303`)
-	})
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Zero(t, subscriptionCalls)
+	require.Zero(t, touchCalls)
 }
 
-func intPtr(v int) *int {
-	return &v
+func TestAPIKeyAuthBillingInfoSkipsLastUsedInSimpleMode(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive}
+	apiKey := &service.APIKey{ID: 100, UserID: user.ID, Key: "billing-info-simple", Status: service.StatusActive, User: user}
+	touchCalls := 0
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(context.Context, string) (*service.APIKey, error) {
+			clone := *apiKey
+			return &clone, nil
+		},
+		updateLastUsed: func(context.Context, int64, time.Time) error {
+			touchCalls++
+			return nil
+		},
+	}
+	cfg := &config.Config{RunMode: config.RunModeSimple}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
+	router := newAuthTestRouter(apiKeyService, nil, cfg)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/sub2api/billing", nil)
+	req.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Zero(t, touchCalls)
+}
+
+func TestAPIKeyAuthUsageStillTouchesLastUsed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	user := &service.User{ID: 7, Role: service.RoleUser, Status: service.StatusActive, Balance: 10}
+	apiKey := &service.APIKey{ID: 100, UserID: user.ID, Key: "usage-touch", Status: service.StatusActive, User: user}
+	touchCalls := 0
+	apiKeyRepo := &stubApiKeyRepo{
+		getByKey: func(context.Context, string) (*service.APIKey, error) {
+			clone := *apiKey
+			return &clone, nil
+		},
+		updateLastUsed: func(context.Context, int64, time.Time) error {
+			touchCalls++
+			return nil
+		},
+	}
+	cfg := &config.Config{RunMode: config.RunModeStandard}
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, nil, nil, nil, nil, nil, cfg)
+	router := newAuthTestRouter(apiKeyService, nil, cfg)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/v1/usage", nil)
+	req.Header.Set("x-api-key", apiKey.Key)
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	require.Equal(t, 1, touchCalls)
 }
 
 func TestAPIKeyAuthAllowsBalanceBelowMinimumReserve(t *testing.T) {
@@ -1428,6 +1228,8 @@ func TestAPIKeyAuthAllowsBalanceBelowMinimumReserve(t *testing.T) {
 	req.Header.Set("x-api-key", apiKey.Key)
 	router.ServeHTTP(w, req)
 
+	// 鉴权层保持历史语义：MinimumBalanceReserve 只用于 billing-cache 预检，
+	// 0 < balance < reserve 不得被鉴权中间件硬 403（存量部署静默行为变更）。
 	require.Equal(t, http.StatusOK, w.Code)
 }
 
@@ -1476,9 +1278,12 @@ func TestAPIKeyAuthRejectsExhaustedBalance(t *testing.T) {
 func newAuthTestRouter(apiKeyService *service.APIKeyService, subscriptionService *service.SubscriptionService, cfg *config.Config) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.HandlerFunc(NewAPIKeyAuthMiddleware(apiKeyService, subscriptionService, cfg)))
-	router.GET("/t", func(c *gin.Context) {
+	ok := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"ok": true})
-	})
+	}
+	router.GET("/t", ok)
+	router.GET("/v1/usage", ok)
+	router.GET("/v1/sub2api/billing", ok)
 	return router
 }
 

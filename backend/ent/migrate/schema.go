@@ -927,6 +927,7 @@ var (
 		{Name: "access_mode", Type: field.TypeString, Size: 20, Default: "public"},
 		{Name: "min_user_level", Type: field.TypeInt, Default: 0},
 		{Name: "status", Type: field.TypeString, Size: 20, Default: "active"},
+		{Name: "duplicate_operation_id", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "platform", Type: field.TypeString, Size: 50, Default: "anthropic"},
 		{Name: "subscription_type", Type: field.TypeString, Size: 20, Default: "standard"},
 		{Name: "daily_limit_usd", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,8)"}},
@@ -980,12 +981,12 @@ var (
 			{
 				Name:    "group_platform",
 				Unique:  false,
-				Columns: []*schema.Column{GroupsColumns[15]},
+				Columns: []*schema.Column{GroupsColumns[16]},
 			},
 			{
 				Name:    "group_subscription_type",
 				Unique:  false,
-				Columns: []*schema.Column{GroupsColumns[16]},
+				Columns: []*schema.Column{GroupsColumns[17]},
 			},
 			{
 				Name:    "group_is_exclusive",
@@ -1010,7 +1011,15 @@ var (
 			{
 				Name:    "group_sort_order",
 				Unique:  false,
-				Columns: []*schema.Column{GroupsColumns[43]},
+				Columns: []*schema.Column{GroupsColumns[44]},
+			},
+			{
+				Name:    "idx_groups_duplicate_operation_id_active",
+				Unique:  true,
+				Columns: []*schema.Column{GroupsColumns[15]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "duplicate_operation_id IS NOT NULL AND deleted_at IS NULL",
+				},
 			},
 		},
 	}
@@ -1584,6 +1593,7 @@ var (
 		{Name: "description", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
 		{Name: "price", Type: field.TypeFloat64, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
 		{Name: "original_price", Type: field.TypeFloat64, Nullable: true, SchemaType: map[string]string{"postgres": "decimal(20,2)"}},
+		{Name: "currency", Type: field.TypeString, Size: 3, Default: ""},
 		{Name: "validity_days", Type: field.TypeInt, Default: 30},
 		{Name: "validity_unit", Type: field.TypeString, Size: 10, Default: "day"},
 		{Name: "features", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "text"}},
@@ -1607,7 +1617,7 @@ var (
 			{
 				Name:    "subscriptionplan_for_sale",
 				Unique:  false,
-				Columns: []*schema.Column{SubscriptionPlansColumns[10]},
+				Columns: []*schema.Column{SubscriptionPlansColumns[11]},
 			},
 		},
 	}

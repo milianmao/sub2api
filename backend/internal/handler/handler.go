@@ -40,6 +40,7 @@ type AdminHandlers struct {
 	MicrosoftEmail         *admin.MicrosoftEmailHandler
 	CardMailbox            *admin.CardMailboxHandler
 	Compliance             *admin.ComplianceHandler
+	AuditLog               *admin.AuditLogHandler
 }
 
 // Handlers contains all HTTP handlers
@@ -60,6 +61,7 @@ type Handlers struct {
 	Payment          *PaymentHandler
 	PaymentWebhook   *PaymentWebhookHandler
 	AvailableChannel *AvailableChannelHandler
+	AsyncImage       *AsyncImageHandler
 	BatchImage       *BatchImageHandler
 }
 
