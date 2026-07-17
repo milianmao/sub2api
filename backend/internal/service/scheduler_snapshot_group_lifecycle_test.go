@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ptrInt64(value int64) *int64 {
+	return &value
+}
+
 type groupLifecycleTestCache struct {
 	*retirementRaceCache
 

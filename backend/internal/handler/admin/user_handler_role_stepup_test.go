@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/server/middleware"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,10 @@ func setupRoleStepUpRouter(t *testing.T) (*gin.Engine, *stubAdminService) {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set(string(middleware.ContextKeyUserRole), service.RoleSuperAdmin)
+		c.Next()
+	})
 	adminSvc := newStubAdminService()
 	// 追加一个已是管理员的目标用户，验证「目标已是 admin 不触发门控」。
 	adminSvc.users = append(adminSvc.users, service.User{
