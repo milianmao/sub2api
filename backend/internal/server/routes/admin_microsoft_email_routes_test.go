@@ -25,6 +25,10 @@ func TestRegisterAdminRoutes_RegistersMicrosoftEmailRoutesWithoutBatchFetchCode(
 
 	RegisterAdminRoutes(v1, h, middleware.AdminAuthMiddleware(func(c *gin.Context) {
 		c.Next()
+	}), middleware.AuditLogMiddleware(func(c *gin.Context) {
+		c.Next()
+	}), middleware.StepUpAuthMiddleware(func(c *gin.Context) {
+		c.Next()
 	}), nil)
 
 	for _, tc := range []struct {

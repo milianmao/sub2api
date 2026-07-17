@@ -34,6 +34,7 @@ func setupChatGPTSessionImportRouter() (*gin.Engine, *stubAdminService) {
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 
 	router.POST("/api/v1/admin/accounts/import/chatgpt-session", h.ImportChatGPTSession)

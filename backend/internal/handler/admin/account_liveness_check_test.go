@@ -93,7 +93,7 @@ func (r livenessTestRunner) RunTestBackground(_ context.Context, accountID int64
 func setupLivenessRouter(adminSvc service.AdminService, runner accountLivenessTestRunner) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	handler.accountLivenessTestRunner = runner
 	router.POST("/api/v1/admin/accounts/liveness-check", handler.LivenessCheck)
 	return router

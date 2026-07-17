@@ -336,6 +336,7 @@ func TestImportDataPayloadAppliesImportOptions(t *testing.T) {
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 
 	notes := "imported-notes"

@@ -33,11 +33,16 @@ func TestRegisterAdminRoutes_RegistersChatGPTSessionImportRoute(t *testing.T) {
 				nil,
 				nil,
 				nil,
+				nil,
 			),
 		},
 	}
 
 	RegisterAdminRoutes(v1, h, middleware.AdminAuthMiddleware(func(c *gin.Context) {
+		c.Next()
+	}), middleware.AuditLogMiddleware(func(c *gin.Context) {
+		c.Next()
+	}), middleware.StepUpAuthMiddleware(func(c *gin.Context) {
 		c.Next()
 	}), nil)
 

@@ -28,7 +28,7 @@ func (s *accessTokenAdminService) GetAccount(_ context.Context, id int64) (*serv
 func setupAccessTokenRouter(adminSvc service.AdminService) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	handler := NewAccountHandler(adminSvc, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	router.GET("/api/v1/admin/accounts/:id/access-token", handler.GetAccessToken)
 	return router
 }

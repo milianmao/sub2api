@@ -650,6 +650,9 @@ func (s *stubUserRepoForGroupAuth) UpdateConcurrency(context.Context, int64, int
 func (s *stubUserRepoForGroupAuth) BatchSetConcurrency(context.Context, []int64, int) (int, error) {
 	panic("unexpected BatchSetConcurrency call")
 }
+func (s *stubUserRepoForGroupAuth) BatchUpdateLimits(context.Context, []int64, *int, *int) (int, error) {
+	panic("unexpected BatchUpdateLimits call")
+}
 func (s *stubUserRepoForGroupAuth) BatchAddConcurrency(context.Context, []int64, int) (int, error) {
 	panic("unexpected BatchAddConcurrency call")
 }
