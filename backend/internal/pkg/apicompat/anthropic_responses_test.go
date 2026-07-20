@@ -402,7 +402,7 @@ func TestAnthropicToResponses_DeepSeekReasoningContentIsNotOutputText(t *testing
 			{Type: "thinking", ReasoningContent: "private reasoning"},
 			{Type: "text", Text: "visible answer"},
 		},
-		StopReason: "end_turn",
+		StopReason: AnthropicStopReasonPtr("end_turn"),
 	}
 
 	out := AnthropicToResponsesResponse(resp)
