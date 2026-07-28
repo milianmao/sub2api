@@ -4306,7 +4306,6 @@ import type {
   CompositeRouteDecision,
   CompositeRouteEndpoint,
   CompositeRouteMatchType,
-  GroupPlatform,
   SubscriptionType,
 } from "@/types";
 import type { Column } from "@/components/common/types";
