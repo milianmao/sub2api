@@ -662,6 +662,9 @@ func (s *stubUserRepoForGroupAuth) BatchAddConcurrency(context.Context, []int64,
 func (s *stubUserRepoForGroupAuth) ExistsByEmail(context.Context, string) (bool, error) {
 	panic("unexpected ExistsByEmail call")
 }
+func (s *stubUserRepoForGroupAuth) ExistsByEmailAlias(context.Context, string) (bool, error) {
+	panic("unexpected ExistsByEmailAlias call")
+}
 func (s *stubUserRepoForGroupAuth) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {
 	panic("unexpected RemoveGroupFromAllowedGroups call")
 }
