@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 17 // v17: preserve web search pricing in single and authorized group snapshots
+const apiKeyAuthSnapshotVersion = 17 // v17: preserve group pricing and OpenAI Live configuration
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -439,6 +439,7 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		SupportedModelScopes:            cloneAPIKeyAuthStringSlice(group.SupportedModelScopes),
 		AllowMessagesDispatch:           group.AllowMessagesDispatch,
 		AllowOpenAICompat:               group.AllowOpenAICompat,
+		AllowLive:                       group.AllowLive,
 		RequireOAuthOnly:                group.RequireOAuthOnly,
 		RequirePrivacySet:               group.RequirePrivacySet,
 		DefaultMappedModel:              group.DefaultMappedModel,
@@ -446,6 +447,8 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		OpenAIImageUpstream:             group.OpenAIImageUpstream,
 		ModelsListConfig:                group.ModelsListConfig,
 		RPMLimit:                        group.RPMLimit,
+		MaxReasoningEffort:              group.MaxReasoningEffort,
+		ReasoningEffortMappings:         cloneReasoningEffortMappings(group.ReasoningEffortMappings),
 		PeakRateEnabled:                 group.PeakRateEnabled,
 		PeakStart:                       group.PeakStart,
 		PeakEnd:                         group.PeakEnd,
@@ -496,6 +499,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		SupportedModelScopes:            cloneAPIKeyAuthStringSlice(snapshot.SupportedModelScopes),
 		AllowMessagesDispatch:           snapshot.AllowMessagesDispatch,
 		AllowOpenAICompat:               snapshot.AllowOpenAICompat,
+		AllowLive:                       snapshot.AllowLive,
 		RequireOAuthOnly:                snapshot.RequireOAuthOnly,
 		RequirePrivacySet:               snapshot.RequirePrivacySet,
 		DefaultMappedModel:              snapshot.DefaultMappedModel,
@@ -503,6 +507,8 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		OpenAIImageUpstream:             snapshot.OpenAIImageUpstream,
 		ModelsListConfig:                snapshot.ModelsListConfig,
 		RPMLimit:                        snapshot.RPMLimit,
+		MaxReasoningEffort:              snapshot.MaxReasoningEffort,
+		ReasoningEffortMappings:         cloneReasoningEffortMappings(snapshot.ReasoningEffortMappings),
 		PeakRateEnabled:                 snapshot.PeakRateEnabled,
 		PeakStart:                       snapshot.PeakStart,
 		PeakEnd:                         snapshot.PeakEnd,

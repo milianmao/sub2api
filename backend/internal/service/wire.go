@@ -681,11 +681,13 @@ func ProvideAPIKeyService(
 var ProviderSet = wire.NewSet(
 	// Core services
 	NewAuthService,
+	NewPasskeyService,
 	NewUserService,
 	ProvideAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
 	ProvideAuthCacheInvalidationWorker,
 	NewGroupService,
+	NewCompositeRouteResolver,
 	NewAccountService,
 	NewProxyService,
 	NewRedeemService,
@@ -730,6 +732,7 @@ var ProviderSet = wire.NewSet(
 	ProvideAccountUsageService,
 	ProvideAccountTestService,
 	ProvideUpstreamBillingProbeService,
+	ProvideOllamaCloudUsageService,
 	ProvideSettingService,
 	NewDataManagementService,
 	ProvideBackupService,

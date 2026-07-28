@@ -35,6 +35,9 @@ func (s *userRepoStubForGroupUpdate) AddGroupToAllowedGroups(_ context.Context, 
 }
 
 func (s *userRepoStubForGroupUpdate) Create(context.Context, *User) error { panic("unexpected") }
+func (s *userRepoStubForGroupUpdate) CreateWithEmailAliasGuard(context.Context, *User) error {
+	panic("unexpected")
+}
 func (s *userRepoStubForGroupUpdate) GetByID(_ context.Context, id int64) (*User, error) {
 	s.getByIDCalled = true
 	if s.user == nil {
@@ -86,6 +89,9 @@ func (s *userRepoStubForGroupUpdate) BatchUpdateLimits(context.Context, []int64,
 	return 0, nil
 }
 func (s *userRepoStubForGroupUpdate) ExistsByEmail(context.Context, string) (bool, error) {
+	panic("unexpected")
+}
+func (s *userRepoStubForGroupUpdate) ExistsByEmailAlias(context.Context, string) (bool, error) {
 	panic("unexpected")
 }
 func (s *userRepoStubForGroupUpdate) RemoveGroupFromAllowedGroups(context.Context, int64) (int64, error) {

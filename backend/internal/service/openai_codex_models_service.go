@@ -35,12 +35,12 @@ const (
 	codexModelsManifestRequestTimeout        = 15 * time.Second
 )
 
-// CodexModelsManifest carries the raw upstream manifest payload plus caching
-// metadata so handlers can pass both through to the client untouched.
+// CodexModelsManifest carries the client representation plus caching metadata.
 type CodexModelsManifest struct {
-	Body        []byte
-	ETag        string
-	NotModified bool
+	Body         []byte
+	ETag         string
+	upstreamETag string
+	NotModified  bool
 }
 
 type codexModelsManifestUpstreamError struct {
@@ -228,10 +228,9 @@ func (c *codexModelsManifestCache) set(key string, manifest *CodexModelsManifest
 // FetchCodexModelsManifest fetches the live Codex models manifest from either
 // the ChatGPT backend for OAuth accounts or a custom upstream for API key accounts.
 //
-// After validating the stable top-level envelope, the response body is passed
-// through verbatim. Model entries evolve with Codex client releases, so the
-// gateway deliberately avoids interpreting their fields and reflects the
-// account's real entitlements without chasing upstream schema changes.
+// After validating the stable top-level envelope, OAuth response bodies are
+// passed through verbatim. Custom API key manifests receive only the narrowly
+// scoped compatibility adjustments required by custom-provider Codex clients.
 func (s *OpenAIGatewayService) FetchCodexModelsManifest(ctx context.Context, account *Account, clientVersion, ifNoneMatch string) (*CodexModelsManifest, error) {
 	if account == nil {
 		return nil, infraerrors.New(http.StatusInternalServerError, "OPENAI_CODEX_MODELS_ACCOUNT_REQUIRED", "account is required")
@@ -421,7 +420,7 @@ func (s *OpenAIGatewayService) refreshCachedAPIKeyCodexModelsManifest(cacheKey s
 		cached, _ := s.codexModelsManifestCache.get(cacheKey, time.Now())
 		ifNoneMatch := ""
 		if cached != nil {
-			ifNoneMatch = cached.ETag
+			ifNoneMatch = cached.upstreamETag
 		}
 		manifest, err := s.fetchCodexModelsManifestUpstream(context.Background(), request, ifNoneMatch)
 		if err != nil {
@@ -504,6 +503,10 @@ func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Cont
 			retryable: isRetryableCodexModelsManifestTransportError(err),
 		}
 	}
+	upstreamBody := body
+	if request.useAPIKeyUpstream {
+		body = convertOpenAIModelListToCodexManifest(body)
+	}
 	if err := validateCodexModelsManifestEnvelope(body); err != nil {
 		return nil, &codexModelsManifestUpstreamError{
 			err: infraerrors.Newf(
@@ -515,7 +518,141 @@ func (s *OpenAIGatewayService) fetchCodexModelsManifestUpstream(ctx context.Cont
 			retryable: true,
 		}
 	}
-	return &CodexModelsManifest{Body: body, ETag: resp.Header.Get("ETag")}, nil
+	if request.useAPIKeyUpstream {
+		body, err = adjustAPIKeyCodexModelsManifest(body)
+		if err != nil {
+			return nil, &codexModelsManifestUpstreamError{
+				err: infraerrors.Newf(
+					http.StatusBadGateway,
+					"OPENAI_CODEX_MODELS_UPSTREAM_INVALID_MANIFEST",
+					"codex models manifest upstream could not be adjusted: %v",
+					err,
+				),
+				retryable: true,
+			}
+		}
+	}
+	etag := resp.Header.Get("ETag")
+	manifest := &CodexModelsManifest{Body: body, ETag: etag}
+	if request.useAPIKeyUpstream {
+		manifest.upstreamETag = etag
+		if !bytes.Equal(body, upstreamBody) {
+			manifest.ETag = codexModelsManifestBodyETag(body)
+		}
+	}
+	return manifest, nil
+}
+
+func codexModelsManifestBodyETag(body []byte) string {
+	sum := sha256.Sum256(body)
+	return fmt.Sprintf(`"%x"`, sum)
+}
+
+var apiKeyCodexModelsWithoutResponsesLite = map[string]struct{}{
+	"gpt-5.6-sol":   {},
+	"gpt-5.6-terra": {},
+	"gpt-5.6-luna":  {},
+}
+
+// adjustAPIKeyCodexModelsManifest prevents Codex from selecting Responses
+// Lite for custom API key providers. Those clients do not install web.run in
+// Lite mode, so the affected model manifests must advertise the full Responses
+// path. Return the original body when no targeted true value is present.
+func adjustAPIKeyCodexModelsManifest(body []byte) ([]byte, error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("decode JSON object: %w", err)
+	}
+	var models []json.RawMessage
+	if err := json.Unmarshal(envelope["models"], &models); err != nil {
+		return nil, fmt.Errorf("decode top-level models array: %w", err)
+	}
+
+	changed := false
+	for i, rawModel := range models {
+		var model map[string]json.RawMessage
+		if err := json.Unmarshal(rawModel, &model); err != nil || model == nil {
+			continue
+		}
+		var slug string
+		if err := json.Unmarshal(model["slug"], &slug); err != nil {
+			continue
+		}
+		if _, targeted := apiKeyCodexModelsWithoutResponsesLite[slug]; !targeted {
+			continue
+		}
+		var useResponsesLite bool
+		if err := json.Unmarshal(model["use_responses_lite"], &useResponsesLite); err != nil || !useResponsesLite {
+			continue
+		}
+		model["use_responses_lite"] = json.RawMessage("false")
+		adjusted, err := json.Marshal(model)
+		if err != nil {
+			return nil, fmt.Errorf("encode model %q: %w", slug, err)
+		}
+		models[i] = adjusted
+		changed = true
+	}
+	if !changed {
+		return body, nil
+	}
+
+	adjustedModels, err := json.Marshal(models)
+	if err != nil {
+		return nil, fmt.Errorf("encode top-level models array: %w", err)
+	}
+	envelope["models"] = adjustedModels
+	adjusted, err := json.Marshal(envelope)
+	if err != nil {
+		return nil, fmt.Errorf("encode JSON object: %w", err)
+	}
+	return adjusted, nil
+}
+
+// convertOpenAIModelListToCodexManifest rewrites a standard OpenAI
+// GET /v1/models response ({"object":"list","data":[{"id":...},...]}) into the
+// Codex manifest envelope ({"models":[{"slug":...},...]}) so custom API key
+// upstreams that only implement the standard endpoint can serve Codex model
+// discovery. Bodies that already carry a top-level models field, are not the
+// standard list shape, or yield no usable model IDs are returned unchanged so
+// envelope validation reports the original payload.
+func convertOpenAIModelListToCodexManifest(body []byte) []byte {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil || envelope == nil {
+		return body
+	}
+	if _, ok := envelope["models"]; ok {
+		return body
+	}
+	data, ok := envelope["data"]
+	if !ok {
+		return body
+	}
+	var entries []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return body
+	}
+	type codexModelEntry struct {
+		Slug string `json:"slug"`
+	}
+	models := make([]codexModelEntry, 0, len(entries))
+	for _, entry := range entries {
+		id := strings.TrimSpace(entry.ID)
+		if id == "" {
+			continue
+		}
+		models = append(models, codexModelEntry{Slug: id})
+	}
+	if len(models) == 0 {
+		return body
+	}
+	converted, err := json.Marshal(map[string][]codexModelEntry{"models": models})
+	if err != nil {
+		return body
+	}
+	return converted
 }
 
 func validateCodexModelsManifestEnvelope(body []byte) error {

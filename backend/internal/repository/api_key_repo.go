@@ -1343,6 +1343,7 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		SortOrder:                       g.SortOrder,
 		AllowMessagesDispatch:           g.AllowMessagesDispatch,
 		AllowOpenAICompat:               g.AllowOpenaiCompat,
+		AllowLive:                       g.AllowLive,
 		RequireOAuthOnly:                g.RequireOauthOnly,
 		RequirePrivacySet:               g.RequirePrivacySet,
 		DefaultMappedModel:              g.DefaultMappedModel,
@@ -1350,6 +1351,8 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		OpenAIImageUpstream:             g.OpenaiImageUpstream,
 		ModelsListConfig:                g.ModelsListConfig,
 		RPMLimit:                        g.RpmLimit,
+		MaxReasoningEffort:              g.MaxReasoningEffort,
+		ReasoningEffortMappings:         g.ReasoningEffortMappings,
 		PeakRateEnabled:                 g.PeakRateEnabled,
 		PeakStart:                       g.PeakStart,
 		PeakEnd:                         g.PeakEnd,
@@ -1401,6 +1404,7 @@ func apiKeyAuthGroupSelect(q *dbent.GroupQuery) {
 		group.FieldSupportedModelScopes,
 		group.FieldAllowMessagesDispatch,
 		group.FieldAllowOpenaiCompat,
+		group.FieldAllowLive,
 		group.FieldRequireOauthOnly,
 		group.FieldRequirePrivacySet,
 		group.FieldDefaultMappedModel,
@@ -1408,6 +1412,8 @@ func apiKeyAuthGroupSelect(q *dbent.GroupQuery) {
 		group.FieldOpenaiImageUpstream,
 		group.FieldModelsListConfig,
 		group.FieldRpmLimit,
+		group.FieldMaxReasoningEffort,
+		group.FieldReasoningEffortMappings,
 	)
 }
 
