@@ -5852,9 +5852,9 @@ const handleCreateGroup = async () => {
       requestData.image_rate_multiplier,
     );
     if (!canEditAuthorization.value) {
-      delete (requestData as Partial<typeof createForm>).access_mode;
-      delete (requestData as Partial<typeof createForm>).min_user_level;
-      delete (requestData as Partial<typeof createForm>).visible_user_ids;
+      delete (requestData as Record<string, unknown>).access_mode;
+      delete (requestData as Record<string, unknown>).min_user_level;
+      delete (requestData as Record<string, unknown>).visible_user_ids;
     } else if (requestData.access_mode === "public") {
       requestData.min_user_level = 0;
     }
@@ -6084,9 +6084,9 @@ const handleUpdateGroup = async () => {
       payload.image_rate_multiplier,
     );
     if (!canEditAuthorization.value) {
-      delete (payload as Partial<typeof editForm>).access_mode;
-      delete (payload as Partial<typeof editForm>).min_user_level;
-      delete (payload as Partial<typeof editForm>).visible_user_ids;
+      delete (payload as Record<string, unknown>).access_mode;
+      delete (payload as Record<string, unknown>).min_user_level;
+      delete (payload as Record<string, unknown>).visible_user_ids;
     } else if (payload.access_mode === "public") {
       payload.min_user_level = 0;
     }

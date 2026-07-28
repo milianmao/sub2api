@@ -29,7 +29,7 @@ func TestRegisterAdminRoutes_RegistersMicrosoftEmailRoutesWithoutBatchFetchCode(
 		c.Next()
 	}), middleware.StepUpAuthMiddleware(func(c *gin.Context) {
 		c.Next()
-	}), nil)
+	}), nil, nil)
 
 	for _, tc := range []struct {
 		method string

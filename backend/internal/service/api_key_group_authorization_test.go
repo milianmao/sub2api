@@ -591,6 +591,9 @@ type stubUserRepoForGroupAuth struct {
 func (s *stubUserRepoForGroupAuth) Create(context.Context, *User) error {
 	panic("unexpected Create call")
 }
+func (s *stubUserRepoForGroupAuth) CreateWithEmailAliasGuard(context.Context, *User) error {
+	panic("unexpected CreateWithEmailAliasGuard call")
+}
 func (s *stubUserRepoForGroupAuth) GetByID(_ context.Context, id int64) (*User, error) {
 	if user := s.users[id]; user != nil {
 		clone := *user
