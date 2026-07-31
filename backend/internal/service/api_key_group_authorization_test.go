@@ -523,7 +523,7 @@ func (s *stubAPIKeyRepoForGroupAuth) GetByKey(context.Context, string) (*APIKey,
 func (s *stubAPIKeyRepoForGroupAuth) GetByKeyForAuth(context.Context, string) (*APIKey, error) {
 	panic("unexpected GetByKeyForAuth call")
 }
-func (s *stubAPIKeyRepoForGroupAuth) Update(_ context.Context, key *APIKey) error {
+func (s *stubAPIKeyRepoForGroupAuth) Update(_ context.Context, key *APIKey, _ APIKeyUpdateFields) error {
 	clone := *key
 	clone.GroupIDs = append([]int64(nil), key.GroupIDs...)
 	s.updated = &clone
@@ -611,7 +611,7 @@ func (s *stubUserRepoForGroupAuth) GetByEmail(context.Context, string) (*User, e
 func (s *stubUserRepoForGroupAuth) GetFirstAdmin(context.Context) (*User, error) {
 	panic("unexpected GetFirstAdmin call")
 }
-func (s *stubUserRepoForGroupAuth) Update(context.Context, *User) error {
+func (s *stubUserRepoForGroupAuth) Update(context.Context, *User, UserUpdateFields) error {
 	panic("unexpected Update call")
 }
 func (s *stubUserRepoForGroupAuth) Delete(context.Context, int64) error {
@@ -646,6 +646,12 @@ func (s *stubUserRepoForGroupAuth) UpdateBalance(context.Context, int64, float64
 }
 func (s *stubUserRepoForGroupAuth) DeductBalance(context.Context, int64, float64) error {
 	panic("unexpected DeductBalance call")
+}
+func (s *stubUserRepoForGroupAuth) AdjustBalance(context.Context, int64, float64) (BalanceChange, error) {
+	panic("unexpected AdjustBalance call")
+}
+func (s *stubUserRepoForGroupAuth) SetBalance(context.Context, int64, float64) (BalanceChange, error) {
+	panic("unexpected SetBalance call")
 }
 func (s *stubUserRepoForGroupAuth) UpdateConcurrency(context.Context, int64, int) error {
 	panic("unexpected UpdateConcurrency call")
