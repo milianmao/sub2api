@@ -311,7 +311,7 @@ func TestAPIKeyRepository_UpdateWithNilGroupIDsPreservesAuthorizedGroups(t *test
 
 	key.Name = "Update nil groups renamed"
 	key.GroupIDs = nil
-	require.NoError(t, repo.Update(ctx, key))
+	require.NoError(t, repo.Update(ctx, key, service.APIKeyUpdateFields{Name: true}))
 
 	got, err := client.APIKey.Query().
 		Where(apikey.IDEQ(key.ID)).
@@ -340,7 +340,7 @@ func TestAPIKeyRepository_UpdateWithEmptyGroupIDsClearsAuthorizedGroups(t *testi
 	require.NoError(t, repo.Create(ctx, key))
 
 	key.GroupIDs = []int64{}
-	require.NoError(t, repo.Update(ctx, key))
+	require.NoError(t, repo.Update(ctx, key, service.APIKeyUpdateFields{GroupIDs: true}))
 
 	got, err := client.APIKey.Query().
 		Where(apikey.IDEQ(key.ID)).

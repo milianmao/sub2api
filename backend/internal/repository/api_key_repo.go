@@ -209,67 +209,87 @@ func (r *apiKeyRepository) GetByKeyForAuth(ctx context.Context, key string) (*se
 	return out, nil
 }
 
-func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) error {
+func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey, fields service.APIKeyUpdateFields) error {
+	// 空掩码代表调用方不改任何列，直接返回，避免产生一次无意义的整行写。
+	if fields.IsEmpty() {
+		return nil
+	}
+
+	// 使用原子操作：将软删除检查与更新合并到同一语句，避免竞态条件。
+	// 之前的实现先检查 Exist 再 UpdateOneID，若在两步之间发生软删除，
+	// 则会更新已删除的记录。
+	// 这里选择 Update().Where()，确保只有未软删除记录能被更新。
+	// 同时显式设置 updated_at，避免二次查询带来的并发可见性问题。
 	return r.withTx(ctx, func(txCtx context.Context, txClient *dbent.Client) error {
-		// 使用原子操作：将软删除检查与更新合并到同一语句，避免竞态条件。
-		// 之前的实现先检查 Exist 再 UpdateOneID，若在两步之间发生软删除，
-		// 则会更新已删除的记录。
-		// 这里选择 Update().Where()，确保只有未软删除记录能被更新。
-		// 同时显式设置 updated_at，避免二次查询带来的并发可见性问题。
 		now := time.Now()
 		builder := txClient.APIKey.Update().
 			Where(apikey.IDEQ(key.ID), apikey.DeletedAtIsNil()).
-			SetName(key.Name).
-			SetStatus(key.Status).
-			SetQuota(key.Quota).
-			SetQuotaUsed(key.QuotaUsed).
-			SetRateLimit5h(key.RateLimit5h).
-			SetRateLimit1d(key.RateLimit1d).
-			SetRateLimit7d(key.RateLimit7d).
-			SetUsage5h(key.Usage5h).
-			SetUsage1d(key.Usage1d).
-			SetUsage7d(key.Usage7d).
 			SetUpdatedAt(now)
-		if key.GroupID != nil {
-			builder.SetGroupID(*key.GroupID)
-		} else {
-			builder.ClearGroupID()
+		if fields.Name {
+			builder.SetName(key.Name)
 		}
+		if fields.Status {
+			builder.SetStatus(key.Status)
+		}
+		if fields.Quota {
+			builder.SetQuota(key.Quota)
+		}
+		if fields.QuotaUsed {
+			builder.SetQuotaUsed(key.QuotaUsed)
+		}
+		if fields.RateLimits {
+			builder.
+				SetRateLimit5h(key.RateLimit5h).
+				SetRateLimit1d(key.RateLimit1d).
+				SetRateLimit7d(key.RateLimit7d)
+		}
+		if fields.RateLimitUsage {
+			builder.
+				SetUsage5h(key.Usage5h).
+				SetUsage1d(key.Usage1d).
+				SetUsage7d(key.Usage7d)
 
-		// Expiration time
-		if key.ExpiresAt != nil {
-			builder.SetExpiresAt(*key.ExpiresAt)
-		} else {
-			builder.ClearExpiresAt()
+			if key.Window5hStart != nil {
+				builder.SetWindow5hStart(*key.Window5hStart)
+			} else {
+				builder.ClearWindow5hStart()
+			}
+			if key.Window1dStart != nil {
+				builder.SetWindow1dStart(*key.Window1dStart)
+			} else {
+				builder.ClearWindow1dStart()
+			}
+			if key.Window7dStart != nil {
+				builder.SetWindow7dStart(*key.Window7dStart)
+			} else {
+				builder.ClearWindow7dStart()
+			}
 		}
-
-		// Rate limit window start times
-		if key.Window5hStart != nil {
-			builder.SetWindow5hStart(*key.Window5hStart)
-		} else {
-			builder.ClearWindow5hStart()
+		if fields.GroupID {
+			if key.GroupID != nil {
+				builder.SetGroupID(*key.GroupID)
+			} else {
+				builder.ClearGroupID()
+			}
 		}
-		if key.Window1dStart != nil {
-			builder.SetWindow1dStart(*key.Window1dStart)
-		} else {
-			builder.ClearWindow1dStart()
+		if fields.ExpiresAt {
+			if key.ExpiresAt != nil {
+				builder.SetExpiresAt(*key.ExpiresAt)
+			} else {
+				builder.ClearExpiresAt()
+			}
 		}
-		if key.Window7dStart != nil {
-			builder.SetWindow7dStart(*key.Window7dStart)
-		} else {
-			builder.ClearWindow7dStart()
-		}
-
-		// IP 限制字段
-		if len(key.IPWhitelist) > 0 {
-			builder.SetIPWhitelist(key.IPWhitelist)
-		} else {
-			builder.ClearIPWhitelist()
-		}
-		if len(key.IPBlacklist) > 0 {
-			builder.SetIPBlacklist(key.IPBlacklist)
-		} else {
-			builder.ClearIPBlacklist()
+		if fields.IPRules {
+			if len(key.IPWhitelist) > 0 {
+				builder.SetIPWhitelist(key.IPWhitelist)
+			} else {
+				builder.ClearIPWhitelist()
+			}
+			if len(key.IPBlacklist) > 0 {
+				builder.SetIPBlacklist(key.IPBlacklist)
+			} else {
+				builder.ClearIPBlacklist()
+			}
 		}
 
 		affected, err := builder.Save(txCtx)
@@ -281,7 +301,7 @@ func (r *apiKeyRepository) Update(ctx context.Context, key *service.APIKey) erro
 			return service.ErrAPIKeyNotFound
 		}
 
-		if key.GroupIDs != nil {
+		if fields.GroupIDs && key.GroupIDs != nil {
 			if err := r.replaceAPIKeyGroups(txCtx, key.ID, key.GroupIDs); err != nil {
 				return err
 			}

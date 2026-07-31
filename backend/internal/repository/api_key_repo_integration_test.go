@@ -218,7 +218,7 @@ func (s *APIKeyRepoSuite) TestUpdateReplacesAuthorizedGroups() {
 	s.Require().NoError(s.repo.Create(s.ctx, key))
 
 	key.GroupIDs = []int64{newGroup.ID}
-	s.Require().NoError(s.repo.Update(s.ctx, key))
+	s.Require().NoError(s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{GroupIDs: true}))
 
 	rows, err := s.client.APIKeyGroup.Query().Where(apikeygroup.APIKeyIDEQ(key.ID)).Order(apikeygroup.ByGroupID()).All(s.ctx)
 	s.Require().NoError(err)
@@ -247,7 +247,7 @@ func (s *APIKeyRepoSuite) TestUpdateWithNilGroupIDsPreservesAuthorizedGroups() {
 
 	key.Name = "Authorized Update Nil Renamed"
 	key.GroupIDs = nil
-	s.Require().NoError(s.repo.Update(s.ctx, key))
+	s.Require().NoError(s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{Name: true}))
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err)
@@ -270,7 +270,7 @@ func (s *APIKeyRepoSuite) TestUpdateWithEmptyGroupIDsClearsAuthorizedGroups() {
 	s.Require().NoError(s.repo.Create(s.ctx, key))
 
 	key.GroupIDs = []int64{}
-	s.Require().NoError(s.repo.Update(s.ctx, key))
+	s.Require().NoError(s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{GroupIDs: true}))
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err)
@@ -345,7 +345,7 @@ func (s *APIKeyRepoSuite) TestUpdate() {
 
 	key.Name = "Renamed"
 	key.Status = service.StatusDisabled
-	err := s.repo.Update(s.ctx, key)
+	err := s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{Name: true, Status: true})
 	s.Require().NoError(err, "Update")
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
@@ -369,7 +369,7 @@ func (s *APIKeyRepoSuite) TestUpdate_ClearGroupID() {
 	s.Require().NoError(s.repo.Create(s.ctx, key))
 
 	key.GroupID = nil
-	err := s.repo.Update(s.ctx, key)
+	err := s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{GroupID: true})
 	s.Require().NoError(err, "Update")
 
 	got, err := s.repo.GetByID(s.ctx, key.ID)
@@ -574,7 +574,7 @@ func (s *APIKeyRepoSuite) TestCRUD_Search_ClearGroupID() {
 	key.Name = "Renamed"
 	key.Status = service.StatusDisabled
 	key.GroupID = nil
-	s.Require().NoError(s.repo.Update(s.ctx, key), "Update")
+	s.Require().NoError(s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{Name: true, Status: true, GroupID: true}), "Update")
 
 	got2, err := s.repo.GetByID(s.ctx, key.ID)
 	s.Require().NoError(err, "GetByID")
@@ -708,7 +708,7 @@ func (s *APIKeyRepoSuite) TestIncrementQuotaUsedAndGetState() {
 	key := s.mustCreateApiKey(user.ID, "sk-quota-state", "QuotaState", nil)
 	key.Quota = 3
 	key.QuotaUsed = 1
-	s.Require().NoError(s.repo.Update(s.ctx, key), "Update quota")
+	s.Require().NoError(s.repo.Update(s.ctx, key, service.APIKeyUpdateFields{Quota: true, QuotaUsed: true}), "Update quota")
 
 	state, err := s.repo.IncrementQuotaUsedAndGetState(s.ctx, key.ID, 2.5)
 	s.Require().NoError(err, "IncrementQuotaUsedAndGetState")
