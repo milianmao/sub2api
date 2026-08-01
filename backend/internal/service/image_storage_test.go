@@ -29,9 +29,9 @@ type fakeImageStorage struct {
 	err   error
 }
 
-type roundTripFunc func(*http.Request) (*http.Response, error)
+type imageRoundTripFunc func(*http.Request) (*http.Response, error)
 
-func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+func (f imageRoundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
 	return f(req)
 }
 
@@ -99,7 +99,7 @@ func TestImageResultUploaderRewritesURL(t *testing.T) {
 
 func TestImageResultUploaderRewritesImageDataURLWithoutHTTP(t *testing.T) {
 	httpCalls := 0
-	client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+	client := &http.Client{Transport: imageRoundTripFunc(func(*http.Request) (*http.Response, error) {
 		httpCalls++
 		return nil, errors.New("HTTP must not be called for data URLs")
 	})}
@@ -142,7 +142,7 @@ func TestImageResultUploaderDataURLValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			httpCalls := 0
-			client := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
+			client := &http.Client{Transport: imageRoundTripFunc(func(*http.Request) (*http.Response, error) {
 				httpCalls++
 				return nil, errors.New("HTTP must not be called for data URLs")
 			})}
