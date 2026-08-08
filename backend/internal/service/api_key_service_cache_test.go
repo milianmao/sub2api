@@ -445,20 +445,23 @@ func TestAPIKeyService_SnapshotRoundTrip_PreservesReasoningEffortPolicy(t *testi
 		Status:  StatusActive,
 		User:    &User{ID: 2, Status: StatusActive, Role: RoleUser, Balance: 10, Concurrency: 3},
 		Group: &Group{
-			ID:                      groupID,
-			Name:                    "openai",
-			Platform:                PlatformOpenAI,
-			Status:                  StatusActive,
-			SubscriptionType:        SubscriptionTypeStandard,
-			RateMultiplier:          1,
-			MaxReasoningEffort:      "medium",
-			ReasoningEffortMappings: []ReasoningEffortMapping{{From: "max", To: "xhigh"}},
+			ID:                 groupID,
+			Name:               "composite",
+			Platform:           PlatformComposite,
+			Status:             StatusActive,
+			SubscriptionType:   SubscriptionTypeStandard,
+			RateMultiplier:     1,
+			MaxReasoningEffort: "medium",
+			ReasoningEffortMappings: []ReasoningEffortMapping{
+				{From: "max", To: "xhigh"},
+			},
 		},
 	}
 
 	roundTrip := svc.snapshotToAPIKey(apiKey.Key, svc.snapshotFromAPIKey(context.Background(), apiKey))
 	require.NotNil(t, roundTrip)
 	require.NotNil(t, roundTrip.Group)
+	require.Equal(t, PlatformComposite, roundTrip.Group.Platform)
 	require.Equal(t, "medium", roundTrip.Group.MaxReasoningEffort)
 	require.Equal(t, apiKey.Group.ReasoningEffortMappings, roundTrip.Group.ReasoningEffortMappings)
 }

@@ -1377,6 +1377,9 @@ func groupEntityToService(g *dbent.Group) *service.Group {
 		PeakStart:                       g.PeakStart,
 		PeakEnd:                         g.PeakEnd,
 		PeakRateMultiplier:              g.PeakRateMultiplier,
+		ProfitControlEnabled:            g.ProfitControlEnabled,
+		ProfitMinMargin:                 g.ProfitMinMargin,
+		ProfitSafetyBuffer:              g.ProfitSafetyBuffer,
 		CreatedAt:                       g.CreatedAt,
 		UpdatedAt:                       g.UpdatedAt,
 	}
@@ -1434,6 +1437,10 @@ func apiKeyAuthGroupSelect(q *dbent.GroupQuery) {
 		group.FieldRpmLimit,
 		group.FieldMaxReasoningEffort,
 		group.FieldReasoningEffortMappings,
+		// 分组利润控制：认证快照是调度门 enable 判定的直接来源。
+		group.FieldProfitControlEnabled,
+		group.FieldProfitMinMargin,
+		group.FieldProfitSafetyBuffer,
 	)
 }
 
