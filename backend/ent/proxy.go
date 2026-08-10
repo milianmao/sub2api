@@ -3,24 +3,13 @@
 package ent
 
 import (
-	"context"
-	stdsql "database/sql"
-	"database/sql/driver"
-	"entgo.io/ent"
-	"entgo.io/ent/dialect"
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
-	"entgo.io/ent/schema/field"
-	"errors"
 	"fmt"
-	"github.com/Wei-Shaw/sub2api/ent/account"
-	"github.com/Wei-Shaw/sub2api/ent/predicate"
-	"github.com/Wei-Shaw/sub2api/ent/proxy"
-	"math"
 	"strings"
-	"sync"
 	"time"
+
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/sql"
+	"github.com/Wei-Shaw/sub2api/ent/proxy"
 )
 
 // Proxy is the model entity for the Proxy schema.

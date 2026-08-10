@@ -4,22 +4,16 @@ package ent
 
 import (
 	"context"
-	stdsql "database/sql"
-	"database/sql/driver"
+	"fmt"
+	"math"
+
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
-	"errors"
-	"fmt"
 	"github.com/Wei-Shaw/sub2api/ent/paymentauditlog"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
-	"math"
-	"strings"
-	"sync"
-	"time"
 )
 
 // PaymentAuditLogQuery is the builder for querying PaymentAuditLog entities.

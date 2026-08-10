@@ -4,23 +4,16 @@ package ent
 
 import (
 	"context"
-	stdsql "database/sql"
-	"database/sql/driver"
-	"entgo.io/ent"
-	"entgo.io/ent/dialect"
-	"entgo.io/ent/dialect/sql"
-	"entgo.io/ent/dialect/sql/sqlgraph"
-	"entgo.io/ent/dialect/sql/sqljson"
-	"entgo.io/ent/schema/field"
 	"errors"
 	"fmt"
+	"time"
+
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/schema/field"
 	"github.com/Wei-Shaw/sub2api/ent/paymentorder"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/user"
-	"math"
-	"strings"
-	"sync"
-	"time"
 )
 
 // PaymentOrderUpdate is the builder for updating PaymentOrder entities.
