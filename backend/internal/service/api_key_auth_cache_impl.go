@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 19 // v19: preserve local group fields and upstream profit control fields
+const apiKeyAuthSnapshotVersion = 20 // v20: combine local authorization fields with upstream group billing fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -429,7 +429,12 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		VideoPrice480P:                  cloneAPIKeyAuthFloat64Ptr(group.VideoPrice480P),
 		VideoPrice720P:                  cloneAPIKeyAuthFloat64Ptr(group.VideoPrice720P),
 		VideoPrice1080P:                 cloneAPIKeyAuthFloat64Ptr(group.VideoPrice1080P),
+		VideoModelPrices:                NormalizeVideoModelPrices(group.VideoModelPrices),
 		WebSearchPricePerCall:           cloneAPIKeyAuthFloat64Ptr(group.WebSearchPricePerCall),
+		SearchPricePer1k:                cloneAPIKeyAuthFloat64Ptr(group.SearchPricePer1k),
+		AudioRealtimePricePerMin:        cloneAPIKeyAuthFloat64Ptr(group.AudioRealtimePricePerMin),
+		AudioTTSPricePerMillionChars:    cloneAPIKeyAuthFloat64Ptr(group.AudioTTSPricePerMillionChars),
+		AudioSTTPricePerHour:            cloneAPIKeyAuthFloat64Ptr(group.AudioSTTPricePerHour),
 		ClaudeCodeOnly:                  group.ClaudeCodeOnly,
 		FallbackGroupID:                 cloneAPIKeyAuthInt64Ptr(group.FallbackGroupID),
 		FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(group.FallbackGroupIDOnInvalidRequest),
@@ -492,7 +497,12 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		VideoPrice480P:                  cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice480P),
 		VideoPrice720P:                  cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice720P),
 		VideoPrice1080P:                 cloneAPIKeyAuthFloat64Ptr(snapshot.VideoPrice1080P),
+		VideoModelPrices:                NormalizeVideoModelPrices(snapshot.VideoModelPrices),
 		WebSearchPricePerCall:           cloneAPIKeyAuthFloat64Ptr(snapshot.WebSearchPricePerCall),
+		SearchPricePer1k:                cloneAPIKeyAuthFloat64Ptr(snapshot.SearchPricePer1k),
+		AudioRealtimePricePerMin:        cloneAPIKeyAuthFloat64Ptr(snapshot.AudioRealtimePricePerMin),
+		AudioTTSPricePerMillionChars:    cloneAPIKeyAuthFloat64Ptr(snapshot.AudioTTSPricePerMillionChars),
+		AudioSTTPricePerHour:            cloneAPIKeyAuthFloat64Ptr(snapshot.AudioSTTPricePerHour),
 		ClaudeCodeOnly:                  snapshot.ClaudeCodeOnly,
 		FallbackGroupID:                 cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupID),
 		FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupIDOnInvalidRequest),

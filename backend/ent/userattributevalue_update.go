@@ -4,17 +4,24 @@ package ent
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"time"
-
+	stdsql "database/sql"
+	"database/sql/driver"
+	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"errors"
+	"fmt"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userattributedefinition"
 	"github.com/Wei-Shaw/sub2api/ent/userattributevalue"
+	"math"
+	"strings"
+	"sync"
+	"time"
 )
 
 // UserAttributeValueUpdate is the builder for updating UserAttributeValue entities.

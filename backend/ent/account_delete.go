@@ -4,12 +4,25 @@ package ent
 
 import (
 	"context"
-
+	stdsql "database/sql"
+	"database/sql/driver"
+	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
-	"github.com/Wei-Shaw/sub2api/ent/account"
+	"errors"
+	"fmt"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"math"
+	"strings"
+	"sync"
+	"time"
+)
+
+import (
+	"github.com/Wei-Shaw/sub2api/ent/account"
 )
 
 // AccountDelete is the builder for deleting a Account entity.

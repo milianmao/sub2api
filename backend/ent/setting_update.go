@@ -4,15 +4,22 @@ package ent
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"time"
-
+	stdsql "database/sql"
+	"database/sql/driver"
+	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
+	"errors"
+	"fmt"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/setting"
+	"math"
+	"strings"
+	"sync"
+	"time"
 )
 
 // SettingUpdate is the builder for updating Setting entities.

@@ -149,3 +149,6 @@ aicodex
 output/
 *.stackdump
 context.md
+
+# Vitest / Vite cache at repo root
+.vite/

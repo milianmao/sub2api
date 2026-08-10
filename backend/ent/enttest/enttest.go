@@ -4,6 +4,7 @@ package enttest
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/Wei-Shaw/sub2api/ent"
 	// required by schema hooks.

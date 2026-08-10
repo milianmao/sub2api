@@ -3,14 +3,24 @@
 package ent
 
 import (
-	"fmt"
-	"strings"
-	"time"
-
+	"context"
+	stdsql "database/sql"
+	"database/sql/driver"
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
+	"entgo.io/ent/schema/field"
+	"errors"
+	"fmt"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitor"
 	"github.com/Wei-Shaw/sub2api/ent/channelmonitordailyrollup"
+	"github.com/Wei-Shaw/sub2api/ent/predicate"
+	"math"
+	"strings"
+	"sync"
+	"time"
 )
 
 // ChannelMonitorDailyRollup is the model entity for the ChannelMonitorDailyRollup schema.
