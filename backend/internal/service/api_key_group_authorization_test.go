@@ -767,6 +767,10 @@ func (s *stubUserSubscriptionRepoForGroupAuth) GetByID(context.Context, int64) (
 	panic("unexpected GetByID call")
 }
 
+func (s *stubUserSubscriptionRepoForGroupAuth) GetByIDForUpdate(context.Context, int64) (*UserSubscription, error) {
+	panic("unexpected GetByIDForUpdate call")
+}
+
 func (s *stubUserSubscriptionRepoForGroupAuth) GetByIDIncludeDeleted(context.Context, int64) (*UserSubscription, error) {
 	panic("unexpected GetByIDIncludeDeleted call")
 }
@@ -834,11 +838,11 @@ func (s *stubUserSubscriptionRepoForGroupAuth) UpdateNotes(context.Context, int6
 	panic("unexpected UpdateNotes call")
 }
 
-func (s *stubUserSubscriptionRepoForGroupAuth) ActivateWindows(context.Context, int64, time.Time) error {
+func (s *stubUserSubscriptionRepoForGroupAuth) ActivateWindows(context.Context, int64, time.Time, time.Time) error {
 	panic("unexpected ActivateWindows call")
 }
 
-func (s *stubUserSubscriptionRepoForGroupAuth) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time) error {
+func (s *stubUserSubscriptionRepoForGroupAuth) ResetUsageWindows(context.Context, int64, bool, bool, bool, time.Time, time.Time) error {
 	panic("unexpected ResetUsageWindows call")
 }
 
