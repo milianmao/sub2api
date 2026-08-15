@@ -112,6 +112,8 @@ backend/data/
 backend/config.yaml
 deploy/config.yaml
 backend/.installed
+.mcp.json
+.pi/
 
 # ===================
 # 其他
@@ -126,6 +128,8 @@ CLAUDE.md
 scripts
 !backend/scripts/
 !backend/scripts/resolve-version.sh
+!/.trellis/scripts/
+!/.trellis/scripts/**
 .code-review-state
 #openspec/
 code-reviews/
@@ -149,6 +153,7 @@ aicodex
 output/
 *.stackdump
 context.md
+.tmp-prod-migrations.tsv
 
 # Vitest / Vite cache at repo root
 .vite/
