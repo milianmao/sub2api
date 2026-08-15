@@ -10,6 +10,11 @@ import (
 )
 
 // AdminService interface defines admin management operations
+type AdminAccountPoolService interface {
+	ListAccountsWithPool(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode, pool, sortBy, sortOrder string) ([]Account, int64, error)
+	ListAccountsForSchedulerScoreFilterWithPool(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, pool string) ([]Account, error)
+}
+
 type AdminService interface {
 	// User management
 	ListUsers(ctx context.Context, page, pageSize int, filters UserListFilters, sortBy, sortOrder string) ([]User, int64, error)
@@ -360,6 +365,7 @@ type CreateAccountInput struct {
 	ProxyID            *int64
 	Concurrency        int
 	Priority           int
+	IsFallback         bool
 	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor         *int
 	GroupIDs           []int64
@@ -383,14 +389,16 @@ type ShadowOptions struct {
 }
 
 type UpdateAccountInput struct {
-	Name                  string
-	Notes                 *string
-	Type                  string // Account type: oauth, setup-token, apikey
-	Credentials           map[string]any
-	Extra                 map[string]any
-	ProxyID               *int64
-	Concurrency           *int     // 使用指针区分"未提供"和"设置为0"
-	Priority              *int     // 使用指针区分"未提供"和"设置为0"
+	Name        string
+	Notes       *string
+	Type        string // Account type: oauth, setup-token, apikey
+	Credentials map[string]any
+	Extra       map[string]any
+	ProxyID     *int64
+	Concurrency *int // 使用指针区分"未提供"和"设置为0"
+	Priority    *int // 使用指针区分"未提供"和"设置为0"
+	// IsFallback nil means unchanged; false and true explicitly choose the account pool.
+	IsFallback            *bool
 	RateMultiplier        *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor            *int
 	Status                string
@@ -404,12 +412,14 @@ type UpdateAccountInput struct {
 
 // BulkUpdateAccountsInput describes the payload for bulk updating accounts.
 type BulkUpdateAccountsInput struct {
-	AccountIDs     []int64
-	Filters        *BulkUpdateAccountFilters
-	Name           string
-	ProxyID        *int64
-	Concurrency    *int
-	Priority       *int
+	AccountIDs  []int64
+	Filters     *BulkUpdateAccountFilters
+	Name        string
+	ProxyID     *int64
+	Concurrency *int
+	Priority    *int
+	// IsFallback nil means unchanged for both explicit IDs and filtered targets.
+	IsFallback     *bool
 	RateMultiplier *float64 // 账号计费倍率（>=0，允许 0）
 	LoadFactor     *int
 	Status         string
@@ -430,6 +440,8 @@ type BulkUpdateAccountFilters struct {
 	Group       string
 	Search      string
 	PrivacyMode string
+	// Pool is empty, primary, or fallback. It is shared by list, liveness, and filtered bulk targets.
+	Pool string
 }
 
 // BulkUpdateAccountResult captures the result for a single account update.

@@ -933,8 +933,15 @@ func maxBatchImageReferenceImagesForModel(model string) int {
 	return 0
 }
 
+type batchImageAccountCandidate struct {
+	provider BatchImageProvider
+	account  *Account
+}
+
 func (s *BatchImagePublicService) selectProviderAndAccount(ctx context.Context, owner BatchImageOwner, requestedProvider, model string) (BatchImageProvider, *Account, error) {
 	providers := batchImageProviderSelectionOrder(requestedProvider)
+	candidates := make([]batchImageAccountCandidate, 0)
+	pricingRejected := false
 	for _, providerName := range providers {
 		provider, ok := s.ProviderRegistry.Get(providerName)
 		if !ok || provider == nil {
@@ -951,19 +958,32 @@ func (s *BatchImagePublicService) selectProviderAndAccount(ctx context.Context, 
 			return accounts[i].ID < accounts[j].ID
 		})
 		for i := range accounts {
-			account := accounts[i]
-			if !account.IsSchedulable() || !account.IsModelSupported(model) {
+			account := &accounts[i]
+			// Provider-specific credential/type checks and provider/model pricing
+			// are request eligibility, so an unusable primary pair cannot prevent
+			// an eligible fallback pair from being considered.
+			if !account.IsSchedulable() || !account.IsModelSupported(model) || !provider.SupportsAccount(account) {
 				continue
 			}
-			if provider.SupportsAccount(&account) {
-				return provider, &account, nil
+			if s.Pricing == nil {
+				pricingRejected = true
+				continue
 			}
+			if _, err := s.Pricing.BatchImageUnitPrice(ctx, &BatchImageJob{Provider: providerName, Model: model}); err != nil {
+				pricingRejected = true
+				continue
+			}
+			candidates = append(candidates, batchImageAccountCandidate{provider: provider, account: account})
 		}
 	}
-	if requestedProvider != "" {
+	candidates, _ = PartitionAccountPool(candidates, func(candidate batchImageAccountCandidate) *Account { return candidate.account }).Preferred()
+	if len(candidates) == 0 {
+		if pricingRejected {
+			return nil, nil, ErrBatchImageSettlementPricingMissing
+		}
 		return nil, nil, ErrBatchImageNoAccountAvailable
 	}
-	return nil, nil, ErrBatchImageNoAccountAvailable
+	return candidates[0].provider, candidates[0].account, nil
 }
 
 func (s *BatchImagePublicService) listCandidateAccounts(ctx context.Context, groupID *int64, platform string) ([]Account, error) {

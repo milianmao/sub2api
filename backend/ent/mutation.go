@@ -2876,6 +2876,9 @@ type AccountMutation struct {
 	addload_factor              *int
 	priority                    *int
 	addpriority                 *int
+	is_fallback                 *bool
+	pool_revision               *int64
+	addpool_revision            *int64
 	rate_multiplier             *float64
 	addrate_multiplier          *float64
 	status                      *string
@@ -3659,6 +3662,98 @@ func (m *AccountMutation) AddedPriority() (r int, exists bool) {
 func (m *AccountMutation) ResetPriority() {
 	m.priority = nil
 	m.addpriority = nil
+}
+
+// SetIsFallback sets the "is_fallback" field.
+func (m *AccountMutation) SetIsFallback(b bool) {
+	m.is_fallback = &b
+}
+
+// IsFallback returns the value of the "is_fallback" field in the mutation.
+func (m *AccountMutation) IsFallback() (r bool, exists bool) {
+	v := m.is_fallback
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsFallback returns the old "is_fallback" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldIsFallback(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsFallback is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsFallback requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsFallback: %w", err)
+	}
+	return oldValue.IsFallback, nil
+}
+
+// ResetIsFallback resets all changes to the "is_fallback" field.
+func (m *AccountMutation) ResetIsFallback() {
+	m.is_fallback = nil
+}
+
+// SetPoolRevision sets the "pool_revision" field.
+func (m *AccountMutation) SetPoolRevision(i int64) {
+	m.pool_revision = &i
+	m.addpool_revision = nil
+}
+
+// PoolRevision returns the value of the "pool_revision" field in the mutation.
+func (m *AccountMutation) PoolRevision() (r int64, exists bool) {
+	v := m.pool_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPoolRevision returns the old "pool_revision" field's value of the Account entity.
+// If the Account object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AccountMutation) OldPoolRevision(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPoolRevision is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPoolRevision requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPoolRevision: %w", err)
+	}
+	return oldValue.PoolRevision, nil
+}
+
+// AddPoolRevision adds i to the "pool_revision" field.
+func (m *AccountMutation) AddPoolRevision(i int64) {
+	if m.addpool_revision != nil {
+		*m.addpool_revision += i
+	} else {
+		m.addpool_revision = &i
+	}
+}
+
+// AddedPoolRevision returns the value that was added to the "pool_revision" field in this mutation.
+func (m *AccountMutation) AddedPoolRevision() (r int64, exists bool) {
+	v := m.addpool_revision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPoolRevision resets all changes to the "pool_revision" field.
+func (m *AccountMutation) ResetPoolRevision() {
+	m.pool_revision = nil
+	m.addpool_revision = nil
 }
 
 // SetRateMultiplier sets the "rate_multiplier" field.
@@ -4712,7 +4807,7 @@ func (m *AccountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AccountMutation) Fields() []string {
-	fields := make([]string, 0, 31)
+	fields := make([]string, 0, 33)
 	if m.created_at != nil {
 		fields = append(fields, account.FieldCreatedAt)
 	}
@@ -4754,6 +4849,12 @@ func (m *AccountMutation) Fields() []string {
 	}
 	if m.priority != nil {
 		fields = append(fields, account.FieldPriority)
+	}
+	if m.is_fallback != nil {
+		fields = append(fields, account.FieldIsFallback)
+	}
+	if m.pool_revision != nil {
+		fields = append(fields, account.FieldPoolRevision)
 	}
 	if m.rate_multiplier != nil {
 		fields = append(fields, account.FieldRateMultiplier)
@@ -4842,6 +4943,10 @@ func (m *AccountMutation) Field(name string) (ent.Value, bool) {
 		return m.LoadFactor()
 	case account.FieldPriority:
 		return m.Priority()
+	case account.FieldIsFallback:
+		return m.IsFallback()
+	case account.FieldPoolRevision:
+		return m.PoolRevision()
 	case account.FieldRateMultiplier:
 		return m.RateMultiplier()
 	case account.FieldStatus:
@@ -4913,6 +5018,10 @@ func (m *AccountMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldLoadFactor(ctx)
 	case account.FieldPriority:
 		return m.OldPriority(ctx)
+	case account.FieldIsFallback:
+		return m.OldIsFallback(ctx)
+	case account.FieldPoolRevision:
+		return m.OldPoolRevision(ctx)
 	case account.FieldRateMultiplier:
 		return m.OldRateMultiplier(ctx)
 	case account.FieldStatus:
@@ -5054,6 +5163,20 @@ func (m *AccountMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPriority(v)
 		return nil
+	case account.FieldIsFallback:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsFallback(v)
+		return nil
+	case account.FieldPoolRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPoolRevision(v)
+		return nil
 	case account.FieldRateMultiplier:
 		v, ok := value.(float64)
 		if !ok {
@@ -5193,6 +5316,9 @@ func (m *AccountMutation) AddedFields() []string {
 	if m.addpriority != nil {
 		fields = append(fields, account.FieldPriority)
 	}
+	if m.addpool_revision != nil {
+		fields = append(fields, account.FieldPoolRevision)
+	}
 	if m.addrate_multiplier != nil {
 		fields = append(fields, account.FieldRateMultiplier)
 	}
@@ -5212,6 +5338,8 @@ func (m *AccountMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedLoadFactor()
 	case account.FieldPriority:
 		return m.AddedPriority()
+	case account.FieldPoolRevision:
+		return m.AddedPoolRevision()
 	case account.FieldRateMultiplier:
 		return m.AddedRateMultiplier()
 	}
@@ -5250,6 +5378,13 @@ func (m *AccountMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPriority(v)
+		return nil
+	case account.FieldPoolRevision:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPoolRevision(v)
 		return nil
 	case account.FieldRateMultiplier:
 		v, ok := value.(float64)
@@ -5431,6 +5566,12 @@ func (m *AccountMutation) ResetField(name string) error {
 		return nil
 	case account.FieldPriority:
 		m.ResetPriority()
+		return nil
+	case account.FieldIsFallback:
+		m.ResetIsFallback()
+		return nil
+	case account.FieldPoolRevision:
+		m.ResetPoolRevision()
 		return nil
 	case account.FieldRateMultiplier:
 		m.ResetRateMultiplier()
@@ -26734,7 +26875,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 64)
+	fields := make([]string, 0, 59)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 
@@ -158,6 +159,13 @@ const findBodyButtonByText = (text: string) =>
   )
 
 describe('admin AccountsView bulk edit scope', () => {
+  it('keeps the pool filter in list requests and local account reconciliation', () => {
+    const source = readFileSync('src/views/admin/AccountsView.vue', 'utf8')
+
+    expect(source).toContain("pool: filters.pool || undefined")
+    expect(source).toContain("pool: params.pool || ''")
+    expect(source).toContain("if (filters.pool && (filters.pool === 'fallback') !== account.is_fallback) return false")
+  })
   beforeEach(() => {
     localStorage.clear()
     document.body.innerHTML = ''

@@ -1466,6 +1466,44 @@ func TestGrokMediaVideoRequestBindingIsScopedToUserAndAPIKey(t *testing.T) {
 	require.Zero(t, accountID)
 }
 
+func TestResolveGrokMediaVideoRequestSelectionKeepsFallbackOwnerAfterPrimaryRecovery(t *testing.T) {
+	groupID := int64(7)
+	fallbackOwner := Account{
+		ID:          63,
+		Platform:    PlatformGrok,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		IsFallback:  true,
+		GroupIDs:    []int64{groupID},
+		Concurrency: 1,
+	}
+	primary := fallbackOwner
+	primary.ID = 64
+	primary.IsFallback = false
+	svc := &OpenAIGatewayService{
+		accountRepo: schedulerTestOpenAIAccountRepo{accounts: []Account{primary, fallbackOwner}},
+	}
+
+	selection, decision, err := svc.ResolveGrokMediaVideoRequestSelection(
+		context.Background(),
+		&groupID,
+		fallbackOwner.ID,
+		"",
+		OpenAIUpstreamTransportHTTPSSE,
+		OpenAIEndpointCapabilityResponses,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, fallbackOwner.ID, selection.Account.ID)
+	require.True(t, selection.Account.IsFallback)
+	require.Equal(t, "grok_video_owner", decision.Layer)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+}
+
 func TestForwardGrokMedia429ReconcilesRateLimitBeforeCustomErrorBypass(t *testing.T) {
 	t.Setenv(xai.EnvAllowUnsafeURLOverrides, "true")
 	gin.SetMode(gin.TestMode)

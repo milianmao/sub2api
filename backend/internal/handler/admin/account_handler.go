@@ -129,6 +129,7 @@ type CreateAccountRequest struct {
 	ProxyID                 *int64         `json:"proxy_id"`
 	Concurrency             int            `json:"concurrency"`
 	Priority                int            `json:"priority"`
+	IsFallback              bool           `json:"is_fallback"`
 	RateMultiplier          *float64       `json:"rate_multiplier"`
 	LoadFactor              *int           `json:"load_factor"`
 	GroupIDs                []int64        `json:"group_ids"`
@@ -149,6 +150,7 @@ type UpdateAccountRequest struct {
 	ProxyID                 *int64         `json:"proxy_id"`
 	Concurrency             *int           `json:"concurrency"`
 	Priority                *int           `json:"priority"`
+	IsFallback              *bool          `json:"is_fallback"`
 	RateMultiplier          *float64       `json:"rate_multiplier"`
 	LoadFactor              *int           `json:"load_factor"`
 	Status                  string         `json:"status" binding:"omitempty,oneof=active inactive error"`
@@ -168,6 +170,7 @@ type BulkUpdateAccountsRequest struct {
 	ProxyID                 *int64                    `json:"proxy_id"`
 	Concurrency             *int                      `json:"concurrency"`
 	Priority                *int                      `json:"priority"`
+	IsFallback              *bool                     `json:"is_fallback"`
 	RateMultiplier          *float64                  `json:"rate_multiplier"`
 	LoadFactor              *int                      `json:"load_factor"`
 	Status                  string                    `json:"status" binding:"omitempty,oneof=active inactive error"`
@@ -186,6 +189,7 @@ type BulkUpdateAccountFilters struct {
 	Group       string `json:"group"`
 	Search      string `json:"search"`
 	PrivacyMode string `json:"privacy_mode"`
+	Pool        string `json:"pool"`
 }
 
 // CheckMixedChannelRequest represents check mixed channel risk request
@@ -488,14 +492,20 @@ func (h *AccountHandler) listAccountSchedulerScoreFilterPool(
 	ctx context.Context,
 	platform, accountType, status, search string,
 	groupID int64,
-	privacyMode string,
+	privacyMode, pool string,
 ) []service.Account {
 	if h.adminService == nil || (platform != "" && platform != service.PlatformOpenAI) {
 		return nil
 	}
 	// 池只用于 OpenAI 分数计算（非 OpenAI 账号会在打分时被丢弃），
 	// 无论列表页平台过滤为何，查询一律限定 openai，避免无过滤时全表扫描。
-	accounts, err := h.adminService.ListAccountsForSchedulerScoreFilter(ctx, service.PlatformOpenAI, accountType, status, search, groupID, privacyMode)
+	var accounts []service.Account
+	var err error
+	if poolService, ok := h.adminService.(service.AdminAccountPoolService); ok {
+		accounts, err = poolService.ListAccountsForSchedulerScoreFilterWithPool(ctx, service.PlatformOpenAI, accountType, status, search, groupID, privacyMode, pool)
+	} else {
+		accounts, err = h.adminService.ListAccountsForSchedulerScoreFilter(ctx, service.PlatformOpenAI, accountType, status, search, groupID, privacyMode)
+	}
 	if err != nil {
 		slog.Warn("openai_scheduler_filter_score_pool_failed", "error", err)
 		return nil
@@ -512,6 +522,11 @@ func (h *AccountHandler) List(c *gin.Context) {
 	status := c.Query("status")
 	search := c.Query("search")
 	privacyMode := strings.TrimSpace(c.Query("privacy_mode"))
+	pool := strings.TrimSpace(c.Query("pool"))
+	if pool != "" && pool != "primary" && pool != "fallback" {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_POOL_FILTER", "invalid pool filter"))
+		return
+	}
 	sortBy := c.DefaultQuery("sort_by", "name")
 	sortOrder := c.DefaultQuery("sort_order", "asc")
 	// 标准化和验证 search 参数
@@ -541,7 +556,14 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 
-	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	var accounts []service.Account
+	var total int64
+	var err error
+	if poolService, ok := h.adminService.(service.AdminAccountPoolService); ok {
+		accounts, total, err = poolService.ListAccountsWithPool(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, pool, sortBy, sortOrder)
+	} else {
+		accounts, total, err = h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
+	}
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
@@ -578,7 +600,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 	if includeSchedulerScore && pageHasOpenAIAccounts {
-		schedulerFilterPool := h.listAccountSchedulerScoreFilterPool(c.Request.Context(), platform, accountType, status, search, groupID, privacyMode)
+		schedulerFilterPool := h.listAccountSchedulerScoreFilterPool(c.Request.Context(), platform, accountType, status, search, groupID, privacyMode, pool)
 		schedulerScores, schedulerGroupScores = h.buildOpenAIAccountSchedulerScores(c.Request.Context(), accounts, schedulerFilterPool)
 	}
 
@@ -691,7 +713,7 @@ func (h *AccountHandler) List(c *gin.Context) {
 
 	h.enrichShadowParents(c.Request.Context(), result)
 
-	etag := buildAccountsListETag(result, total, page, pageSize, platform, accountType, status, search, lite)
+	etag := buildAccountsListETag(result, total, page, pageSize, platform, accountType, status, search, pool, lite)
 	if etag != "" {
 		c.Header("ETag", etag)
 		c.Header("Vary", "If-None-Match")
@@ -708,7 +730,7 @@ func buildAccountsListETag(
 	items []AccountWithConcurrency,
 	total int64,
 	page, pageSize int,
-	platform, accountType, status, search string,
+	platform, accountType, status, search, pool string,
 	lite bool,
 ) string {
 	payload := struct {
@@ -719,6 +741,7 @@ func buildAccountsListETag(
 		AccountType string                   `json:"type"`
 		Status      string                   `json:"status"`
 		Search      string                   `json:"search"`
+		Pool        string                   `json:"pool"`
 		Lite        bool                     `json:"lite"`
 		Items       []AccountWithConcurrency `json:"items"`
 	}{
@@ -729,6 +752,7 @@ func buildAccountsListETag(
 		AccountType: accountType,
 		Status:      status,
 		Search:      search,
+		Pool:        pool,
 		Lite:        lite,
 		Items:       items,
 	}
@@ -889,6 +913,7 @@ func (h *AccountHandler) Create(c *gin.Context) {
 			ProxyID:               req.ProxyID,
 			Concurrency:           req.Concurrency,
 			Priority:              req.Priority,
+			IsFallback:            req.IsFallback,
 			RateMultiplier:        req.RateMultiplier,
 			LoadFactor:            req.LoadFactor,
 			GroupIDs:              req.GroupIDs,
@@ -1016,6 +1041,7 @@ func (h *AccountHandler) Update(c *gin.Context) {
 		ProxyID:               req.ProxyID,
 		Concurrency:           req.Concurrency, // 指针类型，nil 表示未提供
 		Priority:              req.Priority,    // 指针类型，nil 表示未提供
+		IsFallback:            req.IsFallback,
 		RateMultiplier:        req.RateMultiplier,
 		LoadFactor:            req.LoadFactor,
 		Status:                req.Status,
@@ -2294,6 +2320,10 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		response.BadRequest(c, "account_ids or filters is required")
 		return
 	}
+	if req.Filters != nil && req.Filters.Pool != "" && req.Filters.Pool != "primary" && req.Filters.Pool != "fallback" {
+		response.ErrorFrom(c, infraerrors.BadRequest("INVALID_POOL_FILTER", "invalid pool filter"))
+		return
+	}
 	// base_rpm 输入校验：负值归零，超过 10000 截断
 	sanitizeExtraBaseRPM(req.Extra)
 
@@ -2304,6 +2334,7 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		req.ProxyID != nil ||
 		req.Concurrency != nil ||
 		req.Priority != nil ||
+		req.IsFallback != nil ||
 		req.RateMultiplier != nil ||
 		req.LoadFactor != nil ||
 		req.Status != "" ||
@@ -2325,6 +2356,7 @@ func (h *AccountHandler) BulkUpdate(c *gin.Context) {
 		ProxyID:               req.ProxyID,
 		Concurrency:           req.Concurrency,
 		Priority:              req.Priority,
+		IsFallback:            req.IsFallback,
 		RateMultiplier:        req.RateMultiplier,
 		LoadFactor:            req.LoadFactor,
 		Status:                req.Status,
@@ -2368,6 +2400,7 @@ func toServiceBulkUpdateAccountFilters(filters *BulkUpdateAccountFilters) *servi
 		Group:       filters.Group,
 		Search:      filters.Search,
 		PrivacyMode: filters.PrivacyMode,
+		Pool:        filters.Pool,
 	}
 }
 
@@ -2668,6 +2701,7 @@ type AccountLivenessCheckFilters struct {
 	Group       string `json:"group"`
 	Search      string `json:"search"`
 	PrivacyMode string `json:"privacy_mode"`
+	Pool        string `json:"pool"`
 	SortBy      string `json:"sort_by"`
 	SortOrder   string `json:"sort_order"`
 }
@@ -2853,7 +2887,16 @@ func (h *AccountHandler) resolveLivenessAccounts(ctx context.Context, req Accoun
 		if sortOrder == "" {
 			sortOrder = "asc"
 		}
-		items, _, err := h.adminService.ListAccounts(ctx, 1, accountLivenessMaxAccounts+1, req.Filters.Platform, req.Filters.Type, req.Filters.Status, req.Filters.Search, groupID, req.Filters.PrivacyMode, sortBy, sortOrder)
+		if req.Filters.Pool != "" && req.Filters.Pool != "primary" && req.Filters.Pool != "fallback" {
+			return nil, errors.New("invalid pool filter")
+		}
+		var items []service.Account
+		var err error
+		if poolService, ok := h.adminService.(service.AdminAccountPoolService); ok {
+			items, _, err = poolService.ListAccountsWithPool(ctx, 1, accountLivenessMaxAccounts+1, req.Filters.Platform, req.Filters.Type, req.Filters.Status, req.Filters.Search, groupID, req.Filters.PrivacyMode, req.Filters.Pool, sortBy, sortOrder)
+		} else {
+			items, _, err = h.adminService.ListAccounts(ctx, 1, accountLivenessMaxAccounts+1, req.Filters.Platform, req.Filters.Type, req.Filters.Status, req.Filters.Search, groupID, req.Filters.PrivacyMode, sortBy, sortOrder)
+		}
 		if err != nil {
 			return nil, err
 		}

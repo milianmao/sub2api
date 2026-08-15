@@ -555,6 +555,31 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 		_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 		return 0, nil, "", nil
 	}
+	// previous_response_id is affinity, not an exemption from strict failback.
+	// When the binding is fallback, check the request-compatible pool and fall
+	// through without deleting this transient binding if primary has recovered.
+	if account.IsFallback {
+		candidates, listErr := s.listSchedulableAccounts(ctx, groupID, PlatformOpenAI)
+		if listErr == nil {
+			for i := range candidates {
+				candidate := &candidates[i]
+				if candidate.IsFallback || candidate.ID == account.ID {
+					continue
+				}
+				if excludedIDs != nil {
+					if _, excluded := excludedIDs[candidate.ID]; excluded {
+						continue
+					}
+				}
+				if isOpenAICompatibleAccountEligibleForRequest(ctx, candidate, PlatformOpenAI, requestedModel, requireCompact, requiredCapability) &&
+					parentHealthyForShadow(candidate, s.parentAccountLookup(ctx)) &&
+					!s.isOpenAIAccountRequestRuntimeBlocked(candidate, requestedModel) &&
+					(groupID == nil || !s.needsUpstreamChannelRestrictionCheck(ctx, groupID) || !s.isUpstreamModelRestrictedByChannel(ctx, *groupID, candidate, requestedModel, requireCompact)) {
+					return 0, nil, "", nil
+				}
+			}
+		}
+	}
 	return accountID, account, responseID, store
 }
 

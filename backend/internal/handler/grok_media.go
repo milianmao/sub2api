@@ -199,20 +199,34 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		if failoverClientGone(c) {
 			return
 		}
-		selection, scheduleDecision, err := h.gatewayService.SelectAccountWithSchedulerForCapability(
-			requestCtx,
-			apiKey.GroupID,
-			"",
-			sessionHash,
-			routingModel,
-			failedAccountIDs,
-			service.OpenAIUpstreamTransportHTTPSSE,
-			requiredCapability,
-			false,
-			false,
-			false,
-			service.PlatformGrok,
-		)
+		var selection *service.AccountSelectionResult
+		var scheduleDecision service.OpenAIAccountScheduleDecision
+		var err error
+		if boundLookupAccountID > 0 {
+			selection, scheduleDecision, err = h.gatewayService.ResolveGrokMediaVideoRequestSelection(
+				requestCtx,
+				apiKey.GroupID,
+				boundLookupAccountID,
+				routingModel,
+				service.OpenAIUpstreamTransportHTTPSSE,
+				requiredCapability,
+			)
+		} else {
+			selection, scheduleDecision, err = h.gatewayService.SelectAccountWithSchedulerForCapability(
+				requestCtx,
+				apiKey.GroupID,
+				"",
+				sessionHash,
+				routingModel,
+				failedAccountIDs,
+				service.OpenAIUpstreamTransportHTTPSSE,
+				requiredCapability,
+				false,
+				false,
+				false,
+				service.PlatformGrok,
+			)
+		}
 		if err != nil {
 			if failoverClientGone(c) {
 				reqLog.Info("grok_media.account_select_aborted_client_disconnected", zap.Error(err))
@@ -256,15 +270,6 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 			h.errorResponse(c, cls.Status, cls.ErrType, cls.Message)
 			return
 		}
-		if boundLookupAccountID > 0 && selection.Account.ID != boundLookupAccountID {
-			reqLog.Warn("grok_media.video_lookup_bound_account_unavailable",
-				zap.Int64("bound_account_id", boundLookupAccountID),
-				zap.Int64("selected_account_id", selection.Account.ID),
-			)
-			h.errorResponse(c, http.StatusNotFound, "not_found_error", "Video request not found")
-			return
-		}
-
 		reqLog.Debug("grok_media.account_schedule_decision",
 			zap.String("layer", scheduleDecision.Layer),
 			zap.Bool("sticky_session_hit", scheduleDecision.StickySessionHit),

@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Check migration idempotency, Ent generation, field mapping, indexes, and cache compatibility."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Check unchanged no-account behavior and structured invalid-filter failures."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Check backend tests, formatting, lint, generated diffs, and high-risk scheduler coverage."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Check API/component types and explicit true-to-false update semantics."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Check Vitest, typecheck, lint, build, and responsive UI behavior."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Verify end-to-end role flow and strict ordering at all direct and cached selection paths."}
+{"file":".trellis/tasks/08-15-fallback-account-pool/research/repository-map.md","reason":"Audit implementation coverage against every discovered selector, create path, cache, and admin surface."}
+{"file":".trellis/tasks/08-15-fallback-account-pool/research/planning-review.md","reason":"Verify each independent planning finding was implemented and regression-tested before sign-off."}

@@ -21,8 +21,23 @@ import (
 
 // Account management implementations
 func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode string, sortBy, sortOrder string) ([]Account, int64, error) {
+	return s.listAccountsWithPool(ctx, page, pageSize, platform, accountType, status, search, groupID, privacyMode, "", sortBy, sortOrder)
+}
+
+func (s *adminServiceImpl) ListAccountsWithPool(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode, pool, sortBy, sortOrder string) ([]Account, int64, error) {
+	return s.listAccountsWithPool(ctx, page, pageSize, platform, accountType, status, search, groupID, privacyMode, pool, sortBy, sortOrder)
+}
+
+func (s *adminServiceImpl) listAccountsWithPool(ctx context.Context, page, pageSize int, platform, accountType, status, search string, groupID int64, privacyMode, pool, sortBy, sortOrder string) ([]Account, int64, error) {
 	params := pagination.PaginationParams{Page: page, PageSize: pageSize, SortBy: sortBy, SortOrder: sortOrder}
-	accounts, result, err := s.accountRepo.ListWithFilters(ctx, params, platform, accountType, status, search, groupID, privacyMode)
+	var accounts []Account
+	var result *pagination.PaginationResult
+	var err error
+	if repo, ok := s.accountRepo.(AccountFilterRepository); ok {
+		accounts, result, err = repo.ListWithFiltersAndPool(ctx, params, platform, accountType, status, search, groupID, privacyMode, pool)
+	} else {
+		accounts, result, err = s.accountRepo.ListWithFilters(ctx, params, platform, accountType, status, search, groupID, privacyMode)
+	}
 	if err != nil {
 		return nil, 0, err
 	}
@@ -30,8 +45,19 @@ func (s *adminServiceImpl) ListAccounts(ctx context.Context, page, pageSize int,
 }
 
 func (s *adminServiceImpl) ListAccountsForSchedulerScoreFilter(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]Account, error) {
+	return s.listAccountsForSchedulerScoreFilter(ctx, platform, accountType, status, search, groupID, privacyMode, "")
+}
+
+func (s *adminServiceImpl) ListAccountsForSchedulerScoreFilterWithPool(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, pool string) ([]Account, error) {
+	return s.listAccountsForSchedulerScoreFilter(ctx, platform, accountType, status, search, groupID, privacyMode, pool)
+}
+
+func (s *adminServiceImpl) listAccountsForSchedulerScoreFilter(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, pool string) ([]Account, error) {
 	if s == nil || s.accountRepo == nil {
 		return nil, nil
+	}
+	if repo, ok := s.accountRepo.(AccountFilterRepository); ok {
+		return repo.ListAllWithFiltersAndPool(ctx, platform, accountType, status, search, groupID, privacyMode, pool)
 	}
 	return s.accountRepo.ListAllWithFilters(ctx, platform, accountType, status, search, groupID, privacyMode)
 }
@@ -297,6 +323,7 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 		ProxyID:               cloneAccountValuePointer(proxyID),
 		Concurrency:           source.Concurrency,
 		Priority:              source.Priority,
+		IsFallback:            source.IsFallback,
 		RateMultiplier:        cloneAccountValuePointer(source.RateMultiplier),
 		LoadFactor:            cloneAccountValuePointer(source.LoadFactor),
 		GroupIDs:              groupIDs,
@@ -470,6 +497,7 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 		ProxyID:     input.ProxyID,
 		Concurrency: normalizeAccountConcurrency(input.Platform, input.Type, input.Concurrency),
 		Priority:    input.Priority,
+		IsFallback:  input.IsFallback,
 		Status:      StatusActive,
 		Schedulable: true,
 	}
@@ -787,6 +815,10 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 	// 只在指针非 nil 时更新 Priority（支持设置为 0）
 	if input.Priority != nil {
 		account.Priority = *input.Priority
+	}
+	if input.IsFallback != nil {
+		account.IsFallback = *input.IsFallback
+		account.PoolRoleChanged = true
 	}
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier < 0 {
@@ -1107,6 +1139,9 @@ func (s *adminServiceImpl) BulkUpdateAccounts(ctx context.Context, input *BulkUp
 	if input.Priority != nil {
 		repoUpdates.Priority = input.Priority
 	}
+	if input.IsFallback != nil {
+		repoUpdates.IsFallback = input.IsFallback
+	}
 	if input.RateMultiplier != nil {
 		repoUpdates.RateMultiplier = input.RateMultiplier
 	}
@@ -1216,7 +1251,7 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 	accountIDs := make([]int64, 0, pageSize)
 
 	for {
-		accounts, total, err := s.ListAccounts(
+		accounts, total, err := s.ListAccountsWithPool(
 			ctx,
 			page,
 			pageSize,
@@ -1226,6 +1261,7 @@ func (s *adminServiceImpl) resolveBulkUpdateTargetIDs(ctx context.Context, filte
 			filters.Search,
 			groupID,
 			filters.PrivacyMode,
+			filters.Pool,
 			"",
 			"",
 		)
@@ -1404,6 +1440,7 @@ func (s *adminServiceImpl) CreateShadow(ctx context.Context, parentID int64, opt
 		QuotaDimension:  QuotaDimensionSpark,
 		ProxyID:         parent.ProxyID,
 		Priority:        priority,
+		IsFallback:      parent.IsFallback,
 		Concurrency:     concurrency,
 		Schedulable:     true,
 		Extra: map[string]any{

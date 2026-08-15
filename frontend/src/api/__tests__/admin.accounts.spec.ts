@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { post } = vi.hoisted(() => ({
+const { get, post } = vi.hoisted(() => ({
+  get: vi.fn(),
   post: vi.fn()
 }))
 
 vi.mock('@/api/client', () => ({
   apiClient: {
+    get,
     post
   }
 }))
@@ -14,7 +16,29 @@ import { accountsAPI } from '@/api/admin/accounts'
 
 describe('admin accounts api', () => {
   beforeEach(() => {
+    get.mockReset()
     post.mockReset()
+  })
+
+  it('passes the pool filter through list and ETag list requests', async () => {
+    get
+      .mockResolvedValueOnce({ data: { items: [], total: 0, page: 1, page_size: 20, pages: 0 } })
+      .mockResolvedValueOnce({ status: 304, headers: { etag: '"fallback"' } })
+
+    await accountsAPI.list(2, 10, { pool: 'fallback' })
+    await accountsAPI.listWithEtag(3, 25, { pool: 'primary' }, { etag: '"primary"' })
+
+    expect(get.mock.calls[0]).toEqual([
+      '/admin/accounts',
+      expect.objectContaining({ params: expect.objectContaining({ page: 2, page_size: 10, pool: 'fallback' }) })
+    ])
+    expect(get.mock.calls[1]).toEqual([
+      '/admin/accounts',
+      expect.objectContaining({
+        params: expect.objectContaining({ page: 3, page_size: 25, pool: 'primary' }),
+        headers: { 'If-None-Match': '"primary"' }
+      })
+    ])
   })
 
   it('imports ChatGPT sessions through the dedicated admin endpoint', async () => {

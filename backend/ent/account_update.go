@@ -247,6 +247,41 @@ func (_u *AccountUpdate) AddPriority(v int) *AccountUpdate {
 	return _u
 }
 
+// SetIsFallback sets the "is_fallback" field.
+func (_u *AccountUpdate) SetIsFallback(v bool) *AccountUpdate {
+	_u.mutation.SetIsFallback(v)
+	return _u
+}
+
+// SetNillableIsFallback sets the "is_fallback" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableIsFallback(v *bool) *AccountUpdate {
+	if v != nil {
+		_u.SetIsFallback(*v)
+	}
+	return _u
+}
+
+// SetPoolRevision sets the "pool_revision" field.
+func (_u *AccountUpdate) SetPoolRevision(v int64) *AccountUpdate {
+	_u.mutation.ResetPoolRevision()
+	_u.mutation.SetPoolRevision(v)
+	return _u
+}
+
+// SetNillablePoolRevision sets the "pool_revision" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillablePoolRevision(v *int64) *AccountUpdate {
+	if v != nil {
+		_u.SetPoolRevision(*v)
+	}
+	return _u
+}
+
+// AddPoolRevision adds value to the "pool_revision" field.
+func (_u *AccountUpdate) AddPoolRevision(v int64) *AccountUpdate {
+	_u.mutation.AddPoolRevision(v)
+	return _u
+}
+
 // SetRateMultiplier sets the "rate_multiplier" field.
 func (_u *AccountUpdate) SetRateMultiplier(v float64) *AccountUpdate {
 	_u.mutation.ResetRateMultiplier()
@@ -772,6 +807,11 @@ func (_u *AccountUpdate) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Account.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PoolRevision(); ok {
+		if err := account.PoolRevisionValidator(v); err != nil {
+			return &ValidationError{Name: "pool_revision", err: fmt.Errorf(`ent: validator failed for field "Account.pool_revision": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := account.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
@@ -861,6 +901,15 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedPriority(); ok {
 		_spec.AddField(account.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.IsFallback(); ok {
+		_spec.SetField(account.FieldIsFallback, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PoolRevision(); ok {
+		_spec.SetField(account.FieldPoolRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedPoolRevision(); ok {
+		_spec.AddField(account.FieldPoolRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.RateMultiplier(); ok {
 		_spec.SetField(account.FieldRateMultiplier, field.TypeFloat64, value)
@@ -1384,6 +1433,41 @@ func (_u *AccountUpdateOne) SetNillablePriority(v *int) *AccountUpdateOne {
 // AddPriority adds value to the "priority" field.
 func (_u *AccountUpdateOne) AddPriority(v int) *AccountUpdateOne {
 	_u.mutation.AddPriority(v)
+	return _u
+}
+
+// SetIsFallback sets the "is_fallback" field.
+func (_u *AccountUpdateOne) SetIsFallback(v bool) *AccountUpdateOne {
+	_u.mutation.SetIsFallback(v)
+	return _u
+}
+
+// SetNillableIsFallback sets the "is_fallback" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableIsFallback(v *bool) *AccountUpdateOne {
+	if v != nil {
+		_u.SetIsFallback(*v)
+	}
+	return _u
+}
+
+// SetPoolRevision sets the "pool_revision" field.
+func (_u *AccountUpdateOne) SetPoolRevision(v int64) *AccountUpdateOne {
+	_u.mutation.ResetPoolRevision()
+	_u.mutation.SetPoolRevision(v)
+	return _u
+}
+
+// SetNillablePoolRevision sets the "pool_revision" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillablePoolRevision(v *int64) *AccountUpdateOne {
+	if v != nil {
+		_u.SetPoolRevision(*v)
+	}
+	return _u
+}
+
+// AddPoolRevision adds value to the "pool_revision" field.
+func (_u *AccountUpdateOne) AddPoolRevision(v int64) *AccountUpdateOne {
+	_u.mutation.AddPoolRevision(v)
 	return _u
 }
 
@@ -1925,6 +2009,11 @@ func (_u *AccountUpdateOne) check() error {
 			return &ValidationError{Name: "type", err: fmt.Errorf(`ent: validator failed for field "Account.type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.PoolRevision(); ok {
+		if err := account.PoolRevisionValidator(v); err != nil {
+			return &ValidationError{Name: "pool_revision", err: fmt.Errorf(`ent: validator failed for field "Account.pool_revision": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := account.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
@@ -2031,6 +2120,15 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 	}
 	if value, ok := _u.mutation.AddedPriority(); ok {
 		_spec.AddField(account.FieldPriority, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.IsFallback(); ok {
+		_spec.SetField(account.FieldIsFallback, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.PoolRevision(); ok {
+		_spec.SetField(account.FieldPoolRevision, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedPoolRevision(); ok {
+		_spec.AddField(account.FieldPoolRevision, field.TypeInt64, value)
 	}
 	if value, ok := _u.mutation.RateMultiplier(); ok {
 		_spec.SetField(account.FieldRateMultiplier, field.TypeFloat64, value)

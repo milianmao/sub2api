@@ -1160,6 +1160,30 @@ describe('EditAccountModal', () => {
     )
   })
 
+  it('initializes fallback pool state and sends an explicit clear to primary', async () => {
+    const account = { ...buildAccount(), is_fallback: true }
+    updateAccountMock.mockResolvedValue(account)
+
+    const wrapper = mountModal(account)
+    const fallbackToggle = wrapper.findAll('button').find((button) =>
+      button.attributes('aria-pressed') === 'true'
+    )
+    expect(fallbackToggle).toBeTruthy()
+
+    await fallbackToggle!.trigger('click')
+    await wrapper.get('form#edit-account-form').trigger('submit.prevent')
+
+    expect(updateAccountMock).toHaveBeenCalledWith(account.id, expect.objectContaining({
+      is_fallback: false
+    }))
+  })
+
+  it('defaults absent fallback metadata to the primary pool', () => {
+    const wrapper = mountModal(buildAccount())
+
+    expect(wrapper.findAll('button').some((button) => button.attributes('aria-pressed') === 'false')).toBe(true)
+  })
+
   it('clears Antigravity configured project fallback when input is empty', async () => {
     const account = buildAntigravityAccount('configured-project')
     updateAccountMock.mockReset()

@@ -270,6 +270,11 @@
             <span v-if="value" :title="value" class="block max-w-xs truncate text-sm text-gray-600 dark:text-gray-300">{{ value }}</span>
             <span v-else class="text-sm text-gray-400 dark:text-dark-500">-</span>
           </template>
+          <template #cell-pool="{ row }">
+            <span :class="row.is_fallback ? 'rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200' : 'rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700 dark:bg-slate-700 dark:text-slate-200'">
+              {{ row.is_fallback ? t('admin.accounts.fallbackPool') : t('admin.accounts.primaryPool') }}
+            </span>
+          </template>
           <template #cell-platform_type="{ row }">
             <div class="flex min-w-0 flex-col gap-1">
               <div class="flex flex-wrap items-center gap-1">
@@ -677,6 +682,7 @@ type AccountQueryFilters = {
   type?: string
   status?: string
   privacy_mode?: string
+  pool?: 'primary' | 'fallback' | ''
   group?: string
   search?: string
   sort_by?: string
@@ -947,9 +953,10 @@ const normalizeAccountStatusFilter = (status: string) => {
   return status === 'paused' ? 'unschedulable' : status
 }
 
-const normalizeAccountQueryFilters = (filters: AccountQueryFilters): AccountQueryFilters => ({
+const normalizeAccountQueryFilters = (filters: AccountQueryFilters) => ({
   ...filters,
-  status: normalizeAccountStatusFilter(filters.status || '')
+  status: normalizeAccountStatusFilter(filters.status || ''),
+  pool: filters.pool || undefined
 })
 
 const fetchAccounts = (
@@ -1507,6 +1514,7 @@ const allColumns = computed(() => {
     { key: 'name', label: t('admin.accounts.columns.name'), sortable: true },
     { key: 'id', label: t('admin.accounts.columns.id'), sortable: true },
     { key: 'platform_type', label: t('admin.accounts.columns.platformType'), sortable: false },
+    { key: 'pool', label: t('admin.accounts.columns.pool'), sortable: false },
     { key: 'capacity', label: t('admin.accounts.columns.capacity'), sortable: false },
     { key: 'status', label: t('admin.accounts.columns.status'), sortable: true },
     { key: 'schedulable', label: t('admin.accounts.columns.schedulable'), sortable: true },
@@ -1876,6 +1884,7 @@ const buildAccountQueryFilters = () => ({
   status: normalizeAccountStatusFilter(params.status || ''),
   group: params.group || '',
   privacy_mode: params.privacy_mode || '',
+  pool: params.pool || '',
   search: params.search || '',
   sort_by: sortState.sort_by,
   sort_order: sortState.sort_order
@@ -1885,6 +1894,7 @@ const accountMatchesCurrentFilters = (account: Account) => {
   const filters = buildAccountQueryFilters()
   if (filters.platform && account.platform !== filters.platform) return false
   if (filters.type && account.type !== filters.type) return false
+  if (filters.pool && (filters.pool === 'fallback') !== account.is_fallback) return false
   if (filters.status) {
     const now = Date.now()
     const rateLimitResetAt = account.rate_limit_reset_at ? new Date(account.rate_limit_reset_at).getTime() : Number.NaN

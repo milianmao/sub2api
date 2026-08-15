@@ -113,13 +113,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 
 	cacheKey := "gemini:" + sessionHash
 
-	// 2. 尝试粘性会话命中
-	// Try sticky session hit
-	if account := s.tryStickySessionHit(ctx, groupID, sessionHash, cacheKey, requestedModel, excludedIDs, platform, useMixedScheduling); account != nil {
-		return account, nil
-	}
-
-	// 3. 查询可调度账户（强制平台模式：优先按分组查找，找不到再查全部）
+	// 2. 查询可调度账户（强制平台模式：优先按分组查找，找不到再查全部）
 	// Query schedulable accounts (force platform mode: try group first, fallback to all)
 	accounts, err := s.listSchedulableAccountsOnce(ctx, groupID, platform, hasForcePlatform)
 	if err != nil {
@@ -133,16 +127,24 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 		}
 	}
 
-	// 4. 按优先级 + LRU 选择最佳账号
-	// Select best account by priority + LRU
-	selected := s.selectBestGeminiAccount(ctx, accounts, requestedModel, excludedIDs, platform, useMixedScheduling)
-
-	if selected == nil {
+	// Apply all request gates and establish the pool boundary before sticky
+	// affinity. A recovered primary therefore displaces a fallback binding.
+	eligible, role := s.eligibleGeminiAccounts(ctx, accounts, requestedModel, excludedIDs, platform, useMixedScheduling)
+	if len(eligible) == 0 {
 		if requestedModel != "" {
 			return nil, fmt.Errorf("no available Gemini accounts supporting model: %s", requestedModel)
 		}
 		return nil, errors.New("no available Gemini accounts")
 	}
+
+	// 3. Sticky affinity is a preference within the selected pool only.
+	if account := s.tryStickySessionHit(ctx, groupID, sessionHash, cacheKey, requestedModel, excludedIDs, platform, useMixedScheduling); AccountMatchesPool(account, role) {
+		return s.hydrateSelectedAccount(ctx, account)
+	}
+
+	// 4. 按优先级 + LRU 选择最佳账号
+	// Select best account by priority + LRU
+	selected := s.selectBestGeminiEligibleAccount(eligible)
 
 	// 5. 设置粘性会话绑定
 	// Set sticky session binding
@@ -320,6 +322,38 @@ func (s *GeminiMessagesCompatService) passesRateLimitPreCheckWithCache(ctx conte
 //
 // selectBestGeminiAccount selects best account from candidates (priority + LRU + OAuth preferred).
 // Returns nil if no available account.
+func (s *GeminiMessagesCompatService) eligibleGeminiAccounts(
+	ctx context.Context,
+	accounts []Account,
+	requestedModel string,
+	excludedIDs map[int64]struct{},
+	platform string,
+	useMixedScheduling bool,
+) ([]*Account, AccountPoolRole) {
+	precheckResult := s.buildPreCheckUsageResultMap(ctx, accounts, requestedModel)
+	eligible := make([]*Account, 0, len(accounts))
+	for i := range accounts {
+		account := &accounts[i]
+		if _, excluded := excludedIDs[account.ID]; excluded {
+			continue
+		}
+		if s.isAccountUsableForRequestWithPrecheck(ctx, account, requestedModel, platform, useMixedScheduling, precheckResult) {
+			eligible = append(eligible, account)
+		}
+	}
+	return PartitionAccountPool(eligible, func(account *Account) *Account { return account }).Preferred()
+}
+
+func (s *GeminiMessagesCompatService) selectBestGeminiEligibleAccount(eligible []*Account) *Account {
+	var selected *Account
+	for _, account := range eligible {
+		if selected == nil || s.isBetterGeminiAccount(account, selected) {
+			selected = account
+		}
+	}
+	return selected
+}
+
 func (s *GeminiMessagesCompatService) selectBestGeminiAccount(
 	ctx context.Context,
 	accounts []Account,
@@ -328,34 +362,8 @@ func (s *GeminiMessagesCompatService) selectBestGeminiAccount(
 	platform string,
 	useMixedScheduling bool,
 ) *Account {
-	var selected *Account
-	precheckResult := s.buildPreCheckUsageResultMap(ctx, accounts, requestedModel)
-
-	for i := range accounts {
-		acc := &accounts[i]
-
-		// 跳过被排除的账号
-		if _, excluded := excludedIDs[acc.ID]; excluded {
-			continue
-		}
-
-		// 检查账号是否可用于当前请求
-		if !s.isAccountUsableForRequestWithPrecheck(ctx, acc, requestedModel, platform, useMixedScheduling, precheckResult) {
-			continue
-		}
-
-		// 选择最佳账号
-		if selected == nil {
-			selected = acc
-			continue
-		}
-
-		if s.isBetterGeminiAccount(acc, selected) {
-			selected = acc
-		}
-	}
-
-	return selected
+	eligible, _ := s.eligibleGeminiAccounts(ctx, accounts, requestedModel, excludedIDs, platform, useMixedScheduling)
+	return s.selectBestGeminiEligibleAccount(eligible)
 }
 
 func (s *GeminiMessagesCompatService) buildPreCheckUsageResultMap(ctx context.Context, accounts []Account, requestedModel string) map[int64]bool {
@@ -537,9 +545,17 @@ func (s *GeminiMessagesCompatService) SelectAccountForAIStudioEndpoints(ctx cont
 		}
 	}
 
-	var selected *Account
+	endpointCandidates := make([]*Account, 0, len(accounts))
 	for i := range accounts {
 		acc := &accounts[i]
+		if rank(acc) < 999 {
+			endpointCandidates = append(endpointCandidates, acc)
+		}
+	}
+	endpointCandidates, _ = PartitionAccountPool(endpointCandidates, func(account *Account) *Account { return account }).Preferred()
+
+	var selected *Account
+	for _, acc := range endpointCandidates {
 		if selected == nil {
 			selected = acc
 			continue

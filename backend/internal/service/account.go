@@ -31,6 +31,14 @@ type Account struct {
 	ProxyFallbackOriginName *string // 仅展示用
 	Concurrency             int
 	Priority                int
+	// IsFallback is the global routing role. False is the backward-compatible primary role.
+	IsFallback bool
+	// PoolRevision fences fallback-role payload publication in the shared scheduler cache.
+	// It is internal and never exposed through the administrator API.
+	PoolRevision int64
+	// PoolRoleChanged marks an explicit administrator role assignment. Repository
+	// updates use it to increment PoolRevision while holding the account row lock.
+	PoolRoleChanged bool `json:"-"`
 	// RateMultiplier 账号计费倍率（>=0，允许 0 表示该账号计费为 0）。
 	// 使用指针用于兼容旧版本调度缓存（Redis）中缺字段的情况：nil 表示按 1.0 处理。
 	RateMultiplier     *float64

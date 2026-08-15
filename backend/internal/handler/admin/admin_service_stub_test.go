@@ -57,6 +57,7 @@ type stubAdminService struct {
 		search      string
 		groupID     int64
 		privacyMode string
+		pool        string
 		sortBy      string
 		sortOrder   string
 		calls       int

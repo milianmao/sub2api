@@ -1,0 +1,13 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend pre-development checklist and links for service/repository work."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Additive migration, Ent schema, generated-code, repository, and cache persistence rules."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Preserve existing no-account errors and validate the new list filter consistently."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Add low-noise pool decision context without leaking data or creating log spam."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Backend test, generation, formatting, and verification expectations."}
+{"file":".trellis/spec/frontend/index.md","reason":"Frontend pre-development checklist and related component/type guidance."}
+{"file":".trellis/spec/frontend/component-guidelines.md","reason":"Implement create/edit/bulk/list/group controls consistently with the admin UI."}
+{"file":".trellis/spec/frontend/type-safety.md","reason":"Propagate is_fallback and pool filters through typed API and component contracts."}
+{"file":".trellis/spec/frontend/quality-guidelines.md","reason":"Frontend component testing, typecheck, lint, build, and responsive checks."}
+{"file":".trellis/spec/guides/cross-layer-thinking-guide.md","reason":"Trace the role across migration, Ent, service, cache, API, UI, and every scheduler."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Use one strict pool primitive while preserving path-specific eligibility semantics."}
+{"file":".trellis/tasks/08-15-fallback-account-pool/research/repository-map.md","reason":"Repository evidence, independent selection entry points, mutation paths, and settled design conclusions."}
+{"file":".trellis/tasks/08-15-fallback-account-pool/research/planning-review.md","reason":"Independent planning findings and the required cache-consistency, selector-audit, batch eligibility, and test resolutions."}

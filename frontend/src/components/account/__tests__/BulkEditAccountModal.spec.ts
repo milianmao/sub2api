@@ -61,7 +61,7 @@ function mountModal(extraProps: Record<string, unknown> = {}) {
             <select
               v-bind="$attrs"
               :value="modelValue"
-              @change="$emit('update:modelValue', $event.target.value)"
+              @change="$emit('update:modelValue', options.find((option) => String(option.value) === $event.target.value)?.value)"
             >
               <option v-for="option in options" :key="option.value" :value="option.value">
                 {{ option.label }}
@@ -484,6 +484,51 @@ describe('BulkEditAccountModal', () => {
     expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith({
       filters: { platform: 'openai', type: 'apikey', status: 'active' },
       upstream_billing_probe_enabled: true
+    })
+  })
+
+  it('omits fallback pool membership for explicit targets until opted in', async () => {
+    const wrapper = mountModal()
+
+    await wrapper.get('#bulk-edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(adminAPI.accounts.bulkUpdate).not.toHaveBeenCalled()
+  })
+
+  it('sends fallback pool membership for explicit targets when opted in', async () => {
+    const wrapper = mountModal()
+
+    await wrapper.get('#bulk-edit-fallback-pool-enabled').setValue(true)
+    await wrapper.get('select').setValue('true')
+    await wrapper.get('#bulk-edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith([1, 2], { is_fallback: true })
+  })
+
+  it('sends opted-in fallback pool membership for filtered targets', async () => {
+    const wrapper = mountModal({
+      accountIds: [],
+      selectedPlatforms: [],
+      selectedTypes: [],
+      target: {
+        mode: 'filtered',
+        filters: { platform: 'openai', pool: 'primary' },
+        previewCount: 12,
+        selectedPlatforms: ['openai'],
+        selectedTypes: ['apikey']
+      }
+    })
+
+    await wrapper.get('#bulk-edit-fallback-pool-enabled').setValue(true)
+    await wrapper.get('select').setValue('true')
+    await wrapper.get('#bulk-edit-account-form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(adminAPI.accounts.bulkUpdate).toHaveBeenCalledWith({
+      filters: { platform: 'openai', pool: 'primary' },
+      is_fallback: true
     })
   })
 

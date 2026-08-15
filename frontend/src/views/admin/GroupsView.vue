@@ -2058,6 +2058,12 @@
                         class="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
                       >
                         {{ account.name }}
+                        <span
+                          :class="account.is_fallback ? 'bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100' : 'bg-primary-200 text-primary-800 dark:bg-primary-800 dark:text-primary-100'"
+                          class="rounded px-1 py-0.5 text-[10px]"
+                        >
+                          {{ account.is_fallback ? t('admin.accounts.fallbackPool') : t('admin.accounts.primaryPool') }}
+                        </span>
                         <button
                           type="button"
                           @click="removeSelectedAccount(rule, account.id)"
@@ -2110,6 +2116,10 @@
                           "
                         >
                           <span>{{ account.name }}</span>
+                          <span
+                            :class="account.is_fallback ? 'text-amber-600 dark:text-amber-300' : 'text-primary-600 dark:text-primary-300'"
+                            class="ml-2 text-xs"
+                          >{{ account.is_fallback ? t('admin.accounts.fallbackPool') : t('admin.accounts.primaryPool') }}</span>
                           <span class="ml-2 text-xs text-gray-400"
                             >#{{ account.id }}</span
                           >
@@ -3768,6 +3778,12 @@
                         class="inline-flex items-center gap-1 rounded-full bg-primary-100 px-2.5 py-1 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-300"
                       >
                         {{ account.name }}
+                        <span
+                          :class="account.is_fallback ? 'bg-amber-200 text-amber-900 dark:bg-amber-800 dark:text-amber-100' : 'bg-primary-200 text-primary-800 dark:bg-primary-800 dark:text-primary-100'"
+                          class="rounded px-1 py-0.5 text-[10px]"
+                        >
+                          {{ account.is_fallback ? t('admin.accounts.fallbackPool') : t('admin.accounts.primaryPool') }}
+                        </span>
                         <button
                           type="button"
                           @click="removeSelectedAccount(rule, account.id, true)"
@@ -3820,6 +3836,10 @@
                           "
                         >
                           <span>{{ account.name }}</span>
+                          <span
+                            :class="account.is_fallback ? 'text-amber-600 dark:text-amber-300' : 'text-primary-600 dark:text-primary-300'"
+                            class="ml-2 text-xs"
+                          >{{ account.is_fallback ? t('admin.accounts.fallbackPool') : t('admin.accounts.primaryPool') }}</span>
                           <span class="ml-2 text-xs text-gray-400"
                             >#{{ account.id }}</span
                           >
@@ -5074,6 +5094,7 @@ const createForm = reactive({
 interface SimpleAccount {
   id: number;
   name: string;
+  is_fallback: boolean;
 }
 
 // 模型路由规则类型
@@ -5149,7 +5170,11 @@ const accountSearchRunner = useKeyedDebouncedSearch<SimpleAccount[]>({
       },
       { signal },
     );
-    return res.items.map((account) => ({ id: account.id, name: account.name }));
+    return res.items.map((account) => ({
+      id: account.id,
+      name: account.name,
+      is_fallback: account.is_fallback === true,
+    }));
   },
   onSuccess: (key, result) => {
     accountSearchResults.value[key] = result;
@@ -5347,10 +5372,10 @@ const convertApiFormatToRoutingRules = async (
     for (const id of accountIds) {
       try {
         const account = await adminAPI.accounts.getById(id);
-        accounts.push({ id: account.id, name: account.name });
+        accounts.push({ id: account.id, name: account.name, is_fallback: account.is_fallback === true });
       } catch {
         // 如果账号不存在，仍然显示 ID
-        accounts.push({ id, name: `#${id}` });
+        accounts.push({ id, name: `#${id}`, is_fallback: false });
       }
     }
     rules.push({ pattern, accounts });

@@ -356,6 +356,7 @@ func TestImportDataPayloadAppliesImportOptions(t *testing.T) {
 				Credentials:        map[string]any{"access_token": "token"},
 				Concurrency:        4,
 				Priority:           66,
+				IsFallback:         true,
 				RateMultiplier:     &rateMultiplier,
 				ExpiresAt:          &expiresAt,
 				AutoPauseOnExpired: &autoPause,
@@ -381,6 +382,7 @@ func TestImportDataPayloadAppliesImportOptions(t *testing.T) {
 	require.Equal(t, notes, *created.Notes)
 	require.Equal(t, 4, created.Concurrency)
 	require.Equal(t, 66, created.Priority)
+	require.True(t, created.IsFallback)
 	require.Equal(t, &rateMultiplier, created.RateMultiplier)
 	require.Equal(t, expiresAt, *created.ExpiresAt)
 	require.True(t, *created.AutoPauseOnExpired)

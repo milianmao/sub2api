@@ -41,7 +41,7 @@ func TestSchedulerCacheWriteAccountIDsSkipsUnencodableTimes(t *testing.T) {
 	accountIDs, err := cache.writeAccountIDs(ctx, []service.Account{
 		{ID: 111, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey},
 		{ID: 112, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, ExpiresAt: &invalidTime},
-	})
+	}, false)
 	require.NoError(t, err)
 	require.Equal(t, []int64{111}, accountIDs)
 
@@ -54,20 +54,138 @@ func TestSchedulerCacheWriteAccountIDsSkipsUnencodableTimes(t *testing.T) {
 	require.Nil(t, invalid)
 }
 
-func TestSchedulerCacheSetAccountClearsUnencodablePayload(t *testing.T) {
+func TestSchedulerCacheSetAccountRejectsUnencodablePayloadWithoutClearingRevisionFence(t *testing.T) {
 	ctx := context.Background()
 	cache := newSchedulerCacheUnit(t)
 
-	account := service.Account{ID: 113, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey}
+	account := service.Account{ID: 113, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, PoolRevision: 7}
 	require.NoError(t, cache.SetAccount(ctx, &account))
 
 	invalidTime := time.Date(10000, time.January, 1, 0, 0, 0, 0, time.UTC)
 	account.ExpiresAt = &invalidTime
-	require.NoError(t, cache.SetAccount(ctx, &account))
+	require.Error(t, cache.SetAccount(ctx, &account))
 
 	cached, err := cache.GetAccount(ctx, account.ID)
 	require.NoError(t, err)
-	require.Nil(t, cached)
+	require.NotNil(t, cached)
+	require.False(t, cached.IsFallback)
+	id := strconv.FormatInt(account.ID, 10)
+	require.Equal(t, "00000000000000000007", cache.rdb.Get(ctx, schedulerAccountPoolRevisionKey(id)).Val())
+}
+
+func TestSchedulerCachePoolRevisionFencesStaleAccountPayloads(t *testing.T) {
+	ctx := context.Background()
+	cache := newSchedulerCacheUnit(t)
+	account := service.Account{ID: 115, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, PoolRevision: 2}
+	require.NoError(t, cache.SetAccount(ctx, &account))
+
+	account.IsFallback = true
+	account.PoolRevision = 3
+	require.NoError(t, cache.SetAccount(ctx, &account))
+
+	stale := account
+	stale.IsFallback = false
+	stale.PoolRevision = 2
+	require.NoError(t, cache.SetAccount(ctx, &stale))
+
+	cached, err := cache.GetAccount(ctx, account.ID)
+	require.NoError(t, err)
+	require.NotNil(t, cached)
+	require.True(t, cached.IsFallback)
+
+	id := strconv.FormatInt(account.ID, 10)
+	require.Equal(t, "00000000000000000003", cache.rdb.Get(ctx, schedulerAccountPoolRevisionKey(id)).Val())
+	require.NoError(t, cache.DeleteAccount(ctx, account.ID))
+	require.Zero(t, cache.rdb.Exists(ctx, schedulerAccountPoolRevisionKey(id)).Val())
+}
+
+func TestSchedulerCacheSnapshotRebuildDoesNotRefreshEqualAuthoritativeRevision(t *testing.T) {
+	ctx := context.Background()
+	cache := newSchedulerCacheUnit(t)
+	authoritative := service.Account{ID: 117, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, PoolRevision: 6}
+	require.NoError(t, cache.SetAccount(ctx, &authoritative))
+
+	staleRebuild := authoritative
+	staleRebuild.IsFallback = true
+	_, err := cache.writeAccountIDs(ctx, []service.Account{staleRebuild}, false)
+	require.NoError(t, err)
+
+	cached, err := cache.GetAccount(ctx, authoritative.ID)
+	require.NoError(t, err)
+	require.NotNil(t, cached)
+	require.False(t, cached.IsFallback, "equal-revision snapshot rebuild must not refresh authoritative payload")
+
+	require.NoError(t, cache.SetAccount(ctx, &staleRebuild))
+	cached, err = cache.GetAccount(ctx, authoritative.ID)
+	require.NoError(t, err)
+	require.True(t, cached.IsFallback, "authoritative equal revision may repair the payload")
+}
+
+func TestSchedulerCachePoolRevisionTombstoneRejectsRebuildAndAllowsAuthoritativeRepair(t *testing.T) {
+	ctx := context.Background()
+	cache := newSchedulerCacheUnit(t)
+	account := service.Account{ID: 116, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, PoolRevision: 4}
+	require.NoError(t, cache.SetAccount(ctx, &account))
+	require.NoError(t, cache.InvalidateAccountAtPoolRevision(ctx, account.ID, account.PoolRevision+1))
+
+	stale := account
+	stale.PoolRevision = 4
+	stale.IsFallback = true
+	_, err := cache.writeAccountIDs(ctx, []service.Account{stale}, false)
+	require.NoError(t, err)
+	cached, err := cache.GetAccount(ctx, account.ID)
+	require.NoError(t, err)
+	require.Nil(t, cached, "stale rebuild must not resurrect a tombstoned account")
+
+	equalRebuild := account
+	equalRebuild.PoolRevision = 5
+	_, err = cache.writeAccountIDs(ctx, []service.Account{equalRebuild}, false)
+	require.NoError(t, err)
+	cached, err = cache.GetAccount(ctx, account.ID)
+	require.NoError(t, err)
+	require.Nil(t, cached, "equal-revision rebuild is not authoritative")
+
+	equalRepair := equalRebuild
+	equalRepair.IsFallback = true
+	require.NoError(t, cache.SetAccount(ctx, &equalRepair))
+	cached, err = cache.GetAccount(ctx, account.ID)
+	require.NoError(t, err)
+	require.NotNil(t, cached)
+	require.True(t, cached.IsFallback)
+}
+
+func TestSchedulerCachePoolRevisionIgnoresDelayedEqualInvalidationAfterAuthoritativeRepair(t *testing.T) {
+	ctx := context.Background()
+	cache := newSchedulerCacheUnit(t)
+	account := service.Account{ID: 118, Platform: service.PlatformOpenAI, Type: service.AccountTypeAPIKey, PoolRevision: 9}
+
+	// The first failed publication leaves a tombstone. An outbox repair then
+	// publishes the same committed revision. The delayed first invalidation must
+	// not erase that repaired payload.
+	require.NoError(t, cache.InvalidateAccountAtPoolRevision(ctx, account.ID, account.PoolRevision))
+	account.IsFallback = true
+	require.NoError(t, cache.SetAccount(ctx, &account))
+	require.NoError(t, cache.InvalidateAccountAtPoolRevision(ctx, account.ID, account.PoolRevision))
+
+	cached, err := cache.GetAccount(ctx, account.ID)
+	require.NoError(t, err)
+	require.NotNil(t, cached)
+	require.True(t, cached.IsFallback)
+	id := strconv.FormatInt(account.ID, 10)
+	require.Equal(t, "00000000000000000009", cache.rdb.Get(ctx, schedulerAccountPoolRevisionKey(id)).Val())
+}
+
+func TestFormatPoolRevisionUsesFixedWidthDecimal(t *testing.T) {
+	zero, err := formatPoolRevision(0)
+	require.NoError(t, err)
+	require.Equal(t, "00000000000000000000", zero)
+
+	maximum, err := formatPoolRevision(9223372036854775807)
+	require.NoError(t, err)
+	require.Equal(t, "09223372036854775807", maximum)
+
+	_, err = formatPoolRevision(-1)
+	require.Error(t, err)
 }
 
 func TestSchedulerCacheUpdateLastUsedClearsUnencodablePayload(t *testing.T) {

@@ -115,6 +115,16 @@ func Priority(v int) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldPriority, v))
 }
 
+// IsFallback applies equality check predicate on the "is_fallback" field. It's identical to IsFallbackEQ.
+func IsFallback(v bool) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldIsFallback, v))
+}
+
+// PoolRevision applies equality check predicate on the "pool_revision" field. It's identical to PoolRevisionEQ.
+func PoolRevision(v int64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldPoolRevision, v))
+}
+
 // RateMultiplier applies equality check predicate on the "rate_multiplier" field. It's identical to RateMultiplierEQ.
 func RateMultiplier(v float64) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldRateMultiplier, v))
@@ -803,6 +813,56 @@ func PriorityLT(v int) predicate.Account {
 // PriorityLTE applies the LTE predicate on the "priority" field.
 func PriorityLTE(v int) predicate.Account {
 	return predicate.Account(sql.FieldLTE(FieldPriority, v))
+}
+
+// IsFallbackEQ applies the EQ predicate on the "is_fallback" field.
+func IsFallbackEQ(v bool) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldIsFallback, v))
+}
+
+// IsFallbackNEQ applies the NEQ predicate on the "is_fallback" field.
+func IsFallbackNEQ(v bool) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldIsFallback, v))
+}
+
+// PoolRevisionEQ applies the EQ predicate on the "pool_revision" field.
+func PoolRevisionEQ(v int64) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldPoolRevision, v))
+}
+
+// PoolRevisionNEQ applies the NEQ predicate on the "pool_revision" field.
+func PoolRevisionNEQ(v int64) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldPoolRevision, v))
+}
+
+// PoolRevisionIn applies the In predicate on the "pool_revision" field.
+func PoolRevisionIn(vs ...int64) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldPoolRevision, vs...))
+}
+
+// PoolRevisionNotIn applies the NotIn predicate on the "pool_revision" field.
+func PoolRevisionNotIn(vs ...int64) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldPoolRevision, vs...))
+}
+
+// PoolRevisionGT applies the GT predicate on the "pool_revision" field.
+func PoolRevisionGT(v int64) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldPoolRevision, v))
+}
+
+// PoolRevisionGTE applies the GTE predicate on the "pool_revision" field.
+func PoolRevisionGTE(v int64) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldPoolRevision, v))
+}
+
+// PoolRevisionLT applies the LT predicate on the "pool_revision" field.
+func PoolRevisionLT(v int64) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldPoolRevision, v))
+}
+
+// PoolRevisionLTE applies the LTE predicate on the "pool_revision" field.
+func PoolRevisionLTE(v int64) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldPoolRevision, v))
 }
 
 // RateMultiplierEQ applies the EQ predicate on the "rate_multiplier" field.

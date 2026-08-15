@@ -15,18 +15,19 @@ import (
 )
 
 const (
-	schedulerBucketSetKey          = "sched:buckets"
-	schedulerOutboxWatermarkKey    = "sched:outbox:watermark"
-	schedulerAccountPrefix         = "sched:acc:"
-	schedulerAccountMetaPrefix     = "sched:meta:"
-	schedulerAccountLastUsedPrefix = "sched:acc:last_used:"
-	schedulerActivePrefix          = "sched:active:"
-	schedulerReadyPrefix           = "sched:ready:"
-	schedulerVersionPrefix         = "sched:ver:"
-	schedulerEpochPrefix           = "sched:epoch:"
-	schedulerRetiredPrefix         = "sched:retired:"
-	schedulerSnapshotPrefix        = "sched:"
-	schedulerLockPrefix            = "sched:lock:"
+	schedulerBucketSetKey              = "sched:buckets"
+	schedulerOutboxWatermarkKey        = "sched:outbox:watermark"
+	schedulerAccountPrefix             = "sched:acc:"
+	schedulerAccountMetaPrefix         = "sched:meta:"
+	schedulerAccountLastUsedPrefix     = "sched:acc:last_used:"
+	schedulerAccountPoolRevisionPrefix = "sched:acc:pool_revision:"
+	schedulerActivePrefix              = "sched:active:"
+	schedulerReadyPrefix               = "sched:ready:"
+	schedulerVersionPrefix             = "sched:ver:"
+	schedulerEpochPrefix               = "sched:epoch:"
+	schedulerRetiredPrefix             = "sched:retired:"
+	schedulerSnapshotPrefix            = "sched:"
+	schedulerLockPrefix                = "sched:lock:"
 
 	defaultSchedulerSnapshotMGetChunkSize  = 128
 	defaultSchedulerSnapshotWriteChunkSize = 256
@@ -41,6 +42,42 @@ const (
 	schedulerGroupLifecycleLockPrefix      = "sched:group:lifecycle-lock:"
 	schedulerGroupLifecycleOwnerTokenBytes = 16
 )
+
+// publishSchedulerAccountScript writes the full and metadata snapshots together.
+// Pool revisions are fixed-width strings, so lexical comparison is safe without
+// converting a potentially large int64 through Lua's floating-point number.
+var publishSchedulerAccountScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[3])
+if current ~= false and ARGV[3] < current then
+    return 0
+end
+if current ~= false and ARGV[3] == current and ARGV[4] ~= '1' then
+    return 0
+end
+redis.call('SET', KEYS[1], ARGV[1])
+redis.call('SET', KEYS[2], ARGV[2])
+redis.call('SET', KEYS[3], ARGV[3])
+return 1
+`)
+
+// invalidateSchedulerAccountScript preserves the highest seen revision even
+// when removing payloads. A normal rebuild at the same revision cannot repair
+// this tombstone; only an authoritative SetAccount can do so.
+var invalidateSchedulerAccountScript = redis.NewScript(`
+local current = redis.call('GET', KEYS[3])
+if current ~= false and ARGV[1] < current then
+    return 0
+end
+if current ~= false and ARGV[1] == current then
+    -- A same-revision authoritative publication may have repaired an earlier
+    -- tombstone. A delayed invalidation from that same edit must not erase the
+    -- repaired payload and turn the publication point back into a cache miss.
+    return 0
+end
+redis.call('DEL', KEYS[1], KEYS[2])
+redis.call('SET', KEYS[3], ARGV[1])
+return 1
+`)
 
 var updateSchedulerLastUsedScript = redis.NewScript(`
 local updated = 0
@@ -480,7 +517,7 @@ func (c *schedulerCache) allocateSnapshotVersion(ctx context.Context, bucket ser
 }
 
 func (c *schedulerCache) writeSnapshotVersionAndReturnAccountIDs(ctx context.Context, bucket service.SchedulerBucket, version string, accounts []service.Account) ([]int64, error) {
-	accountIDs, err := c.writeAccountIDs(ctx, accounts)
+	accountIDs, err := c.writeAccountIDs(ctx, accounts, false)
 	if err != nil {
 		return nil, err
 	}
@@ -585,18 +622,53 @@ func (c *schedulerCache) GetAccount(ctx context.Context, accountID int64) (*serv
 	return account, nil
 }
 
+// SetAccount publishes a DB-authoritative direct or outbox repair. It may
+// refresh an equal revision and repair an equal-revision tombstone.
 func (c *schedulerCache) SetAccount(ctx context.Context, account *service.Account) error {
+	return c.publishAccountAtPoolRevision(ctx, account, true)
+}
+
+// PublishSnapshotAccount writes an ordinary scheduler snapshot rebuild. Equal
+// revisions are deliberately no-ops so delayed rebuilds cannot overwrite a
+// newer DB-authoritative direct or outbox publication.
+func (c *schedulerCache) PublishSnapshotAccount(ctx context.Context, account *service.Account) error {
+	return c.publishAccountAtPoolRevision(ctx, account, false)
+}
+
+func (c *schedulerCache) publishAccountAtPoolRevision(ctx context.Context, account *service.Account, authoritative bool) error {
 	if account == nil || account.ID <= 0 {
 		return nil
 	}
-	accountIDs, err := c.writeAccountIDs(ctx, []service.Account{*account})
+	accountIDs, err := c.writeAccountIDs(ctx, []service.Account{*account}, authoritative)
 	if err != nil {
 		return err
 	}
 	if len(accountIDs) == 0 {
-		return c.DeleteAccount(ctx, account.ID)
+		// Never remove the revision key here. A serialization failure is not a
+		// permanent account deletion, and clearing its fence would allow a stale
+		// snapshot rebuild to resurrect an older role. Role mutations convert this
+		// error into a revision-preserving tombstone through
+		// InvalidateAccountAtPoolRevision.
+		return fmt.Errorf("scheduler account %d payload was not published", account.ID)
 	}
 	return nil
+}
+
+func (c *schedulerCache) InvalidateAccountAtPoolRevision(ctx context.Context, accountID, poolRevision int64) error {
+	if accountID <= 0 {
+		return nil
+	}
+	id := strconv.FormatInt(accountID, 10)
+	revision, err := formatPoolRevision(poolRevision)
+	if err != nil {
+		return err
+	}
+	_, err = invalidateSchedulerAccountScript.Run(ctx, c.rdb, []string{
+		schedulerAccountKey(id),
+		schedulerAccountMetaKey(id),
+		schedulerAccountPoolRevisionKey(id),
+	}, revision).Result()
+	return err
 }
 
 func (c *schedulerCache) DeleteAccount(ctx context.Context, accountID int64) error {
@@ -604,7 +676,7 @@ func (c *schedulerCache) DeleteAccount(ctx context.Context, accountID int64) err
 		return nil
 	}
 	id := strconv.FormatInt(accountID, 10)
-	return c.rdb.Del(ctx, schedulerAccountKey(id), schedulerAccountMetaKey(id), schedulerLastUsedKey(id)).Err()
+	return c.rdb.Del(ctx, schedulerAccountKey(id), schedulerAccountMetaKey(id), schedulerLastUsedKey(id), schedulerAccountPoolRevisionKey(id)).Err()
 }
 
 func (c *schedulerCache) UpdateLastUsed(ctx context.Context, updates map[int64]time.Time) error {
@@ -724,6 +796,17 @@ func schedulerLastUsedKey(id string) string {
 	return schedulerAccountLastUsedPrefix + id
 }
 
+func schedulerAccountPoolRevisionKey(id string) string {
+	return schedulerAccountPoolRevisionPrefix + id
+}
+
+func formatPoolRevision(revision int64) (string, error) {
+	if revision < 0 {
+		return "", fmt.Errorf("invalid negative pool revision %d", revision)
+	}
+	return fmt.Sprintf("%020d", revision), nil
+}
+
 func ptrTime(t time.Time) *time.Time {
 	return &t
 }
@@ -776,26 +859,12 @@ func decodeCachedAccount(val any) (*service.Account, error) {
 	return &account, nil
 }
 
-func (c *schedulerCache) writeAccountIDs(ctx context.Context, accounts []service.Account) ([]int64, error) {
+func (c *schedulerCache) writeAccountIDs(ctx context.Context, accounts []service.Account, authoritative bool) ([]int64, error) {
 	if len(accounts) == 0 {
 		return nil, nil
 	}
 
-	pipe := c.rdb.Pipeline()
 	accountIDs := make([]int64, 0, len(accounts))
-	pending := 0
-	flush := func() error {
-		if pending == 0 {
-			return nil
-		}
-		if _, err := pipe.Exec(ctx); err != nil {
-			return err
-		}
-		pipe = c.rdb.Pipeline()
-		pending = 0
-		return nil
-	}
-
 	for _, account := range accounts {
 		fullPayload, metaPayload, err := marshalSchedulerCacheAccount(account)
 		if err != nil {
@@ -807,23 +876,33 @@ func (c *schedulerCache) writeAccountIDs(ctx context.Context, accounts []service
 		}
 
 		id := strconv.FormatInt(account.ID, 10)
-		pipe.Set(ctx, schedulerAccountKey(id), fullPayload, 0)
-		pipe.Set(ctx, schedulerAccountMetaKey(id), metaPayload, 0)
+		revision, err := formatPoolRevision(account.PoolRevision)
+		if err != nil {
+			return nil, err
+		}
+		// Execute against the client instead of a pipeline: Script.Run can load a
+		// missing Lua script with EVAL after Redis restarts, while pipelined EVALSHA
+		// commands fail with NOSCRIPT and leave the account unpublished.
+		if _, err := publishSchedulerAccountScript.Run(ctx, c.rdb, []string{
+			schedulerAccountKey(id),
+			schedulerAccountMetaKey(id),
+			schedulerAccountPoolRevisionKey(id),
+		}, fullPayload, metaPayload, revision, boolToRedisArgument(authoritative)).Result(); err != nil {
+			return nil, err
+		}
 		// Keep the hot LastUsedAt side key untouched: a lagging snapshot rebuild
 		// must not overwrite a newer scheduler update.
 		accountIDs = append(accountIDs, account.ID)
-		pending++
-		if pending >= c.writeChunkSize {
-			if err := flush(); err != nil {
-				return nil, err
-			}
-		}
 	}
 
-	if err := flush(); err != nil {
-		return nil, err
-	}
 	return accountIDs, nil
+}
+
+func boolToRedisArgument(value bool) string {
+	if value {
+		return "1"
+	}
+	return "0"
 }
 
 func marshalSchedulerCacheAccount(account service.Account) ([]byte, []byte, error) {
@@ -871,6 +950,8 @@ func buildSchedulerMetadataAccount(account service.Account) service.Account {
 		Concurrency:             account.Concurrency,
 		LoadFactor:              account.LoadFactor,
 		Priority:                account.Priority,
+		IsFallback:              account.IsFallback,
+		PoolRevision:            account.PoolRevision,
 		RateMultiplier:          account.RateMultiplier,
 		Status:                  account.Status,
 		LastUsedAt:              account.LastUsedAt,

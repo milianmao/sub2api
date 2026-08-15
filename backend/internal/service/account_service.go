@@ -47,6 +47,11 @@ type OAuthRefreshCandidatePager interface {
 	ListOAuthRefreshCandidatePage(ctx context.Context, options OAuthRefreshPageOptions) (*OAuthRefreshCandidatePage, error)
 }
 
+type AccountFilterRepository interface {
+	ListWithFiltersAndPool(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode, pool string) ([]Account, *pagination.PaginationResult, error)
+	ListAllWithFiltersAndPool(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, pool string) ([]Account, error)
+}
+
 type AccountRepository interface {
 	Create(ctx context.Context, account *Account) error
 	GetByID(ctx context.Context, id int64) (*Account, error)
@@ -159,6 +164,7 @@ type AccountBulkUpdate struct {
 	ProxyID        *int64
 	Concurrency    *int
 	Priority       *int
+	IsFallback     *bool
 	RateMultiplier *float64
 	LoadFactor     *int
 	Status         *string

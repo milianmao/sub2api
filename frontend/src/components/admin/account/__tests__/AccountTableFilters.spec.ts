@@ -35,6 +35,32 @@ const SelectStub = defineComponent({
 })
 
 describe('AccountTableFilters', () => {
+  it('offers all, primary, and fallback account pool filters', () => {
+    const wrapper = mount(AccountTableFilters, {
+      props: {
+        searchQuery: '',
+        filters: {
+          platform: '',
+          type: '',
+          status: '',
+          privacy_mode: '',
+          pool: '',
+          group: ''
+        },
+        groups: []
+      },
+      global: {
+        stubs: {
+          Select: SelectStub,
+          SearchInput: true
+        }
+      }
+    })
+
+    const poolFilter = wrapper.findAll('.select-stub')[4]
+    expect(JSON.parse(poolFilter.attributes('data-option-values') || '[]')).toEqual(['', 'primary', 'fallback'])
+  })
+
   it('includes upstream and service account in type filter options', () => {
     const wrapper = mount(AccountTableFilters, {
       props: {

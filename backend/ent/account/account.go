@@ -44,6 +44,10 @@ const (
 	FieldLoadFactor = "load_factor"
 	// FieldPriority holds the string denoting the priority field in the database.
 	FieldPriority = "priority"
+	// FieldIsFallback holds the string denoting the is_fallback field in the database.
+	FieldIsFallback = "is_fallback"
+	// FieldPoolRevision holds the string denoting the pool_revision field in the database.
+	FieldPoolRevision = "pool_revision"
 	// FieldRateMultiplier holds the string denoting the rate_multiplier field in the database.
 	FieldRateMultiplier = "rate_multiplier"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -145,6 +149,8 @@ var Columns = []string{
 	FieldConcurrency,
 	FieldLoadFactor,
 	FieldPriority,
+	FieldIsFallback,
+	FieldPoolRevision,
 	FieldRateMultiplier,
 	FieldStatus,
 	FieldErrorMessage,
@@ -208,6 +214,12 @@ var (
 	DefaultConcurrency int
 	// DefaultPriority holds the default value on creation for the "priority" field.
 	DefaultPriority int
+	// DefaultIsFallback holds the default value on creation for the "is_fallback" field.
+	DefaultIsFallback bool
+	// DefaultPoolRevision holds the default value on creation for the "pool_revision" field.
+	DefaultPoolRevision int64
+	// PoolRevisionValidator is a validator for the "pool_revision" field. It is called by the builders before save.
+	PoolRevisionValidator func(int64) error
 	// DefaultRateMultiplier holds the default value on creation for the "rate_multiplier" field.
 	DefaultRateMultiplier float64
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -314,6 +326,16 @@ func ByLoadFactor(opts ...sql.OrderTermOption) OrderOption {
 // ByPriority orders the results by the priority field.
 func ByPriority(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPriority, opts...).ToFunc()
+}
+
+// ByIsFallback orders the results by the is_fallback field.
+func ByIsFallback(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsFallback, opts...).ToFunc()
+}
+
+// ByPoolRevision orders the results by the pool_revision field.
+func ByPoolRevision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPoolRevision, opts...).ToFunc()
 }
 
 // ByRateMultiplier orders the results by the rate_multiplier field.

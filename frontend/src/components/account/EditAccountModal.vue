@@ -2046,6 +2046,23 @@
       <div>
         <div class="flex items-center justify-between">
           <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.fallbackAccount') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.fallbackAccountDesc') }}</p>
+          </div>
+          <button
+            type="button"
+            :aria-pressed="form.is_fallback"
+            @click="form.is_fallback = !form.is_fallback"
+            :class="['relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500', form.is_fallback ? 'bg-amber-500' : 'bg-gray-200 dark:bg-dark-600']"
+          >
+            <span :class="['pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition', form.is_fallback ? 'translate-x-5' : 'translate-x-0']" />
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between">
+          <div>
             <label class="input-label mb-0">{{
               t('admin.accounts.autoPauseOnExpired')
             }}</label>
@@ -3223,6 +3240,7 @@ const form = reactive({
   load_factor: null as number | null,
   priority: 1,
   rate_multiplier: 1,
+  is_fallback: false,
   status: 'active' as 'active' | 'inactive' | 'error',
   group_ids: [] as number[],
   expires_at: null as number | null
@@ -3326,6 +3344,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   form.load_factor = newAccount.load_factor ?? null
   form.priority = newAccount.priority
   form.rate_multiplier = newAccount.rate_multiplier ?? 1
+  form.is_fallback = newAccount.is_fallback === true
   form.status = (newAccount.status === 'active' || newAccount.status === 'inactive' || newAccount.status === 'error')
     ? newAccount.status
     : 'active'

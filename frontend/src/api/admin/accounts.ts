@@ -46,6 +46,7 @@ export async function list(
     group?: string
     search?: string
     privacy_mode?: string
+    pool?: 'primary' | 'fallback'
     lite?: string
     include_scheduler_score?: string
     sort_by?: string
@@ -82,6 +83,7 @@ export async function listWithEtag(
     group?: string
     search?: string
     privacy_mode?: string
+    pool?: 'primary' | 'fallback'
     lite?: string
     include_scheduler_score?: string
     sort_by?: string
@@ -501,6 +503,7 @@ export interface AccountLivenessCheckFilters {
   group?: string
   search?: string
   privacy_mode?: string
+  pool?: 'primary' | 'fallback'
   sort_by?: string
   sort_order?: 'asc' | 'desc'
 }

@@ -3095,6 +3095,23 @@
       <div>
         <div class="flex items-center justify-between">
           <div>
+            <label class="input-label mb-0">{{ t('admin.accounts.fallbackAccount') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.fallbackAccountDesc') }}</p>
+          </div>
+          <button
+            type="button"
+            :aria-pressed="form.is_fallback"
+            @click="form.is_fallback = !form.is_fallback"
+            :class="['relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500', form.is_fallback ? 'bg-amber-500' : 'bg-gray-200 dark:bg-dark-600']"
+          >
+            <span :class="['pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow transition', form.is_fallback ? 'translate-x-5' : 'translate-x-0']" />
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between">
+          <div>
             <label class="input-label mb-0">{{
               t('admin.accounts.autoPauseOnExpired')
             }}</label>
@@ -4114,6 +4131,7 @@ const form = reactive({
   load_factor: null as number | null,
   priority: 1,
   rate_multiplier: 1,
+  is_fallback: false,
   group_ids: [] as number[],
   expires_at: null as number | null
 })
@@ -5304,6 +5322,7 @@ const createAccountAndFinish = async (
     load_factor: form.load_factor ?? undefined,
     priority: form.priority,
     rate_multiplier: form.rate_multiplier,
+    is_fallback: form.is_fallback,
     group_ids: form.group_ids,
     expires_at: form.expires_at,
     // 上游倍率探测对全部 API-key 平台开放（antigravity upstream 走本 helper）；
@@ -5371,6 +5390,7 @@ const handleGrokValidateRT = async (refreshTokenInput: string) => {
           load_factor: form.load_factor ?? undefined,
           priority: form.priority,
           rate_multiplier: form.rate_multiplier,
+          is_fallback: form.is_fallback,
           group_ids: form.group_ids,
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value
@@ -5537,6 +5557,7 @@ const handleOpenAIExchange = async (authCode: string) => {
         load_factor: form.load_factor ?? undefined,
         priority: form.priority,
         rate_multiplier: form.rate_multiplier,
+        is_fallback: form.is_fallback,
         group_ids: form.group_ids,
         expires_at: form.expires_at,
         auto_pause_on_expired: autoPauseOnExpired.value
@@ -5818,6 +5839,7 @@ const handleOpenAIBatchRT = async (refreshTokenInput: string, clientId?: string)
             load_factor: form.load_factor ?? undefined,
             priority: form.priority,
             rate_multiplier: form.rate_multiplier,
+            is_fallback: form.is_fallback,
             group_ids: form.group_ids,
             expires_at: form.expires_at,
             auto_pause_on_expired: autoPauseOnExpired.value
@@ -6298,6 +6320,7 @@ const handleCookieAuth = async (sessionKey: string) => {
           load_factor: form.load_factor ?? undefined,
           priority: form.priority,
           rate_multiplier: form.rate_multiplier,
+          is_fallback: form.is_fallback,
           group_ids: form.group_ids,
           expires_at: form.expires_at,
           auto_pause_on_expired: autoPauseOnExpired.value

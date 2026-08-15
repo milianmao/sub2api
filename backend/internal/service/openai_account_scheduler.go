@@ -499,6 +499,13 @@ func (s *defaultOpenAIAccountScheduler) selectBySessionHash(
 		_ = s.service.deleteStickySessionAccountID(ctx, req.GroupID, sessionHash)
 		return nil, false, nil
 	}
+	// A fallback binding is retained for a later failover, but cannot make a
+	// scheduling decision before the current request establishes its primary
+	// boundary. selectByLoadBalance will either select a usable primary or
+	// return to this fallback when no primary is request-eligible.
+	if account.IsFallback {
+		return nil, false, nil
+	}
 	escapeCfg := s.service.openAIStickyEscapeConfig()
 	if reason, errorRate, ttft, shouldEscape := s.shouldEscapeStickyAccount(accountID, escapeCfg); shouldEscape {
 		slog.Info("sticky_escape_triggered",
@@ -1202,6 +1209,7 @@ func (s *defaultOpenAIAccountScheduler) consumeOpenAISelectionDBRecheck(budget *
 func (s *defaultOpenAIAccountScheduler) tryFallbackToWeightedSticky(
 	ctx context.Context,
 	req OpenAIAccountScheduleRequest,
+	preferredRole AccountPoolRole,
 ) (*AccountSelectionResult, error) {
 	if !req.StickyWeighted {
 		return nil, nil
@@ -1236,6 +1244,13 @@ func (s *defaultOpenAIAccountScheduler) tryFallbackToWeightedSticky(
 			continue
 		}
 		if !s.isAccountRequestCompatible(ctx, account, req) || !s.isAccountTransportCompatible(account, req.RequiredTransport) {
+			continue
+		}
+		// Weighted affinity is a preference inside the role selected from the
+		// complete request-eligible pool. In particular, a full primary account
+		// must remain on the primary wait path rather than spill into a fallback
+		// session binding.
+		if !AccountMatchesPool(account, preferredRole) {
 			continue
 		}
 		if req.RequireCompact && openAICompactSupportTier(account) == 0 {
@@ -1385,6 +1400,14 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 	if len(filtered) == 0 {
 		return nil, 0, 0, 0, noAvailableOpenAISelectionError(req.RequestedModel, false, filterStats.summary(""))
 	}
+	// All request gates have completed. The advanced scheduler must not let
+	// previous/session affinity, subscription priority, or score normalization
+	// compare fallback accounts with an eligible primary account.
+	filtered, selectedRole := PartitionAccountPool(filtered, func(account *Account) *Account { return account }).Preferred()
+	loadReq = loadReq[:0]
+	for _, account := range filtered {
+		loadReq = append(loadReq, AccountWithConcurrency{ID: account.ID, MaxConcurrency: account.EffectiveLoadFactor()})
+	}
 
 	loadMap := map[int64]*AccountLoadInfo{}
 	if s.service.concurrencyService != nil {
@@ -1415,7 +1438,7 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 				candidateCount, topK, loadSkew := regularAttempt.candidateCount, regularAttempt.topK, regularAttempt.loadSkew
 				fallbackErr := regularAttempt.err
 				if regularAttempt.err == nil {
-					result, candidateCount, topK, loadSkew, fallbackErr = s.finishLoadBalanceSelectionFallback(ctx, req, regularAttempt, budget, filterStats)
+					result, candidateCount, topK, loadSkew, fallbackErr = s.finishLoadBalanceSelectionFallback(ctx, req, regularAttempt, budget, filterStats, selectedRole)
 					if fallbackErr == nil && result != nil {
 						return result, candidateCount, topK, loadSkew, nil
 					}
@@ -1423,13 +1446,13 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 				// 常规池既无法获取也无法排队（含仅剩不支持 compact 的候选）时，
 				// 回退到订阅池的等待计划：busy-but-waitable 的订阅账号不应因常规池存在
 				// 而被丢弃，否则开启订阅优先反而让本可排队成功的请求硬失败。
-				subResult, subCandidateCount, subTopK, subLoadSkew, subErr := s.finishLoadBalanceSelectionFallback(ctx, req, attempt, budget, filterStats)
+				subResult, subCandidateCount, subTopK, subLoadSkew, subErr := s.finishLoadBalanceSelectionFallback(ctx, req, attempt, budget, filterStats, selectedRole)
 				if subErr == nil && subResult != nil {
 					return subResult, subCandidateCount, subTopK, subLoadSkew, nil
 				}
 				return result, candidateCount, topK, loadSkew, fallbackErr
 			}
-			return s.finishLoadBalanceSelectionFallback(ctx, req, attempt, budget, filterStats)
+			return s.finishLoadBalanceSelectionFallback(ctx, req, attempt, budget, filterStats, selectedRole)
 		}
 	}
 
@@ -1440,7 +1463,7 @@ func (s *defaultOpenAIAccountScheduler) selectByLoadBalance(
 	if attempt.result != nil {
 		return attempt.result, attempt.candidateCount, attempt.topK, attempt.loadSkew, nil
 	}
-	return s.finishLoadBalanceSelectionFallback(ctx, req, attempt, budget, filterStats)
+	return s.finishLoadBalanceSelectionFallback(ctx, req, attempt, budget, filterStats, selectedRole)
 }
 
 func partitionOpenAIChatGPTSubscriptionAccounts(accounts []*Account) ([]*Account, []*Account) {
@@ -1571,6 +1594,7 @@ func (s *defaultOpenAIAccountScheduler) finishLoadBalanceSelectionFallback(
 	attempt openAIAccountLoadSelectionAttempt,
 	budget *openAISelectionProbeBudget,
 	filterStats openAISelectionFilterStats,
+	preferredRole AccountPoolRole,
 ) (*AccountSelectionResult, int, int, float64, error) {
 	candidateCount := attempt.candidateCount
 	topK := attempt.topK
@@ -1580,7 +1604,7 @@ func (s *defaultOpenAIAccountScheduler) finishLoadBalanceSelectionFallback(
 		return nil, candidateCount, topK, loadSkew, noAvailableOpenAISelectionError(req.RequestedModel, attempt.compactBlocked, filterStats.summary("selection_order_empty"))
 	}
 
-	if stickyFallback, stickyErr := s.tryFallbackToWeightedSticky(ctx, req); stickyErr != nil {
+	if stickyFallback, stickyErr := s.tryFallbackToWeightedSticky(ctx, req, preferredRole); stickyErr != nil {
 		return nil, candidateCount, topK, loadSkew, stickyErr
 	} else if stickyFallback != nil {
 		return stickyFallback, candidateCount, topK, loadSkew, nil
@@ -1996,6 +2020,58 @@ func (s *OpenAIGatewayService) SelectAccountWithScheduler(
 	requireCompact bool,
 ) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
 	return s.selectAccountWithScheduler(ctx, groupID, previousResponseID, sessionHash, requestedModel, excludedIDs, requiredTransport, "", "", requireCompact, PlatformOpenAI, false, true)
+}
+
+// ResolveGrokMediaVideoRequestSelection resolves an existing video request on
+// its owner-bound account. It deliberately bypasses normal pool scheduling:
+// status/content operations continue an account-local upstream resource rather
+// than allocating new traffic after a primary account recovers.
+func (s *OpenAIGatewayService) ResolveGrokMediaVideoRequestSelection(
+	ctx context.Context,
+	groupID *int64,
+	accountID int64,
+	requestedModel string,
+	requiredTransport OpenAIUpstreamTransport,
+	_ OpenAIEndpointCapability,
+) (*AccountSelectionResult, OpenAIAccountScheduleDecision, error) {
+	if s == nil || s.accountRepo == nil || accountID <= 0 {
+		return nil, OpenAIAccountScheduleDecision{}, ErrNoAvailableAccounts
+	}
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil || account == nil || !s.openAIAccountMatchesSchedulingGroup(account, groupID) {
+		return nil, OpenAIAccountScheduleDecision{}, ErrNoAvailableAccounts
+	}
+	// A video status/content request is bound to this account, not a new
+	// allocation. It has no OpenAI-compatible endpoint capability requirement:
+	// applying a generation or Responses capability here would incorrectly
+	// reject a still-valid Grok owner after primary recovery.
+	if !isOpenAICompatibleAccountEligibleForRequest(ctx, account, PlatformGrok, requestedModel, false, "") ||
+		!parentHealthyForShadow(account, s.parentAccountLookup(ctx)) ||
+		s.isOpenAIAccountRequestRuntimeBlocked(account, requestedModel) ||
+		s.isOpenAIProxyStreamQuarantined(ctx, account) {
+		return nil, OpenAIAccountScheduleDecision{}, ErrNoAvailableAccounts
+	}
+	if groupID != nil && s.needsUpstreamChannelRestrictionCheck(ctx, groupID) &&
+		s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel, false) {
+		return nil, OpenAIAccountScheduleDecision{}, ErrNoAvailableAccounts
+	}
+	if !s.isOpenAIAccountTransportCompatible(account, requiredTransport) {
+		return nil, OpenAIAccountScheduleDecision{}, ErrNoAvailableAccounts
+	}
+	acquire, err := s.tryAcquireAccountSlot(ctx, account.ID, account.Concurrency)
+	if err != nil || acquire == nil || !acquire.Acquired {
+		return nil, OpenAIAccountScheduleDecision{}, ErrNoAvailableAccounts
+	}
+	selection, err := s.newAcquiredSelectionResult(ctx, account, acquire.ReleaseFunc)
+	if err != nil {
+		return nil, OpenAIAccountScheduleDecision{}, err
+	}
+	return selection, OpenAIAccountScheduleDecision{
+		Layer:               "grok_video_owner",
+		CandidateCount:      1,
+		SelectedAccountID:   account.ID,
+		SelectedAccountType: account.Type,
+	}, nil
 }
 
 // SelectAccountWithSchedulerForCapability 按能力要求调度账号。

@@ -15,6 +15,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -113,6 +114,8 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 		SetExtra(normalizeJSONMap(account.Extra)).
 		SetConcurrency(account.Concurrency).
 		SetPriority(account.Priority).
+		SetIsFallback(account.IsFallback).
+		SetPoolRevision(account.PoolRevision).
 		SetStatus(account.Status).
 		SetErrorMessage(account.ErrorMessage).
 		SetSchedulable(account.Schedulable).
@@ -466,9 +469,18 @@ func (r *accountRepository) updateAccount(
 	}
 
 	account.UpdatedAt = updated.UpdatedAt
+	account.PoolRevision = updated.PoolRevision
+	poolRoleChanged := account.PoolRoleChanged
+	account.PoolRoleChanged = false
 	// 普通账号编辑（如 model_mapping / credentials）也需要立即刷新单账号快照，
 	// 否则网关在 outbox worker 延迟或异常时仍可能读到旧配置。
 	if contextTx == nil {
+		if poolRoleChanged {
+			if err := r.publishOrInvalidatePoolRoleSnapshot(baseCtx, account); err != nil {
+				return err
+			}
+			return nil
+		}
 		r.syncSchedulerAccountSnapshot(baseCtx, account.ID)
 	}
 	return nil
@@ -502,6 +514,8 @@ func (r *accountRepository) updateLockedAccount(
 		SetExtra(extra).
 		SetConcurrency(account.Concurrency).
 		SetPriority(account.Priority).
+		SetIsFallback(account.IsFallback).
+		SetPoolRevision(account.PoolRevision).
 		SetStatus(account.Status).
 		SetErrorMessage(account.ErrorMessage).
 		SetSchedulable(schedulable).
@@ -567,6 +581,31 @@ func (r *accountRepository) updateLockedAccount(
 
 	builder.SetQuotaDimension(dbaccount.QuotaDimension(account.QuotaDimensionOrDefault()))
 	builder.SetNillableParentAccountID(account.ParentAccountID)
+
+	if account.PoolRoleChanged {
+		// lockAndMergeAccountProbeExtra holds FOR NO KEY UPDATE on this row, so
+		// this read/modify/write increment is serialized with other role edits.
+		rows, err := client.QueryContext(ctx, "SELECT pool_revision FROM accounts WHERE id = $1 FOR NO KEY UPDATE", account.ID)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = rows.Close() }()
+		if !rows.Next() {
+			if err := rows.Err(); err != nil {
+				return nil, err
+			}
+			return nil, service.ErrAccountNotFound
+		}
+		var currentRevision int64
+		if err := rows.Scan(&currentRevision); err != nil {
+			return nil, err
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		account.PoolRevision = currentRevision + 1
+		builder.SetPoolRevision(account.PoolRevision)
+	}
 
 	return builder.Save(ctx)
 }
@@ -876,7 +915,7 @@ func (r *accountRepository) List(ctx context.Context, params pagination.Paginati
 	return r.ListWithFilters(ctx, params, "", "", "", "", 0, "")
 }
 
-func (r *accountRepository) accountListFilteredQuery(platform, accountType, status, search string, groupID int64, privacyMode string) *dbent.AccountQuery {
+func (r *accountRepository) accountListFilteredQuery(platform, accountType, status, search string, groupID int64, privacyMode, pool string) *dbent.AccountQuery {
 	q := r.client.Account.Query()
 
 	if platform != "" {
@@ -954,6 +993,9 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 	} else if groupID > 0 {
 		q = q.Where(dbaccount.HasAccountGroupsWith(dbaccountgroup.GroupIDEQ(groupID)))
 	}
+	if pool != "" {
+		q = q.Where(dbaccount.IsFallbackEQ(pool == "fallback"))
+	}
 	if privacyMode != "" {
 		q = q.Where(dbpredicate.Account(func(s *entsql.Selector) {
 			path := sqljson.Path("privacy_mode")
@@ -973,7 +1015,11 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 }
 
 func (r *accountRepository) ListWithFilters(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, *pagination.PaginationResult, error) {
-	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode)
+	return r.ListWithFiltersAndPool(ctx, params, platform, accountType, status, search, groupID, privacyMode, "")
+}
+
+func (r *accountRepository) ListWithFiltersAndPool(ctx context.Context, params pagination.PaginationParams, platform, accountType, status, search string, groupID int64, privacyMode, pool string) ([]service.Account, *pagination.PaginationResult, error) {
+	q := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode, pool)
 	// Clone before Count so interceptor-appended predicates (SoftDeleteMixin's
 	// deleted_at IS NULL) don't accumulate on the shared builder and pollute the
 	// subsequent list query. Same pattern used in group_repo/promo_code_repo/user_repo
@@ -1003,7 +1049,11 @@ func (r *accountRepository) ListWithFilters(ctx context.Context, params paginati
 }
 
 func (r *accountRepository) ListAllWithFilters(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode string) ([]service.Account, error) {
-	accounts, err := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode).All(ctx)
+	return r.ListAllWithFiltersAndPool(ctx, platform, accountType, status, search, groupID, privacyMode, "")
+}
+
+func (r *accountRepository) ListAllWithFiltersAndPool(ctx context.Context, platform, accountType, status, search string, groupID int64, privacyMode, pool string) ([]service.Account, error) {
+	accounts, err := r.accountListFilteredQuery(platform, accountType, status, search, groupID, privacyMode, pool).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1653,6 +1703,28 @@ func (r *accountRepository) syncSchedulerAccountSnapshot(ctx context.Context, ac
 	}
 }
 
+// publishOrInvalidatePoolRoleSnapshot establishes the routing visibility point
+// for a role edit. The outbox is already durable at this point, so returning an
+// error is retriable; a retained tombstone keeps stale rebuilds fenced.
+func (r *accountRepository) publishOrInvalidatePoolRoleSnapshot(ctx context.Context, account *service.Account) error {
+	if r == nil || r.schedulerCache == nil || account == nil || account.ID <= 0 {
+		return nil
+	}
+	publishErr := r.schedulerCache.SetAccount(ctx, account)
+	if publishErr == nil {
+		return nil
+	} else if invalidator, ok := r.schedulerCache.(interface {
+		InvalidateAccountAtPoolRevision(context.Context, int64, int64) error
+	}); ok {
+		if invalidateErr := invalidator.InvalidateAccountAtPoolRevision(ctx, account.ID, account.PoolRevision); invalidateErr == nil {
+			return nil
+		} else {
+			return fmt.Errorf("publish role snapshot account %d: %w; fenced invalidation: %v", account.ID, publishErr, invalidateErr)
+		}
+	}
+	return fmt.Errorf("publish role snapshot account %d: %w", account.ID, publishErr)
+}
+
 func (r *accountRepository) syncSchedulerAccountSnapshotDetached(ctx context.Context, accountID int64) {
 	base := context.Background()
 	if ctx != nil {
@@ -1672,9 +1744,9 @@ func (r *accountRepository) deleteSchedulerAccountSnapshot(ctx context.Context, 
 	}
 }
 
-func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, accountIDs []int64) {
+func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, accountIDs []int64) error {
 	if r == nil || r.schedulerCache == nil || len(accountIDs) == 0 {
-		return
+		return nil
 	}
 
 	uniqueIDs := make([]int64, 0, len(accountIDs))
@@ -1690,23 +1762,26 @@ func (r *accountRepository) syncSchedulerAccountSnapshots(ctx context.Context, a
 		uniqueIDs = append(uniqueIDs, id)
 	}
 	if len(uniqueIDs) == 0 {
-		return
+		return nil
 	}
 
 	accounts, err := r.GetByIDs(ctx, uniqueIDs)
 	if err != nil {
-		logger.LegacyPrintf("repository.account", "[Scheduler] batch sync account snapshot read failed: count=%d err=%v", len(uniqueIDs), err)
-		return
+		return fmt.Errorf("read scheduler account snapshots: %w", err)
+	}
+	if len(accounts) != len(uniqueIDs) {
+		return fmt.Errorf("read scheduler account snapshots: expected %d accounts, got %d", len(uniqueIDs), len(accounts))
 	}
 
 	for _, account := range accounts {
 		if account == nil {
-			continue
+			return fmt.Errorf("read scheduler account snapshots: nil account")
 		}
-		if err := r.schedulerCache.SetAccount(ctx, account); err != nil {
-			logger.LegacyPrintf("repository.account", "[Scheduler] batch sync account snapshot write failed: id=%d err=%v", account.ID, err)
+		if err := r.publishOrInvalidatePoolRoleSnapshot(ctx, account); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 func (r *accountRepository) ClearError(ctx context.Context, id int64) error {
@@ -2827,6 +2902,11 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		args = append(args, *updates.Priority)
 		idx++
 	}
+	if updates.IsFallback != nil {
+		setClauses = append(setClauses, "is_fallback = $"+itoa(idx), "pool_revision = pool_revision + 1")
+		args = append(args, *updates.IsFallback)
+		idx++
+	}
 	if updates.RateMultiplier != nil {
 		setClauses = append(setClauses, "rate_multiplier = $"+itoa(idx))
 		args = append(args, *updates.RateMultiplier)
@@ -2997,8 +3077,13 @@ func (r *accountRepository) BulkUpdate(ctx context.Context, ids []int64, updates
 		if updates.Schedulable != nil && !*updates.Schedulable {
 			shouldSync = true
 		}
+		if updates.IsFallback != nil {
+			shouldSync = true
+		}
 		if shouldSync {
-			r.syncSchedulerAccountSnapshots(baseCtx, ids)
+			if err := r.syncSchedulerAccountSnapshots(baseCtx, ids); err != nil {
+				return 0, err
+			}
 		}
 	}
 	return rows, nil
@@ -3339,6 +3424,8 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		ProxyFallbackOriginID:   m.ProxyFallbackOriginID,
 		Concurrency:             m.Concurrency,
 		Priority:                m.Priority,
+		IsFallback:              m.IsFallback,
+		PoolRevision:            m.PoolRevision,
 		RateMultiplier:          &rateMultiplier,
 		LoadFactor:              m.LoadFactor,
 		Status:                  m.Status,
