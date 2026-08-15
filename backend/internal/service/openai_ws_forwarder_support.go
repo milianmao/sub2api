@@ -574,6 +574,7 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 				if isOpenAICompatibleAccountEligibleForRequest(ctx, candidate, PlatformOpenAI, requestedModel, requireCompact, requiredCapability) &&
 					parentHealthyForShadow(candidate, s.parentAccountLookup(ctx)) &&
 					!s.isOpenAIAccountRequestRuntimeBlocked(candidate, requestedModel) &&
+					s.isOpenAIAccountTransportCompatible(candidate, OpenAIUpstreamTransportResponsesWebsocketV2) &&
 					(groupID == nil || !s.needsUpstreamChannelRestrictionCheck(ctx, groupID) || !s.isUpstreamModelRestrictedByChannel(ctx, *groupID, candidate, requestedModel, requireCompact)) {
 					return 0, nil, "", nil
 				}

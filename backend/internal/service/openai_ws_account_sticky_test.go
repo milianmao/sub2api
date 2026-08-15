@@ -354,6 +354,63 @@ func TestOpenAIGatewayService_SelectAccountByPreviousResponseID_CapabilityMismat
 	require.Equal(t, account.ID, boundAccountID)
 }
 
+func TestOpenAIGatewayService_SelectAccountByPreviousResponseID_FallbackKeepsResponseWhenPrimaryIsHTTPOnly(t *testing.T) {
+	ctx := context.Background()
+	groupID := int64(26)
+	fallback := Account{
+		ID:          41,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		IsFallback:  true,
+		GroupIDs:    []int64{groupID},
+		Extra: map[string]any{
+			"openai_apikey_responses_websockets_v2_enabled": true,
+		},
+	}
+	primary := Account{
+		ID:          42,
+		Platform:    PlatformOpenAI,
+		Type:        AccountTypeAPIKey,
+		Status:      StatusActive,
+		Schedulable: true,
+		Concurrency: 1,
+		GroupIDs:    []int64{groupID},
+		Extra: map[string]any{
+			"openai_ws_force_http": true,
+		},
+	}
+	cache := &stubGatewayCache{}
+	store := NewOpenAIWSStateStore(cache)
+	cfg := newOpenAIWSV2TestConfig()
+
+	svc := &OpenAIGatewayService{
+		accountRepo:        stubOpenAIAccountRepo{accounts: []Account{fallback, primary}},
+		cache:              cache,
+		cfg:                cfg,
+		concurrencyService: NewConcurrencyService(stubConcurrencyCache{}),
+		openaiWSStateStore: store,
+	}
+
+	require.NoError(t, store.BindResponseAccount(ctx, groupID, "resp_prev_http_primary", fallback.ID, time.Hour))
+
+	selection, err := svc.SelectAccountByPreviousResponseID(ctx, &groupID, "resp_prev_http_primary", "gpt-5.1", nil, false)
+	require.NoError(t, err)
+	require.NotNil(t, selection)
+	require.NotNil(t, selection.Account)
+	require.Equal(t, fallback.ID, selection.Account.ID,
+		"HTTP-only primary is not a transport-compatible recovered primary; the fallback owner must keep the response chain")
+	require.True(t, selection.Acquired)
+	if selection.ReleaseFunc != nil {
+		selection.ReleaseFunc()
+	}
+	boundAccountID, getErr := store.GetResponseAccount(ctx, groupID, "resp_prev_http_primary")
+	require.NoError(t, getErr)
+	require.Equal(t, fallback.ID, boundAccountID)
+}
+
 func newOpenAIWSV2TestConfig() *config.Config {
 	cfg := &config.Config{}
 	cfg.Gateway.OpenAIWS.Enabled = true
