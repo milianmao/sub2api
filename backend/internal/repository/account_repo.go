@@ -1703,9 +1703,9 @@ func (r *accountRepository) syncSchedulerAccountSnapshot(ctx context.Context, ac
 	}
 }
 
-// publishOrInvalidatePoolRoleSnapshot establishes the routing visibility point
-// for a role edit. The outbox is already durable at this point, so returning an
-// error is retriable; a retained tombstone keeps stale rebuilds fenced.
+// publishOrInvalidatePoolRoleSnapshot makes a role edit visible immediately.
+// The outbox is already durable, so a cache outage must not report the committed
+// edit as failed; the outbox will retry it.
 func (r *accountRepository) publishOrInvalidatePoolRoleSnapshot(ctx context.Context, account *service.Account) error {
 	if r == nil || r.schedulerCache == nil || account == nil || account.ID <= 0 {
 		return nil
@@ -1719,10 +1719,12 @@ func (r *accountRepository) publishOrInvalidatePoolRoleSnapshot(ctx context.Cont
 		if invalidateErr := invalidator.InvalidateAccountAtPoolRevision(ctx, account.ID, account.PoolRevision); invalidateErr == nil {
 			return nil
 		} else {
-			return fmt.Errorf("publish role snapshot account %d: %w; fenced invalidation: %v", account.ID, publishErr, invalidateErr)
+			logger.LegacyPrintf("repository.account", "[Scheduler] publish role snapshot failed: account=%d publish_err=%v invalidation_err=%v", account.ID, publishErr, invalidateErr)
+			return nil
 		}
 	}
-	return fmt.Errorf("publish role snapshot account %d: %w", account.ID, publishErr)
+	logger.LegacyPrintf("repository.account", "[Scheduler] publish role snapshot failed: account=%d err=%v", account.ID, publishErr)
+	return nil
 }
 
 func (r *accountRepository) syncSchedulerAccountSnapshotDetached(ctx context.Context, accountID int64) {
