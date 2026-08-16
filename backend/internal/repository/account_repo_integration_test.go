@@ -187,6 +187,23 @@ func (s *AccountRepoSuite) TestUpdate() {
 	s.Require().Equal("updated", got.Name)
 }
 
+func (s *AccountRepoSuite) TestUpdate_PoolRoleChangedIncrementsPoolRevision() {
+	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "pool-role"})
+
+	s.Require().NoError(s.repo.Update(s.ctx, account))
+	unchanged, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().Zero(unchanged.PoolRevision)
+
+	account.IsFallback = true
+	account.PoolRoleChanged = true
+	s.Require().NoError(s.repo.Update(s.ctx, account))
+	updated, err := s.repo.GetByID(s.ctx, account.ID)
+	s.Require().NoError(err)
+	s.Require().True(updated.IsFallback)
+	s.Require().Equal(int64(1), updated.PoolRevision)
+}
+
 func (s *AccountRepoSuite) TestUpdate_SyncSchedulerSnapshotOnDisabled() {
 	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "sync-update", Status: service.StatusActive, Schedulable: true})
 	cacheRecorder := &schedulerCacheRecorder{}

@@ -765,8 +765,10 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 		account.Priority = *input.Priority
 	}
 	if input.IsFallback != nil {
-		account.IsFallback = *input.IsFallback
-		account.PoolRoleChanged = true
+		if account.IsFallback != *input.IsFallback {
+			account.IsFallback = *input.IsFallback
+			account.PoolRoleChanged = true
+		}
 	}
 	if input.RateMultiplier != nil {
 		if *input.RateMultiplier < 0 {

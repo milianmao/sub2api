@@ -585,22 +585,27 @@ func (r *accountRepository) updateLockedAccount(
 	if account.PoolRoleChanged {
 		// lockAndMergeAccountProbeExtra holds FOR NO KEY UPDATE on this row, so
 		// this read/modify/write increment is serialized with other role edits.
-		rows, err := client.QueryContext(ctx, "SELECT pool_revision FROM accounts WHERE id = $1 FOR NO KEY UPDATE", account.ID)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = rows.Close() }()
-		if !rows.Next() {
-			if err := rows.Err(); err != nil {
-				return nil, err
-			}
-			return nil, service.ErrAccountNotFound
-		}
 		var currentRevision int64
-		if err := rows.Scan(&currentRevision); err != nil {
-			return nil, err
-		}
-		if err := rows.Err(); err != nil {
+		if err := func() error {
+			rows, err := client.QueryContext(ctx, "SELECT pool_revision FROM accounts WHERE id = $1 FOR NO KEY UPDATE", account.ID)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = rows.Close() }()
+			if !rows.Next() {
+				if err := rows.Err(); err != nil {
+					return err
+				}
+				return service.ErrAccountNotFound
+			}
+			if err := rows.Scan(&currentRevision); err != nil {
+				return err
+			}
+			if err := rows.Err(); err != nil {
+				return err
+			}
+			return rows.Close()
+		}(); err != nil {
 			return nil, err
 		}
 		account.PoolRevision = currentRevision + 1

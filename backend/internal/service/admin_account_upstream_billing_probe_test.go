@@ -112,6 +112,32 @@ func TestUpdateAccountRoutesRateIntentThroughAtomicBillingUpdater(t *testing.T) 
 	require.Zero(t, *updated.RateMultiplier)
 }
 
+func TestUpdateAccountFallbackOnlyChangesPoolRoleWhenValueChanges(t *testing.T) {
+	accountID := int64(111)
+	repo := &upstreamBillingProbeAccountRepo{accounts: map[int64]*Account{
+		accountID: {
+			ID:           accountID,
+			Platform:     PlatformOpenAI,
+			Type:         AccountTypeAPIKey,
+			Status:       StatusActive,
+			IsFallback:   false,
+			PoolRevision: 7,
+		},
+	}}
+	svc := &adminServiceImpl{accountRepo: repo}
+
+	fallback := false
+	updated, err := svc.UpdateAccount(context.Background(), accountID, &UpdateAccountInput{IsFallback: &fallback})
+	require.NoError(t, err)
+	require.False(t, updated.PoolRoleChanged)
+	require.Equal(t, int64(7), updated.PoolRevision)
+
+	fallback = true
+	updated, err = svc.UpdateAccount(context.Background(), accountID, &UpdateAccountInput{IsFallback: &fallback})
+	require.NoError(t, err)
+	require.True(t, updated.PoolRoleChanged)
+}
+
 func TestCreateAccountDropsManagedUpstreamBillingProbeState(t *testing.T) {
 	repo := &upstreamBillingProbeAccountRepo{}
 	svc := &adminServiceImpl{accountRepo: repo}
