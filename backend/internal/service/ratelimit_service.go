@@ -2132,7 +2132,7 @@ func parseOpenAIImageTryAgainCooldown(body []byte) time.Duration {
 	}
 }
 
-const upstreamModelNotFoundCooldown = 30 * time.Minute
+const upstreamModelNotFoundCooldown = 2 * time.Minute
 const upstreamModelNotFoundReason = "upstream_404_model_not_found"
 const upstreamCodexPlanGatedModelCooldown = 30 * time.Minute
 const upstreamCodexPlanGatedModelReason = "upstream_400_codex_plan_gated_model"
