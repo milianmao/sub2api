@@ -190,7 +190,7 @@ func TestGroupUsageRollupTriggerSerializesInsertTransactionAcrossMidnight(t *tes
 
 	var currentDate string
 	require.NoError(t, integrationDB.QueryRowContext(ctx, `
-		SELECT CURRENT_DATE::text
+		SELECT (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Shanghai')::date::text
 	`).Scan(&currentDate))
 	var closedBefore string
 	err = integrationDB.QueryRowContext(ctx, fmt.Sprintf(
