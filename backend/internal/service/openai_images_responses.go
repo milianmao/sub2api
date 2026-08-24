@@ -1743,6 +1743,14 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	parsed *OpenAIImagesRequest,
 	channelMappedModel string,
 ) (*OpenAIForwardResult, error) {
+	strategy, err := s.resolveOpenAIImageUpstreamStrategy(ctx, account, parsed)
+	if err != nil {
+		return nil, err
+	}
+	if strategy == OpenAIImageUpstreamChatGPTWebImage {
+		return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)
+	}
+
 	startTime := time.Now()
 	requestModel := strings.TrimSpace(parsed.Model)
 	if mapped := strings.TrimSpace(channelMappedModel); mapped != "" {
