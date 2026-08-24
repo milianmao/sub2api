@@ -20,6 +20,7 @@ const (
 	EndpointEmbeddings        = "/v1/embeddings"
 	EndpointAlphaSearch       = "/v1/alpha/search"
 	EndpointResponses         = "/v1/responses"
+	EndpointResponsesInputTokens = "/v1/responses/input_tokens"
 	EndpointResponsesCompact  = "/v1/responses/compact"
 	EndpointImagesGenerations = "/v1/images/generations"
 	EndpointImagesEdits       = "/v1/images/edits"

@@ -583,6 +583,8 @@ func (s *OpenAIGatewayService) ForwardImages(
 		default:
 			return nil, fmt.Errorf("unsupported openai image upstream strategy: %s", strategy)
 		}
+	case AccountTypeSetupToken:
+		return s.forwardOpenAIImagesOAuth(ctx, c, account, parsed, channelMappedModel)
 	default:
 		return nil, fmt.Errorf("unsupported account type: %s", account.Type)
 	}

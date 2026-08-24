@@ -18,6 +18,10 @@ export interface OpenAICompatFormState {
   allow_openai_compat?: boolean;
 }
 
+export function supportsMessagesDispatchPlatform(platform: string): boolean {
+  return platform === "openai" || platform === "composite";
+}
+
 export function createDefaultMessagesDispatchFormState(): MessagesDispatchFormState {
   return {
     allow_messages_dispatch: false,

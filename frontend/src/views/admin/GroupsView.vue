@@ -4703,6 +4703,9 @@ import {
   mTokToPerToken,
   perTokenToMTok,
   toNullableNumber,
+  apiTimePricingToForm,
+  createDefaultTimePricingForm,
+  formTimePricingToAPI,
 } from "@/components/admin/channel/types";
 import type { ChannelModelPricing } from "@/api/admin/channels";
 import { VueDraggable } from "vue-draggable-plus";
@@ -4718,8 +4721,12 @@ import {
   messagesDispatchFormStateToConfig,
   resetOpenAICompatFormState,
   resetMessagesDispatchFormState,
+  supportsMessagesDispatchPlatform,
   type MessagesDispatchMappingRow,
 } from "./groupsMessagesDispatch";
+
+const supportsLivePlatform = (platform: string): boolean =>
+  platform === "openai" || platform === "composite";
 import {
   buildModelsListConfig,
   createModelsListState as createInitialModelsListState,
@@ -4772,6 +4779,7 @@ const emptyGroupPricing = (): PricingFormEntry => ({
   image_output_price: null,
   per_request_price: null,
   intervals: [],
+  time_pricing: createDefaultTimePricingForm(),
 });
 
 const addGroupPricing = (entries: PricingFormEntry[]) =>
@@ -4791,6 +4799,7 @@ const groupPricingFromAPI = (
     image_output_price: perTokenToMTok(entry.image_output_price),
     per_request_price: entry.per_request_price,
     intervals: apiIntervalsToForm(entry.intervals || []),
+    time_pricing: apiTimePricingToForm(entry.time_pricing),
   }));
 
 const groupPricingToAPI = (
@@ -4814,6 +4823,7 @@ const groupPricingToAPI = (
         entry.billing_mode === "token"
           ? []
           : formIntervalsToAPI(entry.intervals || []),
+      time_pricing: formTimePricingToAPI(entry.time_pricing),
     }));
 
 const { t } = useI18n();
@@ -7025,10 +7035,11 @@ watch(
     if (!["anthropic", "antigravity"].includes(newVal)) {
       createForm.fallback_group_id_on_invalid_request = null;
     }
-    if (newVal !== "openai") {
+    if (!supportsMessagesDispatchPlatform(newVal)) {
       resetMessagesDispatchFormState(createForm);
       createForm.allow_live = false;
     }
+    if (!supportsLivePlatform(newVal)) createForm.allow_live = false;
     resetOpenAICompatFormState(createForm);
     if (!isProfitControlPlatform(newVal)) {
       createForm.profit_control_enabled = false;
@@ -7074,10 +7085,11 @@ watch(
     if (!["anthropic", "antigravity"].includes(newVal)) {
       editForm.fallback_group_id_on_invalid_request = null;
     }
-    if (newVal !== "openai") {
+    if (!supportsMessagesDispatchPlatform(newVal)) {
       resetMessagesDispatchFormState(editForm);
       editForm.allow_live = false;
     }
+    if (!supportsLivePlatform(newVal)) editForm.allow_live = false;
     resetOpenAICompatFormState(editForm);
     if (!isProfitControlPlatform(newVal)) {
       editForm.profit_control_enabled = false;
@@ -7125,11 +7137,12 @@ watch(
     if (!['anthropic', 'antigravity'].includes(newVal)) {
       editForm.fallback_group_id_on_invalid_request = null
     }
-    if (newVal !== 'openai') {
+    if (!supportsMessagesDispatchPlatform(newVal)) {
       editForm.allow_messages_dispatch = false
       editForm.allow_live = false
       editForm.default_mapped_model = ''
     }
+    if (!supportsLivePlatform(newVal)) editForm.allow_live = false
     resetOpenAICompatFormState(editForm)
   }
 )
