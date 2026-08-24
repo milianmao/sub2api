@@ -1747,7 +1747,7 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	if err != nil {
 		return nil, err
 	}
-	if strategy == OpenAIImageUpstreamChatGPTWebImage {
+	if strategy == OpenAIImageUpstreamChatGPTWebImage && (parsed.Endpoint != openAIImagesEditsEndpoint || len(parsed.Uploads) > 0) {
 		return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)
 	}
 
