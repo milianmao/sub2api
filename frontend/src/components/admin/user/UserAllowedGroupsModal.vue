@@ -109,11 +109,23 @@
 
         <!-- 公开分组区域 -->
         <div v-if="publicGroups.length > 0">
-          <div class="mb-3 flex items-center gap-2">
+          <div class="mb-3 flex flex-wrap items-center gap-2">
             <div class="h-1.5 w-1.5 rounded-full bg-green-500"></div>
-            <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">{{ t('admin.users.publicGroups') }}</h4>
+            <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              {{ restrictPublicGroups ? t('admin.users.publicGroupsRestricted') : t('admin.users.publicGroups') }}
+            </h4>
             <span class="text-xs text-gray-400">({{ publicGroupConfigs.length }})</span>
+            <label class="ml-auto flex cursor-pointer items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <input
+                type="checkbox"
+                :checked="restrictPublicGroups"
+                @change="toggleRestrictPublicGroups"
+                class="h-4 w-4 cursor-pointer rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-500"
+              />
+              {{ t('admin.users.restrictPublicGroups') }}
+            </label>
           </div>
+          <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.users.restrictPublicGroupsHint') }}</p>
           <div class="grid gap-3">
             <div
               v-for="config in publicGroupConfigs"
@@ -121,9 +133,19 @@
               class="relative overflow-hidden rounded-xl border-2 border-green-200 bg-green-50/50 p-4 dark:border-green-800/50 dark:bg-green-900/10"
             >
               <div class="flex items-center gap-4">
-                <!-- 复选框（禁用状态） -->
+                <!-- 未开启限制时公开分组恒可用，此处仅作展示；开启后才是真实开关 -->
                 <div class="flex-shrink-0">
-                  <div class="flex h-5 w-5 items-center justify-center rounded-md border-2 border-green-400 bg-green-500 dark:border-green-600 dark:bg-green-600">
+                  <input
+                    v-if="restrictPublicGroups"
+                    type="checkbox"
+                    :checked="config.isSelected"
+                    @change="togglePublicGroup(config.groupId)"
+                    class="h-5 w-5 cursor-pointer rounded-md border-2 border-green-400 text-green-600 focus:ring-green-500 dark:border-green-600"
+                  />
+                  <div
+                    v-else
+                    class="flex h-5 w-5 items-center justify-center rounded-md border-2 border-green-400 bg-green-500 dark:border-green-600 dark:bg-green-600"
+                  >
                     <svg class="h-full w-full text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3">
                       <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                     </svg>
@@ -239,6 +261,7 @@ const groupConfigs = ref<GroupRateConfig[]>([])
 const originalGroupRates = ref<Record<number, number>>({}) // 记录原始专属倍率，用于检测删除
 const loading = ref(false)
 const submitting = ref(false)
+const restrictPublicGroups = ref(false)
 
 // 分离专属分组和公开分组
 const exclusiveGroups = computed(() => groups.value.filter((g) => g.is_exclusive || g.access_mode === 'restricted'))
@@ -270,6 +293,7 @@ const load = async () => {
     // 初始化配置
     const userAllowedGroups = props.user?.allowed_groups || []
     const userGroupRates = props.user?.group_rates || {}
+    restrictPublicGroups.value = props.user?.restrict_public_groups ?? false
 
     // 保存原始专属倍率，用于检测删除操作
     originalGroupRates.value = { ...userGroupRates }
@@ -283,8 +307,11 @@ const load = async () => {
       minUserLevel: g.min_user_level ?? 0,
       defaultRate: g.rate_multiplier,
       customRate: userGroupRates[g.id] ?? null,
-      // 专属/受限分组：检查是否在 allowed_groups 中；公开分组始终选中。
-      isSelected: g.is_exclusive || g.access_mode === 'restricted' ? userAllowedGroups.includes(g.id) : true,
+      // 专属/受限分组始终检查授权；公开分组仅在开启限制时检查授权。
+      isSelected:
+        g.is_exclusive || g.access_mode === 'restricted' || restrictPublicGroups.value
+          ? userAllowedGroups.includes(g.id)
+          : true,
     }))
   } catch (error) {
     console.error('Failed to load groups:', error)
@@ -298,6 +325,23 @@ const toggleExclusiveGroup = (groupId: number) => {
   const config = groupConfigs.value.find((c) => c.groupId === groupId)
   if (config && (config.isExclusive || config.accessMode === 'restricted')) {
     config.isSelected = !config.isSelected
+  }
+}
+
+const togglePublicGroup = (groupId: number) => {
+  const config = groupConfigs.value.find((c) => c.groupId === groupId)
+  if (config && !config.isExclusive) {
+    config.isSelected = !config.isSelected
+  }
+}
+
+// 关闭限制时把公开分组全部勾回，避免保存出一份"限制已关但只勾了两个"的误导状态。
+const toggleRestrictPublicGroups = () => {
+  restrictPublicGroups.value = !restrictPublicGroups.value
+  if (!restrictPublicGroups.value) {
+    for (const config of groupConfigs.value) {
+      if (!config.isExclusive) config.isSelected = true
+    }
   }
 }
 
@@ -320,9 +364,13 @@ const handleSave = async () => {
   submitting.value = true
 
   try {
-    // 构建 allowed_groups（仅包含需要显式授权且被勾选的分组）
+    // 仅保存需要显式授权的分组；公开分组限制开启后也需显式授权。
     const allowedGroups = groupConfigs.value
-      .filter((c) => (c.isExclusive || c.accessMode === 'restricted') && c.isSelected)
+      .filter(
+        (c) =>
+          c.isSelected &&
+          (c.isExclusive || c.accessMode === 'restricted' || restrictPublicGroups.value)
+      )
       .map((c) => c.groupId)
 
     // 构建 group_rates
@@ -343,6 +391,7 @@ const handleSave = async () => {
 
     await adminAPI.users.update(props.user.id, {
       allowed_groups: allowedGroups,
+      restrict_public_groups: restrictPublicGroups.value,
       group_rates: Object.keys(groupRates).length > 0 ? groupRates : undefined,
     })
 

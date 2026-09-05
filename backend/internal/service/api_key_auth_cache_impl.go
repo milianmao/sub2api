@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 21 // v21: preserve API key group authorization state
+const apiKeyAuthSnapshotVersion = 22 // v22: preserve authorization state and group Fast billing fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -460,9 +460,9 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		FallbackGroupID: cloneAPIKeyAuthInt64Ptr(group.FallbackGroupID), FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(group.FallbackGroupIDOnInvalidRequest),
 		ModelRouting: cloneAPIKeyAuthModelRoutingSnapshot(group.ModelRouting), ModelRoutingEnabled: group.ModelRoutingEnabled, MCPXMLInject: group.MCPXMLInject,
 		SupportedModelScopes: cloneAPIKeyAuthStringSlice(group.SupportedModelScopes), AllowMessagesDispatch: group.AllowMessagesDispatch, AllowOpenAICompat: group.AllowOpenAICompat,
-		AllowLive: group.AllowLive, RequireOAuthOnly: group.RequireOAuthOnly, RequirePrivacySet: group.RequirePrivacySet, DefaultMappedModel: group.DefaultMappedModel,
+		AllowLive: group.AllowLive, ForceOpenAIFast: group.ForceOpenAIFast, FreeOpenAIFast: group.FreeOpenAIFast, RequireOAuthOnly: group.RequireOAuthOnly, RequirePrivacySet: group.RequirePrivacySet, DefaultMappedModel: group.DefaultMappedModel,
 		MessagesDispatchModelConfig: cloneAPIKeyAuthMessagesDispatchModelConfig(group.MessagesDispatchModelConfig), OpenAIImageUpstream: group.OpenAIImageUpstream, ModelsListConfig: group.ModelsListConfig,
-		RPMLimit: group.RPMLimit, MaxReasoningEffort: group.MaxReasoningEffort, ReasoningEffortMappings: append([]ReasoningEffortMapping(nil), group.ReasoningEffortMappings...),
+		RPMLimit: group.RPMLimit, MaxReasoningEffort: group.MaxReasoningEffort, MaxReasoningEffortOverLimit: group.MaxReasoningEffortOverLimit, ReasoningEffortMappings: append([]ReasoningEffortMapping(nil), group.ReasoningEffortMappings...),
 		PeakRateEnabled: group.PeakRateEnabled, PeakStart: group.PeakStart, PeakEnd: group.PeakEnd, PeakRateMultiplier: group.PeakRateMultiplier,
 		ProfitControlEnabled: group.ProfitControlEnabled, ProfitMinMargin: group.ProfitMinMargin, ProfitSafetyBuffer: group.ProfitSafetyBuffer,
 	}
@@ -489,9 +489,9 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		FallbackGroupID: cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupID), FallbackGroupIDOnInvalidRequest: cloneAPIKeyAuthInt64Ptr(snapshot.FallbackGroupIDOnInvalidRequest),
 		ModelRouting: cloneAPIKeyAuthModelRoutingSnapshot(snapshot.ModelRouting), ModelRoutingEnabled: snapshot.ModelRoutingEnabled, MCPXMLInject: snapshot.MCPXMLInject,
 		SupportedModelScopes: cloneAPIKeyAuthStringSlice(snapshot.SupportedModelScopes), AllowMessagesDispatch: snapshot.AllowMessagesDispatch, AllowOpenAICompat: snapshot.AllowOpenAICompat,
-		AllowLive: snapshot.AllowLive, RequireOAuthOnly: snapshot.RequireOAuthOnly, RequirePrivacySet: snapshot.RequirePrivacySet, DefaultMappedModel: snapshot.DefaultMappedModel,
+		AllowLive: snapshot.AllowLive, ForceOpenAIFast: snapshot.ForceOpenAIFast, FreeOpenAIFast: snapshot.FreeOpenAIFast, RequireOAuthOnly: snapshot.RequireOAuthOnly, RequirePrivacySet: snapshot.RequirePrivacySet, DefaultMappedModel: snapshot.DefaultMappedModel,
 		MessagesDispatchModelConfig: cloneAPIKeyAuthMessagesDispatchModelConfig(snapshot.MessagesDispatchModelConfig), OpenAIImageUpstream: snapshot.OpenAIImageUpstream, ModelsListConfig: snapshot.ModelsListConfig,
-		RPMLimit: snapshot.RPMLimit, MaxReasoningEffort: snapshot.MaxReasoningEffort, ReasoningEffortMappings: append([]ReasoningEffortMapping(nil), snapshot.ReasoningEffortMappings...),
+		RPMLimit: snapshot.RPMLimit, MaxReasoningEffort: snapshot.MaxReasoningEffort, MaxReasoningEffortOverLimit: snapshot.MaxReasoningEffortOverLimit, ReasoningEffortMappings: append([]ReasoningEffortMapping(nil), snapshot.ReasoningEffortMappings...),
 		PeakRateEnabled: snapshot.PeakRateEnabled, PeakStart: snapshot.PeakStart, PeakEnd: snapshot.PeakEnd, PeakRateMultiplier: snapshot.PeakRateMultiplier,
 		ProfitControlEnabled: snapshot.ProfitControlEnabled, ProfitMinMargin: snapshot.ProfitMinMargin, ProfitSafetyBuffer: snapshot.ProfitSafetyBuffer,
 	}
@@ -572,6 +572,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			Email:                      apiKey.User.Email,
 			Username:                   apiKey.User.Username,
 			BalanceNotifyEnabled:       apiKey.User.BalanceNotifyEnabled,
+			RestrictPublicGroups:       apiKey.User.RestrictPublicGroups,
 			BalanceNotifyThresholdType: apiKey.User.BalanceNotifyThresholdType,
 			BalanceNotifyThreshold:     cloneAPIKeyAuthFloat64Ptr(apiKey.User.BalanceNotifyThreshold),
 			BalanceNotifyExtraEmails:   cloneAPIKeyAuthNotifyEmailEntries(apiKey.User.BalanceNotifyExtraEmails),
@@ -625,6 +626,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			Email:                      snapshot.User.Email,
 			Username:                   snapshot.User.Username,
 			BalanceNotifyEnabled:       snapshot.User.BalanceNotifyEnabled,
+			RestrictPublicGroups:       snapshot.User.RestrictPublicGroups,
 			BalanceNotifyThresholdType: snapshot.User.BalanceNotifyThresholdType,
 			BalanceNotifyThreshold:     cloneAPIKeyAuthFloat64Ptr(snapshot.User.BalanceNotifyThreshold),
 			BalanceNotifyExtraEmails:   cloneAPIKeyAuthNotifyEmailEntries(snapshot.User.BalanceNotifyExtraEmails),
