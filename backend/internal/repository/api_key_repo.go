@@ -1457,6 +1457,8 @@ func apiKeyAuthGroupSelect(q *dbent.GroupQuery) {
 		group.FieldAllowMessagesDispatch,
 		group.FieldAllowOpenaiCompat,
 		group.FieldAllowLive,
+		group.FieldForceOpenaiFast,
+		group.FieldFreeOpenaiFast,
 		group.FieldRequireOauthOnly,
 		group.FieldRequirePrivacySet,
 		group.FieldDefaultMappedModel,
@@ -1465,6 +1467,7 @@ func apiKeyAuthGroupSelect(q *dbent.GroupQuery) {
 		group.FieldModelsListConfig,
 		group.FieldRpmLimit,
 		group.FieldMaxReasoningEffort,
+		group.FieldMaxReasoningEffortOverLimit,
 		group.FieldReasoningEffortMappings,
 		// 分组利润控制：认证快照是调度门 enable 判定的直接来源。
 		group.FieldProfitControlEnabled,
