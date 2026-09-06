@@ -124,6 +124,7 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetMessagesDispatchModelConfig(groupIn.MessagesDispatchModelConfig).
 		SetOpenaiImageUpstream(normalizeGroupOpenAIImageUpstream(groupIn.OpenAIImageUpstream)).
 		SetModelsListConfig(groupIn.ModelsListConfig).
+		SetCodexModelsManifestConfig(groupIn.CodexModelsManifestConfig).
 		SetRpmLimit(groupIn.RPMLimit).
 		SetMaxReasoningEffort(groupIn.MaxReasoningEffort).
 		SetMaxReasoningEffortOverLimit(groupIn.MaxReasoningEffortOverLimit).
@@ -313,6 +314,7 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetMessagesDispatchModelConfig(groupIn.MessagesDispatchModelConfig).
 		SetOpenaiImageUpstream(normalizeGroupOpenAIImageUpstream(groupIn.OpenAIImageUpstream)).
 		SetModelsListConfig(groupIn.ModelsListConfig).
+		SetCodexModelsManifestConfig(groupIn.CodexModelsManifestConfig).
 		SetRpmLimit(groupIn.RPMLimit).
 		SetMaxReasoningEffort(groupIn.MaxReasoningEffort).
 		SetMaxReasoningEffortOverLimit(groupIn.MaxReasoningEffortOverLimit).

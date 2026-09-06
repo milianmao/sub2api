@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 22 // v22: preserve authorization state and group Fast billing fields
+const apiKeyAuthSnapshotVersion = 23 // v23: preserve authorization state, Fast billing and Codex manifest fields
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -462,6 +462,11 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		SupportedModelScopes: cloneAPIKeyAuthStringSlice(group.SupportedModelScopes), AllowMessagesDispatch: group.AllowMessagesDispatch, AllowOpenAICompat: group.AllowOpenAICompat,
 		AllowLive: group.AllowLive, ForceOpenAIFast: group.ForceOpenAIFast, FreeOpenAIFast: group.FreeOpenAIFast, RequireOAuthOnly: group.RequireOAuthOnly, RequirePrivacySet: group.RequirePrivacySet, DefaultMappedModel: group.DefaultMappedModel,
 		MessagesDispatchModelConfig: cloneAPIKeyAuthMessagesDispatchModelConfig(group.MessagesDispatchModelConfig), OpenAIImageUpstream: group.OpenAIImageUpstream, ModelsListConfig: group.ModelsListConfig,
+		CodexModelsManifestConfig: GroupCodexModelsManifestConfig{
+			Enabled:             group.CodexModelsManifestConfig.Enabled,
+			AccountIDs:          cloneAPIKeyAuthInt64Slice(group.CodexModelsManifestConfig.AccountIDs),
+			FallbackToScheduler: group.CodexModelsManifestConfig.FallbackToScheduler,
+		},
 		RPMLimit: group.RPMLimit, MaxReasoningEffort: group.MaxReasoningEffort, MaxReasoningEffortOverLimit: group.MaxReasoningEffortOverLimit, ReasoningEffortMappings: append([]ReasoningEffortMapping(nil), group.ReasoningEffortMappings...),
 		PeakRateEnabled: group.PeakRateEnabled, PeakStart: group.PeakStart, PeakEnd: group.PeakEnd, PeakRateMultiplier: group.PeakRateMultiplier,
 		ProfitControlEnabled: group.ProfitControlEnabled, ProfitMinMargin: group.ProfitMinMargin, ProfitSafetyBuffer: group.ProfitSafetyBuffer,
@@ -491,6 +496,11 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		SupportedModelScopes: cloneAPIKeyAuthStringSlice(snapshot.SupportedModelScopes), AllowMessagesDispatch: snapshot.AllowMessagesDispatch, AllowOpenAICompat: snapshot.AllowOpenAICompat,
 		AllowLive: snapshot.AllowLive, ForceOpenAIFast: snapshot.ForceOpenAIFast, FreeOpenAIFast: snapshot.FreeOpenAIFast, RequireOAuthOnly: snapshot.RequireOAuthOnly, RequirePrivacySet: snapshot.RequirePrivacySet, DefaultMappedModel: snapshot.DefaultMappedModel,
 		MessagesDispatchModelConfig: cloneAPIKeyAuthMessagesDispatchModelConfig(snapshot.MessagesDispatchModelConfig), OpenAIImageUpstream: snapshot.OpenAIImageUpstream, ModelsListConfig: snapshot.ModelsListConfig,
+		CodexModelsManifestConfig: GroupCodexModelsManifestConfig{
+			Enabled:             snapshot.CodexModelsManifestConfig.Enabled,
+			AccountIDs:          cloneAPIKeyAuthInt64Slice(snapshot.CodexModelsManifestConfig.AccountIDs),
+			FallbackToScheduler: snapshot.CodexModelsManifestConfig.FallbackToScheduler,
+		},
 		RPMLimit: snapshot.RPMLimit, MaxReasoningEffort: snapshot.MaxReasoningEffort, MaxReasoningEffortOverLimit: snapshot.MaxReasoningEffortOverLimit, ReasoningEffortMappings: append([]ReasoningEffortMapping(nil), snapshot.ReasoningEffortMappings...),
 		PeakRateEnabled: snapshot.PeakRateEnabled, PeakStart: snapshot.PeakStart, PeakEnd: snapshot.PeakEnd, PeakRateMultiplier: snapshot.PeakRateMultiplier,
 		ProfitControlEnabled: snapshot.ProfitControlEnabled, ProfitMinMargin: snapshot.ProfitMinMargin, ProfitSafetyBuffer: snapshot.ProfitSafetyBuffer,

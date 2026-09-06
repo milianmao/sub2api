@@ -88,6 +88,7 @@ vi.mock('@/api/admin', () => ({
       getUsageSummary: getGroupUsageSummary,
       getCapacitySummary: getGroupCapacitySummary,
       getModelsListCandidates,
+      getLiveCapability: vi.fn().mockResolvedValue({ supported: false }),
     },
     dashboard: {
       getBatchUsersUsage,
