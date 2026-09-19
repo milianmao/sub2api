@@ -623,7 +623,7 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 		if vetoed, _ := openAIProfitControlVetoReason(ctx, latest); vetoed {
 			return 0, nil, "", nil
 		}
-		if s.isOpenAIAccountRequestRuntimeBlocked(latest, requestedModel) {
+		if s.isOpenAIAccountRequestRuntimeBlocked(latest, requestedModel, requireCompact) {
 			_ = store.DeleteResponseAccount(ctx, derefGroupID(groupID), responseID)
 			return 0, nil, "", nil
 		}
@@ -651,7 +651,7 @@ func (s *OpenAIGatewayService) resolveAccountByPreviousResponseIDForCapability(
 				}
 				if isOpenAICompatibleAccountEligibleForRequest(ctx, candidate, PlatformOpenAI, requestedModel, requireCompact, requiredCapability) &&
 					parentHealthyForShadow(candidate, s.parentAccountLookup(ctx)) &&
-					!s.isOpenAIAccountRequestRuntimeBlocked(candidate, requestedModel) &&
+					!s.isOpenAIAccountRequestRuntimeBlocked(candidate, requestedModel, requireCompact) &&
 					s.isOpenAIAccountTransportCompatible(candidate, OpenAIUpstreamTransportResponsesWebsocketV2) &&
 					(groupID == nil || !s.needsUpstreamChannelRestrictionCheck(ctx, groupID) || !s.isUpstreamModelRestrictedByChannel(ctx, *groupID, candidate, requestedModel, requireCompact)) {
 					return 0, nil, "", nil
