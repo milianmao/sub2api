@@ -175,7 +175,7 @@ func TestGroupHandlerSimpleModeResponseUsesFieldAllowlist(t *testing.T) {
 	require.ElementsMatch(t, []string{
 		"id", "name", "description", "platform", "status", "account_count",
 		"active_account_count", "rate_limited_account_count", "sort_order", "created_at", "updated_at",
-	}, mapKeys(item))
+	}, simpleModeMapKeys(item))
 	for _, forbidden := range []string{
 		"rate_multiplier", "rpm_limit", "long_context_pricing_enabled", "model_pricing",
 		"allow_batch_image_generation", "video_price_720p", "web_search_price_per_call",
@@ -199,7 +199,7 @@ func TestGroupHandlerSimpleModeListsOnlyBindableGroups(t *testing.T) {
 	}
 }
 
-func mapKeys(values map[string]any) []string {
+func simpleModeMapKeys(values map[string]any) []string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
 		keys = append(keys, key)

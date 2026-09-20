@@ -229,13 +229,8 @@ func (h *OpenAIGatewayHandler) handleGrokMedia(c *gin.Context, endpoint service.
 		var scheduleDecision service.OpenAIAccountScheduleDecision
 		var err error
 		if boundLookupAccountID > 0 {
-			selection, scheduleDecision, err = h.gatewayService.ResolveGrokMediaVideoRequestSelection(
-				requestCtx,
-				apiKey.GroupID,
-				boundLookupAccountID,
-				routingModel,
-				service.OpenAIUpstreamTransportHTTPSSE,
-				requiredCapability,
+			selection, scheduleDecision, err = h.gatewayService.SelectMediaVideoRequestAccount(
+				requestCtx, apiKey.GroupID, sessionHash, boundLookupAccountID, routingModel, platform,
 			)
 		} else {
 			selection, scheduleDecision, err = h.gatewayService.SelectAccountWithSchedulerForCapability(

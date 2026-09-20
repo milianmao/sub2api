@@ -30,8 +30,6 @@ type stubAdminService struct {
 	updatedGroupIDs                     []int64
 	updatedGroups                       []*service.UpdateGroupInput
 	createdAccounts                     []*service.CreateAccountInput
-	createdGroups                       []*service.CreateGroupInput
-	updatedGroups                       []*service.UpdateGroupInput
 	deletedGroupIDs                     []int64
 	guardedDeletedGroupIDs              []int64
 	deleteGroupIfEmptyErr               error
