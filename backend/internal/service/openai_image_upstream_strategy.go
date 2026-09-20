@@ -160,8 +160,13 @@ func accountOpenAIImageUpstreamGroup(account *Account, parsed *OpenAIImagesReque
 
 func resolveOpenAIImageUpstreamAuto(account *Account, strategy OpenAIImageUpstreamStrategy) (OpenAIImageUpstreamStrategy, error) {
 	if strategy == OpenAIImageUpstreamAuto || strategy == "" {
-		if account != nil && account.Type == AccountTypeAPIKey {
-			return OpenAIImageUpstreamOfficialImages, nil
+		if account != nil {
+			switch account.Type {
+			case AccountTypeAPIKey:
+				return OpenAIImageUpstreamOfficialImages, nil
+			case AccountTypeSetupToken:
+				return OpenAIImageUpstreamCodexImages, nil
+			}
 		}
 		return OpenAIImageUpstreamCodexResponses, nil
 	}
