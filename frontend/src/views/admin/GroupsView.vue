@@ -4970,6 +4970,10 @@ const openAIImageUpstreamOptions = computed(() => [
     label: t("admin.groups.openaiImageUpstream.options.codexResponses"),
   },
   {
+    value: "codex_images",
+    label: t("admin.groups.openaiImageUpstream.options.codexImages"),
+  },
+  {
     value: "chatgpt_web_image",
     label: t("admin.groups.openaiImageUpstream.options.chatgptWebImage"),
   },

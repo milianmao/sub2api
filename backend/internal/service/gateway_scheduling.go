@@ -232,7 +232,10 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 	// Establish the strict pool boundary before model routing, sticky affinity,
 	// load ordering, or slot probing. A full primary remains in this set and
 	// therefore produces the existing primary wait path rather than failover.
-	accounts, _ = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, platform, useMixed, group)
+	accounts, err = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, platform, useMixed, group)
+	if err != nil {
+		return nil, err
+	}
 	if len(accounts) == 0 {
 		return nil, ErrNoAvailableAccounts
 	}
@@ -1612,9 +1615,10 @@ func (s *GatewayService) eligibleGatewayAccounts(
 	requestedModel, platform string,
 	allowMixed bool,
 	schedGroup *Group,
-) ([]Account, AccountPoolRole) {
+) ([]Account, error) {
 	needsUpstreamCheck := s.needsUpstreamChannelRestrictionCheck(ctx, groupID)
 	eligible := make([]Account, 0, len(accounts))
+	channelRestrictedCount := 0
 	for i := range accounts {
 		account := &accounts[i]
 		if _, excluded := excludedIDs[account.ID]; excluded {
@@ -1634,6 +1638,7 @@ func (s *GatewayService) eligibleGatewayAccounts(
 			continue
 		}
 		if needsUpstreamCheck && groupID != nil && s.isUpstreamModelRestrictedByChannel(ctx, *groupID, account, requestedModel) {
+			channelRestrictedCount++
 			continue
 		}
 		if !s.isAccountSchedulableForModelSelection(ctx, account, requestedModel) ||
@@ -1644,7 +1649,16 @@ func (s *GatewayService) eligibleGatewayAccounts(
 		}
 		eligible = append(eligible, *account)
 	}
-	return PreferAccountPool(eligible)
+	if len(eligible) == 0 && channelRestrictedCount > 0 {
+		slog.Warn("channel pricing restriction blocked request",
+			"group_id", derefGroupID(groupID),
+			"model", requestedModel,
+			"restricted_accounts", channelRestrictedCount,
+			"total_accounts", len(accounts))
+		return nil, fmt.Errorf("%w supporting model: %s (channel pricing restriction)", ErrNoAvailableAccounts, requestedModel)
+	}
+	selected, _ := PreferAccountPool(eligible)
+	return selected, nil
 }
 
 func filterByMinPriority(accounts []accountWithLoad) []accountWithLoad {
@@ -1970,7 +1984,10 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	}
 	ctx = s.withWindowCostPrefetch(ctx, accounts)
 	ctx = s.withRPMPrefetch(ctx, accounts)
-	accounts, _ = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, platform, false, schedGroup)
+	accounts, err = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, platform, false, schedGroup)
+	if err != nil {
+		return nil, err
+	}
 	accountsLoaded := true
 
 	// ============ Model Routing (legacy path): apply before sticky session ============
@@ -2127,7 +2144,10 @@ func (s *GatewayService) selectAccountForModelWithPlatform(ctx context.Context, 
 	ctx = s.withWindowCostPrefetch(ctx, accounts)
 	ctx = s.withRPMPrefetch(ctx, accounts)
 
-	accounts, _ = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, platform, false, schedGroup)
+	accounts, err = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, platform, false, schedGroup)
+	if err != nil {
+		return nil, err
+	}
 
 	// 3. 按优先级+最久未用选择（考虑模型支持）
 	// needsUpstreamCheck 仅在主选择循环中使用；粘性会话命中时跳过此检查，
@@ -2231,7 +2251,10 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	}
 	ctx = s.withWindowCostPrefetch(ctx, accounts)
 	ctx = s.withRPMPrefetch(ctx, accounts)
-	accounts, _ = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, nativePlatform, true, schedGroup)
+	accounts, err = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, nativePlatform, true, schedGroup)
+	if err != nil {
+		return nil, err
+	}
 	accountsLoaded := true
 
 	// ============ Model Routing (legacy path): apply before sticky session ============
@@ -2390,7 +2413,10 @@ func (s *GatewayService) selectAccountWithMixedScheduling(ctx context.Context, g
 	ctx = s.withWindowCostPrefetch(ctx, accounts)
 	ctx = s.withRPMPrefetch(ctx, accounts)
 
-	accounts, _ = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, nativePlatform, true, schedGroup)
+	accounts, err = s.eligibleGatewayAccounts(ctx, accounts, groupID, excludedIDs, requestedModel, nativePlatform, true, schedGroup)
+	if err != nil {
+		return nil, err
+	}
 
 	// 3. 按优先级+最久未用选择（考虑模型支持和混合调度）
 	// needsUpstreamCheck 仅在主选择循环中使用；粘性会话命中时跳过此检查。

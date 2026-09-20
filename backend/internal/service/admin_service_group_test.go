@@ -346,6 +346,10 @@ func TestNormalizeOpenAIImageUpstreamStrategyForGroupInput(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, string(OpenAIImageUpstreamAuto), strategy)
 
+	strategy, err = NormalizeOpenAIImageUpstreamStrategy(" codex_images ")
+	require.NoError(t, err)
+	require.Equal(t, string(OpenAIImageUpstreamCodexImages), strategy)
+
 	strategy, err = NormalizeOpenAIImageUpstreamStrategy(" chatgpt_web_image ")
 	require.NoError(t, err)
 	require.Equal(t, string(OpenAIImageUpstreamChatGPTWebImage), strategy)

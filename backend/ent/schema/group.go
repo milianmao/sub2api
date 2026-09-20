@@ -285,10 +285,10 @@ func (Group) Fields() []ent.Field {
 			Default("auto").
 			Validate(func(value string) error {
 				switch value {
-				case "auto", "official_images", "codex_responses", "chatgpt_web_image":
+				case "auto", "official_images", "codex_responses", "codex_images", "chatgpt_web_image":
 					return nil
 				default:
-					return fmt.Errorf("must be one of auto, official_images, codex_responses, chatgpt_web_image")
+					return fmt.Errorf("must be one of auto, official_images, codex_responses, codex_images, chatgpt_web_image")
 				}
 			}).
 			Comment("OpenAI image upstream strategy for this group"),

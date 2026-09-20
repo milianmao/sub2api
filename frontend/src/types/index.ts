@@ -553,6 +553,7 @@ export type OpenAIImageUpstreamStrategy =
   | 'auto'
   | 'official_images'
   | 'codex_responses'
+  | 'codex_images'
   | 'chatgpt_web_image'
 
 export interface OpenAIMessagesDispatchModelConfig {

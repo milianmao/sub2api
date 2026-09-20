@@ -243,7 +243,7 @@ type CreateGroupRequest struct {
 	RequirePrivacySet           bool                                      `json:"require_privacy_set"`
 	DefaultMappedModel          string                                    `json:"default_mapped_model"`
 	MessagesDispatchModelConfig service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
-	OpenAIImageUpstream         string                                    `json:"openai_image_upstream" binding:"omitempty,oneof=auto official_images codex_responses chatgpt_web_image"`
+	OpenAIImageUpstream         string                                    `json:"openai_image_upstream" binding:"omitempty,oneof=auto official_images codex_responses codex_images chatgpt_web_image"`
 	ModelAllowlist              service.GroupModelAllowlist               `json:"model_allowlist"`
 	// 固定账号 manifest 配置；创建路径禁止开启，仅编辑可配置。
 	CodexModelsManifestConfig service.GroupCodexModelsManifestConfig `json:"codex_models_manifest_config"`
@@ -323,7 +323,7 @@ type UpdateGroupRequest struct {
 	RequirePrivacySet           *bool                                      `json:"require_privacy_set"`
 	DefaultMappedModel          *string                                    `json:"default_mapped_model"`
 	MessagesDispatchModelConfig *service.OpenAIMessagesDispatchModelConfig `json:"messages_dispatch_model_config"`
-	OpenAIImageUpstream         *string                                    `json:"openai_image_upstream" binding:"omitempty,oneof=auto official_images codex_responses chatgpt_web_image"`
+	OpenAIImageUpstream         *string                                    `json:"openai_image_upstream" binding:"omitempty,oneof=auto official_images codex_responses codex_images chatgpt_web_image"`
 	ModelAllowlist              *service.GroupModelAllowlist               `json:"model_allowlist"`
 	// 固定账号 manifest 配置；nil 表示不修改。
 	CodexModelsManifestConfig *service.GroupCodexModelsManifestConfig `json:"codex_models_manifest_config"`
@@ -651,6 +651,13 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if h.isSimpleMode() && req.Platform == service.PlatformComposite {
+		response.BadRequest(c, "Platform is not supported in simple mode")
+		return
+	}
+	if h.isSimpleMode() {
+		sanitizeCreateGroupRequestForSimpleMode(&req)
+	}
 	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive || req.VisibleUserIDs != nil) {
 		return
 	}
@@ -666,13 +673,6 @@ func (h *GroupHandler) Create(c *gin.Context) {
 	var visibleUserIDs []int64
 	if req.VisibleUserIDs != nil {
 		visibleUserIDs = *req.VisibleUserIDs
-	}
-	if h.isSimpleMode() && req.Platform == service.PlatformComposite {
-		response.BadRequest(c, "Platform is not supported in simple mode")
-		return
-	}
-	if h.isSimpleMode() {
-		sanitizeCreateGroupRequestForSimpleMode(&req)
 	}
 
 	if err := service.ValidatePeakRateConfig(req.SubscriptionType, req.PeakRateEnabled, req.PeakStart, req.PeakEnd, float64ValueOrDefault(req.PeakRateMultiplier, 1.0)); err != nil {
@@ -833,11 +833,11 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
-	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive != nil || req.VisibleUserIDs != nil) {
-		return
-	}
 	if h.isSimpleMode() {
 		sanitizeUpdateGroupRequestForSimpleMode(&req)
+	}
+	if !requireSuperAdminForAuthorizationFields(c, req.AccessMode != nil || req.MinUserLevel != nil || req.IsExclusive != nil || req.VisibleUserIDs != nil) {
+		return
 	}
 
 	group, err := h.adminService.UpdateGroup(c.Request.Context(), groupID, &service.UpdateGroupInput{

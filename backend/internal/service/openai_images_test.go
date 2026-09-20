@@ -67,6 +67,14 @@ func TestResolveOpenAIImageUpstreamStrategy(t *testing.T) {
 			want:    OpenAIImageUpstreamCodexResponses,
 		},
 		{
+			name: "account override codex images",
+			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: map[string]any{
+				"openai_image_upstream": "codex_images",
+			}},
+			parsed: &OpenAIImagesRequest{Model: "gpt-image-2"},
+			want:   OpenAIImageUpstreamCodexImages,
+		},
+		{
 			name: "account override chatgpt web",
 			account: &Account{Platform: PlatformOpenAI, Type: AccountTypeOAuth, Extra: map[string]any{
 				"openai_image_upstream": "chatgpt_web_image",

@@ -1030,11 +1030,12 @@ export default {
       },
       openaiImageUpstream: {
         title: 'OpenAI Image Upstream',
-        hint: 'Controls whether image generation in this OpenAI group uses official Images, Codex Responses, or ChatGPT Web image flow. codex-gpt-image-2 always uses Codex Responses.',
+        hint: 'Controls whether image generation in this OpenAI group uses official Images, Codex Responses, direct Codex Images, or ChatGPT Web image flow. codex-gpt-image-2 always uses Codex Responses.',
         options: {
           auto: 'Auto (by account type)',
           officialImages: 'Official Images API',
           codexResponses: 'Codex Responses',
+          codexImages: 'Codex Images (Direct)',
           chatgptWebImage: 'ChatGPT Web Image'
         }
       },

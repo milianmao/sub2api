@@ -1027,11 +1027,12 @@ export default {
       },
       openaiImageUpstream: {
         title: 'OpenAI 生图上游',
-        hint: '控制此 OpenAI 分组的图片生成走官方 Images、Codex Responses 或 ChatGPT Web 生图链路。codex-gpt-image-2 固定走 Codex Responses。',
+        hint: '控制此 OpenAI 分组的图片生成走官方 Images、Codex Responses、Codex Images 直调或 ChatGPT Web 生图链路。codex-gpt-image-2 固定走 Codex Responses。',
         options: {
           auto: '自动（按账号类型）',
           officialImages: '官方 Images API',
           codexResponses: 'Codex Responses',
+          codexImages: 'Codex Images 直调',
           chatgptWebImage: 'ChatGPT Web 生图'
         }
       },

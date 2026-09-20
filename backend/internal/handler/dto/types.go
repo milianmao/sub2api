@@ -345,10 +345,10 @@ type Account struct {
 type AccountListItem struct {
 	IsFallback bool    `json:"is_fallback"`
 	ID         int64   `json:"id"`
-	Name     string  `json:"name"`
-	Notes    *string `json:"notes"`
-	Platform string  `json:"platform"`
-	Type     string  `json:"type"`
+	Name       string  `json:"name"`
+	Notes      *string `json:"notes"`
+	Platform   string  `json:"platform"`
+	Type       string  `json:"type"`
 
 	Credentials       map[string]any                    `json:"credentials,omitempty"`
 	CredentialsStatus map[string]bool                   `json:"credentials_status,omitempty"`

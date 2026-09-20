@@ -1792,8 +1792,23 @@ func (s *OpenAIGatewayService) forwardOpenAIImagesOAuth(
 	if err != nil {
 		return nil, err
 	}
-	if strategy == OpenAIImageUpstreamChatGPTWebImage && (parsed.Endpoint != openAIImagesEditsEndpoint || len(parsed.Uploads) > 0) {
-		return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)
+	switch strategy {
+	case OpenAIImageUpstreamCodexResponses:
+		ctx = withOpenAIImagesForceResponses(ctx)
+	case OpenAIImageUpstreamCodexImages:
+		// Keep the upstream 0.2.7 direct Codex Images route available as an
+		// explicit strategy without changing the legacy codex_responses meaning.
+	case OpenAIImageUpstreamChatGPTWebImage:
+		if parsed.Endpoint != openAIImagesEditsEndpoint || len(parsed.Uploads) > 0 {
+			return s.forwardOpenAIImagesChatGPTWeb(ctx, c, account, parsed, channelMappedModel)
+		}
+		// URL-only edits are not supported by the ChatGPT Web flow. Preserve the
+		// existing fallback contract by routing them through Codex Responses.
+		ctx = withOpenAIImagesForceResponses(ctx)
+	case OpenAIImageUpstreamOfficialImages:
+		return nil, fmt.Errorf("openai_image_upstream=%s is not valid for OAuth accounts", strategy)
+	default:
+		return nil, fmt.Errorf("unsupported openai image upstream strategy: %s", strategy)
 	}
 
 	startTime := time.Now()

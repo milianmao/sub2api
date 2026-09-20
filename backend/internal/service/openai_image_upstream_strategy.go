@@ -13,6 +13,7 @@ const (
 	OpenAIImageUpstreamAuto            OpenAIImageUpstreamStrategy = "auto"
 	OpenAIImageUpstreamOfficialImages  OpenAIImageUpstreamStrategy = "official_images"
 	OpenAIImageUpstreamCodexResponses  OpenAIImageUpstreamStrategy = "codex_responses"
+	OpenAIImageUpstreamCodexImages     OpenAIImageUpstreamStrategy = "codex_images"
 	OpenAIImageUpstreamChatGPTWebImage OpenAIImageUpstreamStrategy = "chatgpt_web_image"
 )
 
@@ -26,6 +27,8 @@ func parseOpenAIImageUpstreamStrategy(value string) (OpenAIImageUpstreamStrategy
 		return OpenAIImageUpstreamOfficialImages, true
 	case OpenAIImageUpstreamCodexResponses:
 		return OpenAIImageUpstreamCodexResponses, true
+	case OpenAIImageUpstreamCodexImages:
+		return OpenAIImageUpstreamCodexImages, true
 	case OpenAIImageUpstreamChatGPTWebImage:
 		return OpenAIImageUpstreamChatGPTWebImage, true
 	default:
