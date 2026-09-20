@@ -234,6 +234,7 @@ type Account struct {
 	Concurrency             int                               `json:"concurrency"`
 	LoadFactor              *int                              `json:"load_factor,omitempty"`
 	Priority                int                               `json:"priority"`
+	IsFallback              bool                              `json:"is_fallback"`
 	RateMultiplier          float64                           `json:"rate_multiplier"`
 	Status                  string                            `json:"status"`
 	ErrorMessage            string                            `json:"error_message"`
@@ -342,7 +343,8 @@ type Account struct {
 // repeated account_groups and groups object graphs. Fetch /admin/accounts/:id
 // for the complete Account DTO when editing or inspecting an account.
 type AccountListItem struct {
-	ID       int64   `json:"id"`
+	IsFallback bool    `json:"is_fallback"`
+	ID         int64   `json:"id"`
 	Name     string  `json:"name"`
 	Notes    *string `json:"notes"`
 	Platform string  `json:"platform"`

@@ -4526,7 +4526,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
 import { useOnboardingStore } from "@/stores/onboarding";
-import { useAuthStore } from "@/stores/auth";
+import { GROUP_PLATFORM_OPTIONS } from "@/constants/platforms";
 import { adminAPI } from "@/api/admin";
 import type {
   AdminGroup,
@@ -4703,7 +4703,6 @@ const { t } = useI18n();
 const appStore = useAppStore();
 const authStore = useAuthStore();
 const onboardingStore = useOnboardingStore();
-const authStore = useAuthStore();
 const canEditAuthorization = computed(() => authStore.user?.role === "super_admin");
 
 const ALWAYS_VISIBLE_COLUMNS = new Set(["name", "actions"]);

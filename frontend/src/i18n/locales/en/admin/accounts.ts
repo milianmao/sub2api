@@ -1710,6 +1710,9 @@ export default {
       generateCheckoutLink: 'Generate Payment Link',
       checkoutLinkFailed: 'Failed to generate payment link'
     },
+    chatgptPlusCheckout: {
+      title: 'ChatGPT Plus Checkout'
+    },
 
     // Scheduled Tests
 }

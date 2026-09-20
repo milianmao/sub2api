@@ -48,6 +48,10 @@ func NewOAuthHandler(oauthService *service.OAuthService) *OAuthHandler {
 	}
 }
 
+type accountLivenessTestRunner interface {
+	RunTestBackground(ctx context.Context, accountID int64, modelID string) (*service.ScheduledTestResult, error)
+}
+
 // AccountHandler handles admin account management
 type AccountHandler struct {
 	adminService              service.AdminService

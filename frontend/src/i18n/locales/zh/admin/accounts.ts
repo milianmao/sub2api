@@ -1680,6 +1680,9 @@ export default {
       generateCheckoutLink: '生成支付链接',
       checkoutLinkFailed: '生成支付链接失败'
     },
+    chatgptPlusCheckout: {
+      title: 'ChatGPT Plus 支付链接'
+    },
 
     // Scheduled Tests
 }
