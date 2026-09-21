@@ -92,6 +92,9 @@ func TestAccountReadableSnapshot_DenylistTripwire(t *testing.T) {
 	// = relational graphs with back-references that would cycle under encoding/json.
 	stripped := map[string]struct{}{
 		"Credentials": {}, "Groups": {}, "AccountGroups": {},
+		// PoolRoleChanged is the local fork's explicit-role marker. It carries
+		// `json:"-"`, so encoding/json strips it without help from the snapshot.
+		"PoolRoleChanged": {},
 	}
 	// Fields intentionally exposed as readable metadata (incl. Extra and Proxy —
 	// the proxy password is already handed out via ResolveOutboundIdentity's URL).
@@ -105,6 +108,10 @@ func TestAccountReadableSnapshot_DenylistTripwire(t *testing.T) {
 		"TempUnschedulableUntil": {}, "TempUnschedulableReason": {},
 		"SessionWindowStart": {}, "SessionWindowEnd": {}, "SessionWindowStatus": {},
 		"ParentAccountID": {}, "QuotaDimension": {}, "GroupIDs": {},
+		// Local fork fields, classified to keep the denylist behaviour unchanged:
+		// IsFallback is the global routing role and PoolRevision the scheduler
+		// fencing counter — both non-secret, neither cyclic nor heavy.
+		"IsFallback": {}, "PoolRevision": {},
 	}
 	tp := reflect.TypeOf(Account{})
 	for i := 0; i < tp.NumField(); i++ {
