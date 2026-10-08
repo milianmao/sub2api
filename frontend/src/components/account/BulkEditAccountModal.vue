@@ -193,6 +193,18 @@
         </p>
       </div>
 
+      <!-- Fallback account role -->
+      <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
+        <div class="mb-3 flex items-center justify-between">
+          <div>
+            <label id="bulk-edit-fallback-pool-label" class="input-label mb-0" for="bulk-edit-fallback-pool-enabled">{{ t('admin.accounts.fallbackAccount') }}</label>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.accounts.fallbackAccountDesc') }}</p>
+          </div>
+          <input v-model="enableFallbackPool" id="bulk-edit-fallback-pool-enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
+        </div>
+        <Select v-model="isFallback" :disabled="!enableFallbackPool" :options="[{ value: false, label: t('admin.accounts.primaryPool') }, { value: true, label: t('admin.accounts.fallbackPool') }]" />
+      </div>
+
       <!-- Base URL (API Key only) -->
       <div class="border-t border-gray-200 pt-4 dark:border-dark-600">
         <div class="mb-3 flex items-center justify-between">
@@ -343,6 +355,7 @@
 
               <ModelWhitelistSelector
                 v-model="allowedModels"
+                :model-mappings="modelMappings"
                 :platforms="targetSelectedPlatforms"
               />
 
@@ -1655,6 +1668,8 @@ const enableConcurrency = ref(false)
 const enableLoadFactor = ref(false)
 const enablePriority = ref(false)
 const enableRateMultiplier = ref(false)
+const enableFallbackPool = ref(false)
+const isFallback = ref(false)
 const enableStatus = ref(false)
 const enableGroups = ref(false)
 const enableOpenAIPassthrough = ref(false)
@@ -1956,6 +1971,10 @@ const buildUpdatePayload = (): Record<string, unknown> | null => {
     updates.priority = priority.value
   }
 
+  if (enableFallbackPool.value) {
+    updates.is_fallback = isFallback.value
+  }
+
   if (enableRateMultiplier.value) {
     updates.rate_multiplier = rateMultiplier.value
   }
@@ -2215,6 +2234,7 @@ const handleSubmit = async () => {
     enableConcurrency.value ||
     enableLoadFactor.value ||
     enablePriority.value ||
+    enableFallbackPool.value ||
     enableRateMultiplier.value ||
     enableStatus.value ||
     enableGroups.value ||
@@ -2361,6 +2381,8 @@ watch(
       enableConcurrency.value = false
       enableLoadFactor.value = false
       enablePriority.value = false
+      enableFallbackPool.value = false
+      isFallback.value = false
       enableRateMultiplier.value = false
       enableStatus.value = false
       enableGroups.value = false

@@ -917,7 +917,7 @@
                 <span class="min-w-0 flex-1 break-all text-sm text-gray-700 dark:text-gray-300">
                   {{ item.id }}
                   <span
-                    v-if="item.id.endsWith('*')"
+                    v-if="item.id.includes('*')"
                     class="ml-1 rounded bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
                   >
                     {{ t("admin.groups.modelAllowlist.wildcardTag") }}
@@ -2673,7 +2673,7 @@
                 <span class="min-w-0 flex-1 break-all text-sm text-gray-700 dark:text-gray-300">
                   {{ item.id }}
                   <span
-                    v-if="item.id.endsWith('*')"
+                    v-if="item.id.includes('*')"
                     class="ml-1 rounded bg-primary-50 px-1.5 py-0.5 text-[10px] font-medium text-primary-600 dark:bg-primary-900/30 dark:text-primary-400"
                   >
                     {{ t("admin.groups.modelAllowlist.wildcardTag") }}
@@ -4526,7 +4526,7 @@ import { useI18n } from "vue-i18n";
 import { useAppStore } from "@/stores/app";
 import { useAuthStore } from "@/stores/auth";
 import { useOnboardingStore } from "@/stores/onboarding";
-import { GROUP_PLATFORM_OPTIONS } from "@/constants/platforms";
+import { CONCRETE_PLATFORM_OPTIONS, GROUP_PLATFORM_OPTIONS } from "@/constants/platforms";
 import { adminAPI } from "@/api/admin";
 import type {
   AdminGroup,
@@ -4881,20 +4881,11 @@ const platformOptions = computed(() =>
 
 const platformFilterOptions = computed(() => [
   { value: "", label: t("admin.groups.allPlatforms") },
-  { value: "anthropic", label: "Anthropic" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "antigravity", label: "Antigravity" },
-  { value: "grok", label: "Grok" },
-  { value: "composite", label: "Composite" },
+  ...GROUP_PLATFORM_OPTIONS,
 ]);
 
 const compositeRoutePlatformOptions = computed(() => [
-  { value: "anthropic", label: "Anthropic" },
-  { value: "openai", label: "OpenAI" },
-  { value: "gemini", label: "Gemini" },
-  { value: "antigravity", label: "Antigravity" },
-  { value: "grok", label: "Grok" },
+  ...CONCRETE_PLATFORM_OPTIONS,
 ]);
 
 const compositeRouteEndpointOptions = computed(() => [

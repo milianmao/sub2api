@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
+import type { Account } from '@/types'
 import AccountActionMenu from '../AccountActionMenu.vue'
 
 vi.mock('vue-i18n', async () => {
@@ -24,8 +25,11 @@ function mountMenu(account: Record<string, unknown>) {
   return mount(AccountActionMenu, {
     props: {
       show: true,
-      account: account as any,
-      position: { top: 10, left: 20 }
+      account: account as Account,
+      anchorRect: {
+        top: 10, left: 20, width: 10, height: 10, bottom: 20, right: 30,
+        x: 20, y: 10, toJSON: () => '{}'
+      } as DOMRect
     },
     global: {
       stubs: {

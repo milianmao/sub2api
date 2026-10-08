@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { setActivePinia, createPinia } from 'pinia'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import type { AdminUser } from '@/types'
 import UserAllowedGroupsModal from '../UserAllowedGroupsModal.vue'
@@ -6,11 +6,16 @@ import UserAllowedGroupsModal from '../UserAllowedGroupsModal.vue'
 const mocks = vi.hoisted(() => ({ list: vi.fn(), update: vi.fn() }))
 vi.mock('@/api/admin', () => ({ adminAPI: { groups: { list: mocks.list }, users: { update: mocks.update } } }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess: vi.fn(), showError: vi.fn() }) }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', () => ({
+  createI18n: () => ({ global: { t: (key: string) => key } }),
+  useI18n: () => ({ t: (key: string) => key })
+}))
 enableAutoUnmount(afterEach)
 afterEach(() => vi.restoreAllMocks())
+vi.mock('@/stores/auth', () => ({ useAuthStore: () => ({ user: { id: 1, role: 'super_admin' } }) }))
 const response = { items: [{ id: 7, name: 'Exclusive', platform: 'openai', is_exclusive: true, subscription_type: 'standard', status: 'active', rate_multiplier: 1 }] }
 beforeEach(() => {
+  setActivePinia(createPinia())
   vi.clearAllMocks()
   vi.spyOn(console, 'error').mockImplementation(() => {})
   mocks.list.mockResolvedValue(response)
