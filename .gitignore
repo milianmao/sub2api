@@ -150,6 +150,10 @@ docs/*
 !docs/PLUGIN_DEVELOPMENT.md
 !docs/channel-monitor-v2-safe-defaults.md
 !docs/codex-credits.md
+!docs/design/
+!docs/design/*.md
+!docs/plans/
+!docs/plans/*.md
 !docs/legal/
 !docs/legal/*.md
 !docs/screenshots/
