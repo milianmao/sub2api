@@ -598,16 +598,24 @@ func (s *APIKeyService) Create(ctx context.Context, userID int64, req CreateAPIK
 		}
 	}
 
-	groupIDs, err := normalizeAPIKeyGroupIDs(req.GroupID, req.GroupIDs)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.validateAPIKeyGroupAccess(ctx, user, groupIDs); err != nil {
-		return nil, err
-	}
-	groupID := &groupIDs[0]
-	if req.GroupID != nil && slices.Contains(groupIDs, *req.GroupID) {
-		groupID = req.GroupID
+	// 本地多分组授权：显式指定分组时校验并归一化；未指定分组时沿用上游
+	// 默认分组语义（分组在鉴权阶段解析），不在此处拒绝。
+	var groupID *int64
+	var groupIDs []int64
+	if req.GroupID != nil || len(req.GroupIDs) > 0 {
+		normalized, err := normalizeAPIKeyGroupIDs(req.GroupID, req.GroupIDs)
+		if err != nil {
+			return nil, err
+		}
+		if err := s.validateAPIKeyGroupAccess(ctx, user, normalized); err != nil {
+			return nil, err
+		}
+		groupIDs = normalized
+		first := groupIDs[0]
+		groupID = &first
+		if req.GroupID != nil && slices.Contains(groupIDs, *req.GroupID) {
+			groupID = req.GroupID
+		}
 	}
 	if err := s.checkAPIKeyCreateLimits(ctx, userID); err != nil {
 		return nil, err

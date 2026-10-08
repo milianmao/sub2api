@@ -101,6 +101,12 @@ func (h *GatewayHandler) ChatCompletions(c *gin.Context) {
 	pricingCtx, pricingAt := service.WithGatewayTokenRequestPricing(c.Request.Context())
 	c.Request = c.Request.WithContext(pricingCtx)
 
+	// 客户端已断开（请求上下文已取消）时不再进入分组门禁与调度，
+	// 未提交的响应统一标记 499。
+	if c.Request.Context().Err() != nil {
+		failoverClientGone(c)
+		return
+	}
 	// Claude Code only restriction: /v1/chat/completions is never a Claude Code
 	// endpoint. With a fallback group the request continues and account selection
 	// (checkClaudeCodeRestriction) schedules it in the fallback group; without one
