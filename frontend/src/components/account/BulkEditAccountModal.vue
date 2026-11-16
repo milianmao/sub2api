@@ -218,6 +218,7 @@
           <input v-model="enableFallbackPool" id="bulk-edit-fallback-pool-enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500" />
         </div>
         <Select v-model="isFallback" :disabled="!enableFallbackPool" :options="[{ value: false, label: t('admin.accounts.primaryPool') }, { value: true, label: t('admin.accounts.fallbackPool') }]" />
+      </div>
       <!-- OpenAI images: size tier routing -->
       <div
         v-if="allOpenAIPassthroughCapable"

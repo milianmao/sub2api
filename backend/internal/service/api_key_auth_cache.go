@@ -158,8 +158,6 @@ type APIKeyAuthGroupSnapshot struct {
 	ProfitMinMargin      float64 `json:"profit_min_margin"`
 	ProfitSafetyBuffer   float64 `json:"profit_safety_buffer"`
 
-	// RequirePrivacySet 由 OpenAI 选号从 ctx 分组读取，与 GetByKeyForAuth 投影同步。
-	RequirePrivacySet bool `json:"require_privacy_set"`
 }
 
 // APIKeyAuthorizedGroupAuthSnapshot API Key 授权分组快照，保留优先级顺序。
