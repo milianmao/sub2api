@@ -180,7 +180,7 @@ func (s *adminServiceImpl) ensureNotLastAdmin(ctx context.Context) error {
 		return fmt.Errorf("count super admin users: %w", err)
 	}
 	if admins == nil || superAdmins == nil || admins.Total+superAdmins.Total <= 1 {
-		return errors.New("cannot demote the last admin user")
+		return infraerrors.BadRequest("LAST_ADMIN_DEMOTE_FORBIDDEN", "cannot demote the last admin user")
 	}
 	return nil
 }
@@ -234,7 +234,7 @@ func (s *adminServiceImpl) UpdateUser(ctx context.Context, id int64, input *Upda
 
 	// Protect admin users: cannot disable admin accounts
 	if user.IsAdmin() && input.Status == "disabled" {
-		return nil, errors.New("cannot disable admin user")
+		return nil, infraerrors.BadRequest("ADMIN_DISABLE_FORBIDDEN", "cannot disable admin user; change the role to user first")
 	}
 
 	oldConcurrency := user.Concurrency
@@ -398,7 +398,7 @@ func (s *adminServiceImpl) DeleteUser(ctx context.Context, id int64) error {
 		return err
 	}
 	if user.IsAdmin() {
-		return errors.New("cannot delete admin user")
+		return nil, infraerrors.BadRequest("ADMIN_DELETE_FORBIDDEN", "cannot delete admin user; change the role to user first")
 	}
 
 	apiKeys, err := s.listUserAPIKeysForDeletion(ctx, id)

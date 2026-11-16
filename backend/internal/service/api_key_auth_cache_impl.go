@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 25 // v25: preserve custom authorization fields with upstream model allowlist/codex manifest
+const apiKeyAuthSnapshotVersion = 28 // v28: 上游 v27 (group require_privacy_set) + 本地多分组授权快照字段
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -449,6 +449,7 @@ func groupSnapshotFromGroup(group *Group) *APIKeyAuthGroupSnapshot {
 		MinUserLevel: group.MinUserLevel, VisibleUserIDs: cloneAPIKeyAuthInt64Slice(group.VisibleUserIDs),
 		DailyLimitUSD: cloneAPIKeyAuthFloat64Ptr(group.DailyLimitUSD), WeeklyLimitUSD: cloneAPIKeyAuthFloat64Ptr(group.WeeklyLimitUSD), MonthlyLimitUSD: cloneAPIKeyAuthFloat64Ptr(group.MonthlyLimitUSD),
 		AllowImageGeneration: group.AllowImageGeneration, AllowBatchImageGeneration: group.AllowBatchImageGeneration,
+		ImageCountBilling: group.ImageCountBilling,
 		ImageRateIndependent: group.ImageRateIndependent, ImageRateMultiplier: group.ImageRateMultiplier,
 		ImagePrice1K: cloneAPIKeyAuthFloat64Ptr(group.ImagePrice1K), ImagePrice2K: cloneAPIKeyAuthFloat64Ptr(group.ImagePrice2K), ImagePrice4K: cloneAPIKeyAuthFloat64Ptr(group.ImagePrice4K),
 		BatchImageDiscountMultiplier: group.BatchImageDiscountMultiplier, BatchImageHoldMultiplier: group.BatchImageHoldMultiplier,
@@ -478,6 +479,7 @@ func groupFromAuthSnapshot(snapshot *APIKeyAuthGroupSnapshot) *Group {
 		MinUserLevel: snapshot.MinUserLevel, VisibleUserIDs: cloneAPIKeyAuthInt64Slice(snapshot.VisibleUserIDs),
 		DailyLimitUSD: cloneAPIKeyAuthFloat64Ptr(snapshot.DailyLimitUSD), WeeklyLimitUSD: cloneAPIKeyAuthFloat64Ptr(snapshot.WeeklyLimitUSD), MonthlyLimitUSD: cloneAPIKeyAuthFloat64Ptr(snapshot.MonthlyLimitUSD),
 		AllowImageGeneration: snapshot.AllowImageGeneration, AllowBatchImageGeneration: snapshot.AllowBatchImageGeneration,
+		ImageCountBilling: snapshot.ImageCountBilling,
 		ImageRateIndependent: snapshot.ImageRateIndependent, ImageRateMultiplier: snapshot.ImageRateMultiplier,
 		ImagePrice1K: cloneAPIKeyAuthFloat64Ptr(snapshot.ImagePrice1K), ImagePrice2K: cloneAPIKeyAuthFloat64Ptr(snapshot.ImagePrice2K), ImagePrice4K: cloneAPIKeyAuthFloat64Ptr(snapshot.ImagePrice4K),
 		BatchImageDiscountMultiplier: snapshot.BatchImageDiscountMultiplier, BatchImageHoldMultiplier: snapshot.BatchImageHoldMultiplier,
@@ -584,10 +586,11 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 	// 填充 (user, group) RPM override —— snapshot 构建时查一次 DB，后续请求零 DB 往返。
 	if apiKey.GroupID != nil && *apiKey.GroupID > 0 && s.userGroupRateRepo != nil {
 		override, err := s.userGroupRateRepo.GetRPMOverrideByUserAndGroup(ctx, apiKey.UserID, *apiKey.GroupID)
-		if err == nil && override != nil {
+		if err == nil {
 			snapshot.User.UserGroupRPMOverride = override
+			snapshot.User.UserGroupRPMOverrideGroupID = *apiKey.GroupID
 		}
-		// 查询失败或无 override 时留 nil，checkRPM 会回退到 DB 查询
+		// 查询失败时不记录分组，checkRPM 会回退到 DB 查询
 	}
 	snapshot.Group = groupSnapshotFromGroup(apiKey.Group)
 	snapshot.Groups = groupSnapshotsFromGroups(apiKey.Groups)
